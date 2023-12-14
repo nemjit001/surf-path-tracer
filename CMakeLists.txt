@@ -57,3 +57,19 @@ target_link_libraries(${TARGET_NAME}
 	VulkanMemoryAllocator
 	vk-bootstrap
 )
+
+# Generate shader output directory + build shaders for Surf
+add_custom_target(create-shader-dir ALL
+	COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET_NAME}>/shaders
+	COMMENT "Creating shader output directory"
+)
+
+foreach(SHADER IN LISTS PROJECT_SHADERS)
+	cmake_path(GET SHADER FILENAME SHADER_FILENAME)
+
+	add_custom_target(${SHADER_FILENAME} ALL
+		glslc ${SHADER} -o $<TARGET_FILE_DIR:${TARGET_NAME}>/shaders/${SHADER_FILENAME}.spv
+		COMMENT "Compiling shader ${SHADER_FILENAME}"
+		DEPENDS ${SHADER} ${PROJECT_SHADERS}
+	)
+endforeach()
