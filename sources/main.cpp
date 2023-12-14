@@ -1,7 +1,5 @@
 #include "surf.hpp"
 
-#include <iostream>
-
 int main()
 {
 	//
