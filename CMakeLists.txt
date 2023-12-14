@@ -26,10 +26,16 @@ option(VK_BOOTSTRAP_WERROR OFF)
 option(VK_BOOTSTRAP_TEST OFF)
 add_subdirectory(dependencies/vk-bootstrap/)
 
+file(GLOB PROJECT_SHADERS "shaders/*.glsl")
 file(GLOB PROJECT_HEADERS "headers/*.h")
 file(GLOB PROJECT_SOURCES "sources/*.cpp")
 
+source_group("Shaders" ${PROJECT_SHADERS})
+source_group("Headers" ${PROJECT_HEADERS})
+source_group("Sources" ${PROJECT_SOURCES})
+
 add_executable(${TARGET_NAME}
+	${PROJECT_SHADERS}
 	${PROJECT_HEADERS}
 	${PROJECT_SOURCES}
 )
