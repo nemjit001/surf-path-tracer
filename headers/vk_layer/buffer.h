@@ -4,5 +4,5 @@
 
 class Buffer
 {
-    Buffer(SizeType size);
+    //
 };
