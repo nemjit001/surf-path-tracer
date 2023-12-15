@@ -12,6 +12,7 @@
 
 #include "surf.h"
 #include "types.h"
+#include "vk_layer/vk_check.h"
 
 Renderer::Renderer()
     :
@@ -71,11 +72,7 @@ void Renderer::init(GLFWwindow* window)
 
     m_instace = instanceResult.value();
 
-    // TODO: create surface using GLFW
-    if (glfwCreateWindowSurface(m_instace, m_window, nullptr, &m_renderSurface) != VK_SUCCESS)
-    {
-        // TODO: handle error
-    }
+    VK_CHECK(glfwCreateWindowSurface(m_instace, m_window, nullptr, &m_renderSurface));
 
     // Choose a GPU that supports the required features
     vkb::PhysicalDeviceSelector gpuSelector(m_instace);
@@ -120,10 +117,7 @@ void Renderer::init(GLFWwindow* window)
     allocatorCreateInfo.device = m_device;
     allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
 
-    if (vmaCreateAllocator(&allocatorCreateInfo, &m_allocator) != VK_SUCCESS)
-    {
-        // TODO: handle error
-    }
+    VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_allocator));
 }
 
 void Renderer::destroy()

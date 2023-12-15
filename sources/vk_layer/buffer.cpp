@@ -44,6 +44,11 @@ Buffer::Buffer(VmaAllocator allocator, SizeType size, VkBufferUsageFlags bufferU
     );
 }
 
+Buffer::~Buffer()
+{
+    destroy();
+}
+
 Buffer::Buffer(Buffer&& other)
     :
     m_allocator(other.m_allocator),
@@ -81,11 +86,6 @@ void Buffer::copyToBuffer(SizeType size, const void* data)
 
     memcpy(pBufferData, data, size);
     vmaUnmapMemory(m_allocator, m_allocation);
-}
-
-Buffer::~Buffer()
-{
-    destroy();
 }
 
 void Buffer::destroy()
