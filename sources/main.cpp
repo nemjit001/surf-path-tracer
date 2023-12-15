@@ -17,6 +17,8 @@ int main()
 	Renderer renderer;
 	renderer.init(window);
 
+	// TODO: load scene
+
 	printf("Initialized Surf\n");
 
 	while (!glfwWindowShouldClose(window))
