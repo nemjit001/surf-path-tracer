@@ -7,6 +7,7 @@
 #include <vulkan/vulkan.h>
 
 #include "surf.h"
+#include "types.h"
 
 Renderer::Renderer()
     :
@@ -115,7 +116,7 @@ void Renderer::destroy()
     vkb::destroy_instance(m_instace);
 }
 
-void Renderer::render(float deltaTime)
+void Renderer::render(F32 deltaTime)
 {
     // Tick renderer
 }

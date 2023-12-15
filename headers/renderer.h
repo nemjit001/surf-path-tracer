@@ -6,6 +6,8 @@
 #include <VkBootstrap.h>
 #include <vulkan/vulkan.h>
 
+#include "types.h"
+
 class Renderer
 {
 public:
@@ -15,7 +17,7 @@ public:
 
     void destroy();
 
-    void render(float deltaTime);
+    void render(F32 deltaTime);
 
 private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
