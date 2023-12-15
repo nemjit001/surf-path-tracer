@@ -4,6 +4,7 @@
 
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 #include "types.h"
