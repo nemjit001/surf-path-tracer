@@ -1,5 +1,7 @@
 #pragma once
 
+#define GLFW_INCLUDE_VULKAN
+
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
 #include <vulkan/vulkan.h>
@@ -30,5 +32,4 @@ private:
     vkb::PhysicalDevice m_gpu;
     vkb::Device m_device;
     vkb::Swapchain m_swapchain;
-
 };

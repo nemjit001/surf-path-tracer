@@ -1,6 +1,6 @@
 #include "surf.h"
 
-#define GLFW_INCLUDE_VULKAN
+#define GLFW_INCLUDE_NONE
 
 #include <cstdio>
 #include <GLFW/glfw3.h>
