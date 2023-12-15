@@ -35,4 +35,5 @@ private:
     vkb::PhysicalDevice m_gpu;
     vkb::Device m_device;
     vkb::Swapchain m_swapchain;
+    VmaAllocator m_allocator;
 };

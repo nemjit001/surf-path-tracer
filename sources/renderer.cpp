@@ -20,7 +20,8 @@ Renderer::Renderer()
     m_renderSurface(VK_NULL_HANDLE),
     m_gpu(),
     m_device(),
-    m_swapchain()
+    m_swapchain(),
+    m_allocator(VK_NULL_HANDLE)
 {
     //
 }
@@ -110,10 +111,24 @@ void Renderer::init(GLFWwindow* window)
         .build();
 
     m_swapchain = swapchainResult.value();
+
+    // Create an allocator for Vulkan resources
+    VmaAllocatorCreateInfo allocatorCreateInfo = {};
+    allocatorCreateInfo.flags = 0;
+    allocatorCreateInfo.instance = m_instace;
+    allocatorCreateInfo.physicalDevice = m_gpu;
+    allocatorCreateInfo.device = m_device;
+    allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+
+    if (vmaCreateAllocator(&allocatorCreateInfo, &m_allocator) != VK_SUCCESS)
+    {
+        // TODO: handle error
+    }
 }
 
 void Renderer::destroy()
 {
+    vmaDestroyAllocator(m_allocator);
     vkb::destroy_swapchain(m_swapchain);
     vkb::destroy_device(m_device);
     vkb::destroy_surface(m_instace, m_renderSurface);
