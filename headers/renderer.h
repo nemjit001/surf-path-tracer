@@ -8,6 +8,7 @@
 #include <vulkan/vulkan.h>
 
 #include "types.h"
+#include "vk_layer/pipeline.h"
 
 class Renderer
 {
@@ -36,4 +37,6 @@ private:
     vkb::Device m_device;
     vkb::Swapchain m_swapchain;
     VmaAllocator m_allocator;
+    PipelineLayout m_presentPipelineLayout;
+    GraphicsPipeline m_presentPipeline;
 };
