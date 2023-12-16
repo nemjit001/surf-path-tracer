@@ -170,7 +170,52 @@ void Renderer::destroy()
 
 void Renderer::render(F32 deltaTime)
 {
-    // Tick renderer
+    U32 availableSwapImage = 0;
+    VkResult acquireResult = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, VK_NULL_HANDLE, VK_NULL_HANDLE, &availableSwapImage);
+    if (acquireResult != VK_SUCCESS)
+    {
+        if (acquireResult == VK_SUBOPTIMAL_KHR || acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            // recreate swapchain
+            return; // cannot submit work to newly created swapchain yet -> wait for next frame
+        }
+        else
+        {
+            // Abort execution
+        }
+    }
+
+    VkSubmitInfo presentPassSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    presentPassSubmit.commandBufferCount = 0;
+    presentPassSubmit.pCommandBuffers = nullptr;
+    presentPassSubmit.waitSemaphoreCount = 0;
+    presentPassSubmit.pWaitSemaphores = nullptr;
+    presentPassSubmit.pWaitDstStageMask = nullptr;
+    presentPassSubmit.signalSemaphoreCount = 0;
+    presentPassSubmit.pSignalSemaphores = nullptr;
+
+    VK_CHECK(vkQueueSubmit(VK_NULL_HANDLE, 1, &presentPassSubmit, VK_NULL_HANDLE));
+
+    VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &m_swapchain.swapchain;
+    presentInfo.pImageIndices = &availableSwapImage;
+    presentInfo.pResults = nullptr;
+    presentInfo.waitSemaphoreCount = 0;
+    presentInfo.pWaitSemaphores = nullptr;
+
+    VkResult presentResult = vkQueuePresentKHR(VK_NULL_HANDLE, &presentInfo);
+    if (presentResult != VK_SUCCESS)
+    {
+        if (presentResult == VK_SUBOPTIMAL_KHR || presentResult == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            // recreate swapchain
+        }
+        else
+        {
+            // Abort execution
+        }
+    }
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL Renderer::debugCallback(
