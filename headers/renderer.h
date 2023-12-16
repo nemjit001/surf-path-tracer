@@ -9,6 +9,7 @@
 
 #include "types.h"
 #include "vk_layer/pipeline.h"
+#include "vk_layer/render_pass.h"
 
 class Renderer
 {
@@ -37,6 +38,7 @@ private:
     vkb::Device m_device;
     vkb::Swapchain m_swapchain;
     VmaAllocator m_allocator;
+    RenderPass m_presentPass;
     PipelineLayout m_presentPipelineLayout;
     GraphicsPipeline m_presentPipeline;
 };

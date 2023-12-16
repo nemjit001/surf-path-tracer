@@ -23,6 +23,7 @@ Renderer::Renderer()
     m_device(),
     m_swapchain(),
     m_allocator(VK_NULL_HANDLE),
+    m_presentPass(),
     m_presentPipelineLayout(),
     m_presentPipeline()
 {
@@ -121,7 +122,8 @@ void Renderer::init(GLFWwindow* window)
 
     VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_allocator));
 
-    // Set up present pipeline
+    // Set up present pass, layout & pipeline
+    m_presentPass.init(m_device, m_swapchain.image_format);
     m_presentPipelineLayout.init(m_device);
 
     // Set up a viewport for the window size
@@ -133,13 +135,19 @@ void Renderer::init(GLFWwindow* window)
         0.0f, 1.0f
     };
 
-    m_presentPipeline.init(m_device, renderViewport, m_presentPipelineLayout);
+    m_presentPipeline.init(
+        m_device,
+        renderViewport,
+        m_presentPass,
+        m_presentPipelineLayout
+    );
 }
 
 void Renderer::destroy()
 {
     m_presentPipeline.destroy();
     m_presentPipelineLayout.destroy();
+    m_presentPass.destroy();
 
     vmaDestroyAllocator(m_allocator);
     vkb::destroy_swapchain(m_swapchain);

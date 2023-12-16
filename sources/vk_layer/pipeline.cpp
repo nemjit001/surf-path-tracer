@@ -2,6 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "types.h"
+#include "vk_layer/render_pass.h"
 #include "vk_layer/vk_check.h"
 
 PipelineLayout::PipelineLayout()
@@ -66,7 +68,7 @@ GraphicsPipeline::GraphicsPipeline()
 
 }
 
-void GraphicsPipeline::init(VkDevice device, Viewport viewport, const PipelineLayout& layout)
+void GraphicsPipeline::init(VkDevice device, Viewport viewport, const RenderPass& renderPass, const PipelineLayout& layout)
 {
     m_device = device;
 
@@ -172,7 +174,7 @@ void GraphicsPipeline::init(VkDevice device, Viewport viewport, const PipelineLa
     createInfo.pColorBlendState = &colorBlendState;
     createInfo.pDynamicState = &dynamicState;
     createInfo.layout = layout.handle();
-    createInfo.renderPass = VK_NULL_HANDLE;
+    createInfo.renderPass = renderPass.handle();
     createInfo.subpass = 0;
     createInfo.basePipelineHandle = VK_NULL_HANDLE;
     createInfo.basePipelineIndex = 0;

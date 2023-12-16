@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include "types.h"
+#include "vk_layer/render_pass.h"
 
 struct Viewport
 {
@@ -41,7 +42,7 @@ class GraphicsPipeline
 public:
     GraphicsPipeline();
 
-    void init(VkDevice device, Viewport viewport, const PipelineLayout& layout);
+    void init(VkDevice device, Viewport viewport, const RenderPass& renderPass, const PipelineLayout& layout);
 
     void destroy();
 
