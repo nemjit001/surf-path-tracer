@@ -1,9 +1,11 @@
 #include "vk_layer/pipeline.h"
 
+#include <vector>
 #include <vulkan/vulkan.h>
 
 #include "types.h"
 #include "vk_layer/render_pass.h"
+#include "vk_layer/shader.h"
 #include "vk_layer/vk_check.h"
 
 PipelineLayout::PipelineLayout()
@@ -68,9 +70,28 @@ GraphicsPipeline::GraphicsPipeline()
 
 }
 
-void GraphicsPipeline::init(VkDevice device, Viewport viewport, const RenderPass& renderPass, const PipelineLayout& layout)
+void GraphicsPipeline::init(
+    VkDevice device,
+    Viewport viewport,
+    const RenderPass& renderPass,
+    const PipelineLayout& layout,
+    const std::vector<Shader*>& shaders
+)
 {
     m_device = device;
+
+    std::vector<VkPipelineShaderStageCreateInfo> stages = {};
+    for (auto const& shader : shaders)
+    {
+        VkPipelineShaderStageCreateInfo shaderStage = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        shaderStage.flags = 0;
+        shaderStage.stage = shader->stage();
+        shaderStage.module = shader->handle();
+        shaderStage.pName = "main";
+        shaderStage.pSpecializationInfo = nullptr;
+
+        stages.push_back(shaderStage);
+    }
 
     VkPipelineVertexInputStateCreateInfo vertexInputState = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
     vertexInputState.flags = 0;
@@ -162,8 +183,8 @@ void GraphicsPipeline::init(VkDevice device, Viewport viewport, const RenderPass
 
     VkGraphicsPipelineCreateInfo createInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
     createInfo.flags = 0;
-    createInfo.stageCount = 0;
-    createInfo.pStages = nullptr;
+    createInfo.stageCount = static_cast<U32>(stages.size());
+    createInfo.pStages = stages.data();
     createInfo.pVertexInputState = &vertexInputState;
     createInfo.pInputAssemblyState = &inputAssemblyState;
     createInfo.pTessellationState = nullptr;

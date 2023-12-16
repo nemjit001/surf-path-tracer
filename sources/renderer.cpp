@@ -12,6 +12,8 @@
 
 #include "surf.h"
 #include "types.h"
+#include "vk_layer/render_pass.h"
+#include "vk_layer/shader.h"
 #include "vk_layer/vk_check.h"
 
 Renderer::Renderer()
@@ -135,12 +137,22 @@ void Renderer::init(GLFWwindow* window)
         0.0f, 1.0f
     };
 
+    // Instantiate shaders
+    Shader presentVertShader;
+    Shader presentFragShader;
+    presentVertShader.initFromFile(m_device, ShaderType::Vertex, "shaders/fs_quad_vert.glsl.spv");
+    presentFragShader.initFromFile(m_device, ShaderType::Fragment, "shaders/fs_quad_frag.glsl.spv");
+
     m_presentPipeline.init(
         m_device,
         renderViewport,
         m_presentPass,
-        m_presentPipelineLayout
+        m_presentPipelineLayout,
+        { &presentVertShader, &presentFragShader }
     );
+
+    presentVertShader.destroy();
+    presentFragShader.destroy();
 }
 
 void Renderer::destroy()

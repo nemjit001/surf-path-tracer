@@ -1,9 +1,11 @@
 #pragma once
 
+#include <vector>
 #include <vulkan/vulkan.h>
 
 #include "types.h"
 #include "vk_layer/render_pass.h"
+#include "vk_layer/shader.h"
 
 struct Viewport
 {
@@ -42,7 +44,13 @@ class GraphicsPipeline
 public:
     GraphicsPipeline();
 
-    void init(VkDevice device, Viewport viewport, const RenderPass& renderPass, const PipelineLayout& layout);
+    void init(
+        VkDevice device,
+        Viewport viewport,
+        const RenderPass& renderPass,
+        const PipelineLayout& layout,
+        const std::vector<Shader*>& shaders
+    );
 
     void destroy();
 
