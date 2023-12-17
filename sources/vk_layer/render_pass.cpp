@@ -5,18 +5,11 @@
 #include "types.h"
 #include "vk_layer/vk_check.h"
 
-RenderPass::RenderPass()
+RenderPass::RenderPass(VkDevice device, VkFormat colorFormat)
     :
-    m_device(VK_NULL_HANDLE),
+    m_device(device),
     m_renderPass(VK_NULL_HANDLE)
 {
-    //
-}
-
-void RenderPass::init(VkDevice device, VkFormat colorFormat)
-{
-    m_device = device;
-
     VkAttachmentDescription swapAttachment = {};
     swapAttachment.flags = 0;
     swapAttachment.format = colorFormat;
@@ -56,12 +49,39 @@ void RenderPass::init(VkDevice device, VkFormat colorFormat)
     VK_CHECK(vkCreateRenderPass(m_device, &createInfo, nullptr, &m_renderPass));
 }
 
-void RenderPass::destroy()
+RenderPass::~RenderPass()
 {
-    vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+    release();
+}
+
+RenderPass::RenderPass(RenderPass&& other) noexcept
+    :
+    m_device(other.m_device),
+    m_renderPass(other.m_renderPass)
+{
+    other.m_renderPass = VK_NULL_HANDLE;
+}
+
+RenderPass& RenderPass::operator=(RenderPass&& other) noexcept
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+
+    this->release();
+    this->m_device = other.m_device;
+    this->m_renderPass = other.m_renderPass;
+
+    return *this;
 }
 
 VkRenderPass RenderPass::handle() const
 {
     return m_renderPass;
+}
+
+void RenderPass::release()
+{
+    vkDestroyRenderPass(m_device, m_renderPass, nullptr);
 }

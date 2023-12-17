@@ -9,20 +9,12 @@
 #include "types.h"
 #include "vk_layer/vk_check.h"
 
-Shader::Shader()
+Shader::Shader(VkDevice device, ShaderType type, const std::string& path)
     :
-    m_device(VK_NULL_HANDLE),
-    m_type(ShaderType::Undefined),
+    m_device(device),
+    m_type(type),
     m_shader(VK_NULL_HANDLE)
 {
-    //
-}
-
-void Shader::initFromFile(VkDevice device, ShaderType type, const std::string& path)
-{
-    m_device = device;
-    m_type = type;
-
     std::ifstream file(path, std::ios::binary | std::ios::ate);
 
     if (!file.good())
@@ -34,7 +26,7 @@ void Shader::initFromFile(VkDevice device, ShaderType type, const std::string& p
     SizeType codeSize = file.tellg();
     file.seekg(std::ios::beg);
 
-    char* byteCode = new char[codeSize + 1]{};
+    char* byteCode = new char[codeSize + 1] {};
     file.read(byteCode, codeSize);
     file.close();
 
@@ -47,9 +39,33 @@ void Shader::initFromFile(VkDevice device, ShaderType type, const std::string& p
     delete[] byteCode;
 }
 
-void Shader::destroy()
+Shader::~Shader()
 {
-    vkDestroyShaderModule(m_device, m_shader, nullptr);
+    release();
+}
+
+Shader::Shader(Shader&& other) noexcept
+    :
+    m_device(other.m_device),
+    m_type(other.m_type),
+    m_shader(other.m_shader)
+{
+    other.m_shader = VK_NULL_HANDLE;
+}
+
+Shader& Shader::operator=(Shader&& other) noexcept
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+
+    this->release();
+    this->m_device = other.m_device;
+    this->m_type = other.m_type;
+    this->m_shader = other.m_shader;
+
+    return *this;
 }
 
 VkShaderStageFlagBits Shader::stage() const
@@ -76,6 +92,10 @@ VkShaderStageFlagBits Shader::stage() const
 
 VkShaderModule Shader::handle() const
 {
-    assert(m_type != ShaderType::Undefined);
     return m_shader;
+}
+
+void Shader::release()
+{
+    vkDestroyShaderModule(m_device, m_shader, nullptr);
 }

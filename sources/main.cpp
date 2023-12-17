@@ -19,8 +19,14 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, PROGRAM_NAME, nullptr, nullptr);
+
+	RenderResulution resolution = RenderResulution{
+		SCR_WIDTH,
+		SCR_HEIGHT
+	};
+
 	RenderContext renderContext(window);
-	Renderer renderer(std::move(renderContext));
+	Renderer renderer(std::move(renderContext), resolution);
 
 	// TODO: load scene
 

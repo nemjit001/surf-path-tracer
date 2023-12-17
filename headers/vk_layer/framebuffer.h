@@ -9,9 +9,7 @@
 class Framebuffer
 {
 public:
-    Framebuffer();
-
-    void init(
+    Framebuffer(
         VkDevice device,
         const RenderPass& renderPass,
         const std::vector<VkImageView>& attachments,
@@ -20,9 +18,18 @@ public:
         U32 layers = 1
     );
 
-    void destroy();
+    ~Framebuffer();
+
+    Framebuffer(const Framebuffer&) = delete;
+    Framebuffer& operator=(const Framebuffer&) = delete;
+
+    Framebuffer(Framebuffer&& other) noexcept;
+    Framebuffer& operator=(Framebuffer&& other) noexcept;
 
     VkFramebuffer handle() const;
+
+private:
+    void release();
 
 private:
     VkDevice m_device;

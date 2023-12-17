@@ -10,6 +10,12 @@
 
 #define FRAMES_IN_FLIGHT 2
 
+struct RenderResulution
+{
+    U32 width;
+    U32 height;
+};
+
 struct FrameData
 {
     VkCommandPool pool;
@@ -22,7 +28,7 @@ struct FrameData
 class Renderer
 {
 public:
-    Renderer(RenderContext renderContext);
+    Renderer(RenderContext renderContext, RenderResulution resolution);
 
     ~Renderer();
 

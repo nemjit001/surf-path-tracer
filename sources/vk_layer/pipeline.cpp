@@ -8,18 +8,11 @@
 #include "vk_layer/shader.h"
 #include "vk_layer/vk_check.h"
 
-PipelineLayout::PipelineLayout()
+PipelineLayout::PipelineLayout(VkDevice device)
     :
-    m_device(VK_NULL_HANDLE),
+    m_device(device),
     m_layout(VK_NULL_HANDLE)
 {
-    //
-}
-
-void PipelineLayout::init(VkDevice device)
-{
-    m_device = device;
-
     VkPipelineLayoutCreateInfo createInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
     createInfo.flags = 0;
     createInfo.pushConstantRangeCount = 0;
@@ -30,14 +23,41 @@ void PipelineLayout::init(VkDevice device)
     VK_CHECK(vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_layout));
 }
 
-void PipelineLayout::destroy()
+PipelineLayout::~PipelineLayout()
 {
-    vkDestroyPipelineLayout(m_device, m_layout, nullptr);
+    release();
+}
+
+PipelineLayout::PipelineLayout(PipelineLayout&& other) noexcept
+    :
+    m_device(other.m_device),
+    m_layout(other.m_layout)
+{
+    other.m_layout = VK_NULL_HANDLE;
+}
+
+PipelineLayout& PipelineLayout::operator=(PipelineLayout&& other) noexcept
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+
+    this->release();
+    this->m_device = other.m_device;
+    this->m_layout = other.m_layout;
+
+    return *this;
 }
 
 VkPipelineLayout PipelineLayout::handle() const
 {
     return m_layout;
+}
+
+void PipelineLayout::release()
+{
+    vkDestroyPipelineLayout(m_device, m_layout, nullptr);
 }
 
 GraphicsPipeline::GraphicsPipeline()
@@ -53,7 +73,7 @@ void GraphicsPipeline::init(
     Viewport viewport,
     const RenderPass& renderPass,
     const PipelineLayout& layout,
-    const std::vector<Shader>& shaders
+    const std::vector<Shader*>& shaders
 )
 {
     m_device = device;
@@ -63,8 +83,8 @@ void GraphicsPipeline::init(
     {
         VkPipelineShaderStageCreateInfo shaderStage = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         shaderStage.flags = 0;
-        shaderStage.stage = shader.stage();
-        shaderStage.module = shader.handle();
+        shaderStage.stage = shader->stage();
+        shaderStage.module = shader->handle();
         shaderStage.pName = "main";
         shaderStage.pSpecializationInfo = nullptr;
 

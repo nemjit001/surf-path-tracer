@@ -16,14 +16,14 @@
 #include "vk_layer/shader.h"
 #include "vk_layer/vk_check.h"
 
-Renderer::Renderer(RenderContext renderContext)
+Renderer::Renderer(RenderContext renderContext, RenderResulution resolution)
     :
     m_context(std::move(renderContext)),
     m_currentFrame(0),
     m_frames{},
-    m_presentPass(),
+    m_presentPass(m_context.device, m_context.swapchain.image_format),
     m_framebuffers(),
-    m_presentPipelineLayout(),
+    m_presentPipelineLayout(m_context.device),
     m_presentPipeline()
 {
     // Set up per frame structures
@@ -52,46 +52,32 @@ Renderer::Renderer(RenderContext renderContext)
         VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
     }
 
-    // Set up present pass
-    m_presentPass.init(m_context.device, m_context.swapchain.image_format);
-
     // Create framebuffers for swapchain images
-    U32 width = 0, height = 0;
-    m_context.getFramebufferSize(width, height);
     m_framebuffers.reserve(m_context.swapchain.image_count);
     for (const auto& imageView : m_context.swapImageViews)
     {
-        Framebuffer swapFramebuffer;
-        swapFramebuffer.init(m_context.device, m_presentPass, { imageView }, 1280, 720);
-        m_framebuffers.push_back(swapFramebuffer);
+        Framebuffer swapFramebuffer(m_context.device, m_presentPass, { imageView }, resolution.width, resolution.height);
+        m_framebuffers.push_back(std::move(swapFramebuffer));
     }
-
-    // Set up pipeline layout & pipeline
-    m_presentPipelineLayout.init(m_context.device);
 
     // Set up a viewport for the window size
     Viewport renderViewport = Viewport {
         0, 0,   // Offset of viewport in (X, Y)
-        static_cast<U32>(width), static_cast<U32>(height),
+        resolution.width, resolution.height,
         0.0f, 1.0f
     };
 
-    // Instantiate shaders
-    Shader presentVertShader;
-    Shader presentFragShader;
-    presentVertShader.initFromFile(m_context.device, ShaderType::Vertex, "shaders/fs_quad_vert.glsl.spv");
-    presentFragShader.initFromFile(m_context.device, ShaderType::Fragment, "shaders/fs_quad_frag.glsl.spv");
+    // Instantiate shaders & pipeline
+    Shader presentVertShader(m_context.device, ShaderType::Vertex, "shaders/fs_quad_vert.glsl.spv");
+    Shader presentFragShader(m_context.device, ShaderType::Fragment, "shaders/fs_quad_frag.glsl.spv");
 
     m_presentPipeline.init(
         m_context.device,
         renderViewport,
         m_presentPass,
         m_presentPipelineLayout,
-        { presentVertShader, presentFragShader }
+        { &presentVertShader, &presentFragShader }
     );
-
-    presentVertShader.destroy();
-    presentFragShader.destroy();
 }
 
 Renderer::~Renderer()
@@ -99,14 +85,6 @@ Renderer::~Renderer()
     vkDeviceWaitIdle(m_context.device);
 
     m_presentPipeline.destroy();
-    m_presentPipelineLayout.destroy();
-
-    for (auto& framebuffer : m_framebuffers)
-    {
-        framebuffer.destroy();
-    }
-
-    m_presentPass.destroy();
 
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {

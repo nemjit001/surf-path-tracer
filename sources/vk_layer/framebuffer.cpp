@@ -6,15 +6,7 @@
 #include "vk_layer/render_pass.h"
 #include "vk_layer/vk_check.h"
 
-Framebuffer::Framebuffer()
-    :
-    m_device(VK_NULL_HANDLE),
-    m_framebuffer(VK_NULL_HANDLE)
-{
-    //
-}
-
-void Framebuffer::init(
+Framebuffer::Framebuffer(
     VkDevice device,
     const RenderPass& renderPass,
     const std::vector<VkImageView>& attachments,
@@ -22,9 +14,10 @@ void Framebuffer::init(
     U32 height,
     U32 layers
 )
+    :
+    m_device(device),
+    m_framebuffer(VK_NULL_HANDLE)
 {
-    m_device = device;
-
     VkFramebufferCreateInfo createInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     createInfo.flags = 0;
     createInfo.renderPass = renderPass.handle();
@@ -37,12 +30,39 @@ void Framebuffer::init(
     VK_CHECK(vkCreateFramebuffer(m_device, &createInfo, nullptr, &m_framebuffer));
 }
 
-void Framebuffer::destroy()
+Framebuffer::~Framebuffer()
 {
-    vkDestroyFramebuffer(m_device, m_framebuffer, nullptr);
+    release();
+}
+
+Framebuffer::Framebuffer(Framebuffer&& other) noexcept
+    :
+    m_device(other.m_device),
+    m_framebuffer(other.m_framebuffer)
+{
+    other.m_framebuffer = VK_NULL_HANDLE;
+}
+
+Framebuffer& Framebuffer::operator=(Framebuffer&& other) noexcept
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+
+    this->release();
+    this->m_device = other.m_device;
+    this->m_framebuffer = other.m_framebuffer;
+
+    return *this;
 }
 
 VkFramebuffer Framebuffer::handle() const
 {
     return m_framebuffer;
+}
+
+void Framebuffer::release()
+{
+    vkDestroyFramebuffer(m_device, m_framebuffer, nullptr);
 }

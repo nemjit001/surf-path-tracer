@@ -20,13 +20,20 @@ struct Viewport
 class PipelineLayout
 {
 public:
-    PipelineLayout();
+    PipelineLayout(VkDevice device);
 
-    void init(VkDevice device);
+    ~PipelineLayout();
 
-    void destroy();
+    PipelineLayout(PipelineLayout&) = delete;
+    PipelineLayout& operator=(PipelineLayout&) = delete;
+
+    PipelineLayout(PipelineLayout&&other) noexcept;
+    PipelineLayout& operator=(PipelineLayout&&other) noexcept;
 
     VkPipelineLayout handle() const;
+
+private:
+    void release();
 
 private:
     VkDevice m_device;
@@ -43,7 +50,7 @@ public:
         Viewport viewport,
         const RenderPass& renderPass,
         const PipelineLayout& layout,
-        const std::vector<Shader>& shaders
+        const std::vector<Shader*>& shaders
     );
 
     void destroy();
