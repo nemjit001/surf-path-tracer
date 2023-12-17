@@ -24,13 +24,16 @@ Renderer::Renderer()
     m_gpu(),
     m_device(),
     m_swapchain(),
-    m_framebuffers(),
     m_allocator(VK_NULL_HANDLE),
     m_transferQueue(VK_NULL_HANDLE),
     m_computeQueue(VK_NULL_HANDLE),
     m_graphicsQueue(VK_NULL_HANDLE),
     m_presentQueue(VK_NULL_HANDLE),
+    m_currentFrame(0),
+    m_frames{},
     m_presentPass(),
+    m_swapImageViews(),
+    m_framebuffers(),
     m_presentPipelineLayout(),
     m_presentPipeline()
 {
@@ -151,6 +154,23 @@ void Renderer::init(GLFWwindow* window)
     m_graphicsQueue = graphicsQueue.value();
     m_presentQueue = presentQueue.value();
 
+    // Set up per frame structures
+    for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
+        VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+        poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolCreateInfo.queueFamilyIndex = m_device.get_queue_index(vkb::QueueType::graphics).value();
+
+        VK_CHECK(vkCreateCommandPool(m_device, &poolCreateInfo, nullptr, &m_frames[i].pool));
+
+        VkCommandBufferAllocateInfo bufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        bufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        bufferAllocateInfo.commandPool = m_frames[i].pool;
+        bufferAllocateInfo.commandBufferCount = 1;
+
+        VK_CHECK(vkAllocateCommandBuffers(m_device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
+    }
+
     // Set up present pass
     m_presentPass.init(m_device, m_swapchain.image_format);
 
@@ -211,6 +231,11 @@ void Renderer::destroy()
     }
 
     m_presentPass.destroy();
+
+    for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
+        vkDestroyCommandPool(m_device, m_frames[i].pool, nullptr);
+    }
 
     vmaDestroyAllocator(m_allocator);
     vkb::destroy_swapchain(m_swapchain);

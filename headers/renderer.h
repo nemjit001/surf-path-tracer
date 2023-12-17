@@ -13,6 +13,14 @@
 #include "vk_layer/pipeline.h"
 #include "vk_layer/render_pass.h"
 
+#define FRAMES_IN_FLIGHT 2
+
+struct FrameData
+{
+    VkCommandPool pool;
+    VkCommandBuffer commandBuffer;
+};
+
 class Renderer
 {
 public:
@@ -47,6 +55,10 @@ private:
     VkQueue m_computeQueue;
     VkQueue m_graphicsQueue;
     VkQueue m_presentQueue;
+
+    // Renderer Frame management
+    SizeType m_currentFrame;
+    FrameData m_frames[FRAMES_IN_FLIGHT];
 
     // Default render pass w/ framebuffers
     RenderPass m_presentPass;
