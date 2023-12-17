@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 
 #include "renderer.h"
+#include "timer.h"
 
 int main()
 {
@@ -19,11 +20,18 @@ int main()
 
 	// TODO: load scene
 
+	// Create frame timer
+	Timer frameTimer;
+
 	printf("Initialized Surf\n");
 
 	while (!glfwWindowShouldClose(window))
 	{
-		renderer.render(0.0f);
+		frameTimer.tick();
+		F32 deltaTime  = frameTimer.deltaTime();
+    	printf("%08.2fms (%08.2ffps)\n", deltaTime * 1'000.0f, 1.0f / deltaTime);
+
+		renderer.render(deltaTime);
 		glfwPollEvents();
 	}
 
