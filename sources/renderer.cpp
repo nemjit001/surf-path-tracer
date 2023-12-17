@@ -6,13 +6,15 @@
 
 #include "surf.h"
 #include "types.h"
+#include "surface.h"
 #include "vk_layer/render_pass.h"
 #include "vk_layer/shader.h"
 #include "vk_layer/vk_check.h"
 
-Renderer::Renderer(RenderContext renderContext, RenderResulution resolution)
+Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Surface surface)
     :
     m_context(std::move(renderContext)),
+    m_renderResult(surface),
     m_currentFrame(0),
     m_frames{},
     m_presentPass(m_context.device, m_context.swapchain.image_format),
