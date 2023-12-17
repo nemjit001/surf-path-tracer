@@ -114,6 +114,7 @@ void Renderer::init(GLFWwindow* window)
     vkb::Result<vkb::Swapchain> swapchainResult = swapchainBuilder
         .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
         .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .set_required_min_image_count(vkb::SwapchainBuilder::BufferMode::TRIPLE_BUFFERING)
         .set_clipped(false)
         .set_image_usage_flags(
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
