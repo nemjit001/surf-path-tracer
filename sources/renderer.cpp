@@ -318,6 +318,8 @@ void Renderer::render(F32 deltaTime)
     VK_CHECK(vkResetFences(m_device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty rest flags */ 0));
 
+    // TODO: For pixel in screen buffer (CPU RAM buffer) do Kajiya Path Tracing -> massively parallel w/ openMP?
+
     const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
     recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
 
