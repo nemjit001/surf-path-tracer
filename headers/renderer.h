@@ -30,6 +30,12 @@ public:
 
     void destroy();
 
+    void recordFrame(
+        VkCommandBuffer commandBuffer,
+        const Framebuffer& framebuffer,
+        const RenderPass& renderPass
+    );
+
     void render(F32 deltaTime);
 
 private:

@@ -48,6 +48,10 @@ public:
 
     void destroy();
 
+    VkPipelineBindPoint bindPoint() const;
+
+    VkPipeline handle() const;
+
 private:
     VkDevice m_device;
     VkPipeline m_pipeline;

@@ -185,3 +185,13 @@ void GraphicsPipeline::destroy()
 {
     vkDestroyPipeline(m_device, m_pipeline, nullptr);
 }
+
+VkPipelineBindPoint GraphicsPipeline::bindPoint() const
+{
+    return VK_PIPELINE_BIND_POINT_GRAPHICS;
+}
+
+VkPipeline GraphicsPipeline::handle() const
+{
+    return m_pipeline;
+}

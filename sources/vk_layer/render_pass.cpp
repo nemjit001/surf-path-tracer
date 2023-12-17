@@ -35,8 +35,8 @@ void RenderPass::init(VkDevice device, VkFormat colorFormat)
     VkSubpassDescription subpass = {};
     subpass.flags = 0;
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 0;
-    subpass.pColorAttachments = nullptr;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &swapAttachmentRef;
     subpass.pResolveAttachments = nullptr;
     subpass.pDepthStencilAttachment = nullptr;
     subpass.inputAttachmentCount = 0;

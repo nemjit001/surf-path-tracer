@@ -244,6 +244,40 @@ void Renderer::destroy()
     vkb::destroy_instance(m_instace);
 }
 
+void Renderer::recordFrame(
+    VkCommandBuffer commandBuffer,
+    const Framebuffer& framebuffer,
+    const RenderPass& renderPass
+)
+{
+    VkCommandBufferBeginInfo bufferBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    bufferBeginInfo.flags = 0;
+    bufferBeginInfo.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &bufferBeginInfo));
+
+    VkClearValue clearValue = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+
+    VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    renderPassBeginInfo.renderPass = renderPass.handle();
+    renderPassBeginInfo.framebuffer = framebuffer.handle();
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValue;
+    renderPassBeginInfo.renderArea = {  // FIXME: take from some value stored in renderer
+        0, 0,
+        1280, 720
+    };
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Draw fullscreen quad
+    vkCmdBindPipeline(commandBuffer, m_presentPipeline.bindPoint(), m_presentPipeline.handle());
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);   // Single instance -> shader takes vertex index and transforms it to screen coords
+
+    vkCmdEndRenderPass(commandBuffer);
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
+}
+
 void Renderer::render(F32 deltaTime)
 {
     U32 availableSwapImage = 0;
@@ -263,6 +297,9 @@ void Renderer::render(F32 deltaTime)
 
     const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
     const FrameData& activeFrame = m_frames[m_currentFrame];
+
+    VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty rest flags */ 0));
+    recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
 
     // Record render commands
     // Await swap image availability before submission
