@@ -19,6 +19,7 @@ struct FrameData
 {
     VkCommandPool pool;
     VkCommandBuffer commandBuffer;
+    VkFence frameReady;
 };
 
 class Renderer

@@ -170,6 +170,11 @@ void Renderer::init(GLFWwindow* window)
         bufferAllocateInfo.commandBufferCount = 1;
 
         VK_CHECK(vkAllocateCommandBuffers(m_device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
+
+        VkFenceCreateInfo frameReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+        frameReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        VK_CHECK(vkCreateFence(m_device, &frameReadyCreateInfo, nullptr, &m_frames[i].frameReady));
     }
 
     // Set up present pass
@@ -216,6 +221,8 @@ void Renderer::init(GLFWwindow* window)
 
 void Renderer::destroy()
 {
+    vkDeviceWaitIdle(m_device);
+
     m_presentPipeline.destroy();
     m_presentPipelineLayout.destroy();
 
@@ -228,7 +235,9 @@ void Renderer::destroy()
 
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
+        VK_CHECK(vkWaitForFences(m_device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
         vkDestroyCommandPool(m_device, m_frames[i].pool, nullptr);
+        vkDestroyFence(m_device, m_frames[i].frameReady, nullptr);
     }
 
     vmaDestroyAllocator(m_allocator);
@@ -298,10 +307,12 @@ void Renderer::render(F32 deltaTime)
     const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
     const FrameData& activeFrame = m_frames[m_currentFrame];
 
+    VK_CHECK(vkWaitForFences(m_device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_device, 1, &activeFrame.frameReady));
+
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty rest flags */ 0));
     recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
 
-    // Record render commands
     // Await swap image availability before submission
     // Signal render finished for present
 
@@ -314,7 +325,7 @@ void Renderer::render(F32 deltaTime)
     presentPassSubmit.signalSemaphoreCount = 0;
     presentPassSubmit.pSignalSemaphores = nullptr;
 
-    VK_CHECK(vkQueueSubmit(m_graphicsQueue, 1, &presentPassSubmit, VK_NULL_HANDLE));
+    VK_CHECK(vkQueueSubmit(m_graphicsQueue, 1, &presentPassSubmit, activeFrame.frameReady));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.swapchainCount = 1;
