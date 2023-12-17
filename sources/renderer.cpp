@@ -157,22 +157,9 @@ void Renderer::render(F32 deltaTime)
     const FrameData& activeFrame = m_frames[m_currentFrame];
 
     U32 availableSwapImage = 0;
-    VkResult acquireResult = vkAcquireNextImageKHR(m_context.device, m_context.swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &availableSwapImage);
-    if (acquireResult != VK_SUCCESS)
-    {
-        if (acquireResult == VK_SUBOPTIMAL_KHR || acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
-        {
-            // recreate swapchain
-            return; // cannot submit work to newly created swapchain yet -> wait for next frame
-        }
-        else
-        {
-            // Abort execution
-        }
-    }
+    VK_CHECK(vkAcquireNextImageKHR(m_context.device, m_context.swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &availableSwapImage));
 
     VK_CHECK(vkWaitForFences(m_context.device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
-
     VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty rest flags */ 0));
 
@@ -206,18 +193,6 @@ void Renderer::render(F32 deltaTime)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
 
-    VkResult presentResult = vkQueuePresentKHR(m_context.queues.presentQueue, &presentInfo);
-    if (presentResult != VK_SUCCESS)
-    {
-        if (presentResult == VK_SUBOPTIMAL_KHR || presentResult == VK_ERROR_OUT_OF_DATE_KHR)
-        {
-            // recreate swapchain
-        }
-        else
-        {
-            // Abort execution
-        }
-    }
-
+    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }
