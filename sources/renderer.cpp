@@ -113,7 +113,7 @@ void Renderer::init(GLFWwindow* window)
     vkb::SwapchainBuilder swapchainBuilder(m_device);
     vkb::Result<vkb::Swapchain> swapchainResult = swapchainBuilder
         .set_desired_present_mode(VK_PRESENT_MODE_MAILBOX_KHR)
-        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .add_fallback_present_mode(VK_PRESENT_MODE_FIFO_KHR)
         .set_clipped(false)
         .set_image_usage_flags(
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
