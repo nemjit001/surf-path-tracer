@@ -20,6 +20,8 @@ struct FrameData
     VkCommandPool pool;
     VkCommandBuffer commandBuffer;
     VkFence frameReady;
+    VkSemaphore swapImageAvailable;
+    VkSemaphore renderingFinished;
 };
 
 class Renderer

@@ -175,6 +175,10 @@ void Renderer::init(GLFWwindow* window)
         frameReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
         VK_CHECK(vkCreateFence(m_device, &frameReadyCreateInfo, nullptr, &m_frames[i].frameReady));
+
+        VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+        VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
+        VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
     }
 
     // Set up present pass
@@ -238,6 +242,8 @@ void Renderer::destroy()
         VK_CHECK(vkWaitForFences(m_device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
         vkDestroyCommandPool(m_device, m_frames[i].pool, nullptr);
         vkDestroyFence(m_device, m_frames[i].frameReady, nullptr);
+        vkDestroySemaphore(m_device, m_frames[i].swapImageAvailable, nullptr);
+        vkDestroySemaphore(m_device, m_frames[i].renderingFinished, nullptr);
     }
 
     vmaDestroyAllocator(m_allocator);
@@ -289,8 +295,10 @@ void Renderer::recordFrame(
 
 void Renderer::render(F32 deltaTime)
 {
+    const FrameData& activeFrame = m_frames[m_currentFrame];
+
     U32 availableSwapImage = 0;
-    VkResult acquireResult = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, VK_NULL_HANDLE, VK_NULL_HANDLE, &availableSwapImage);
+    VkResult acquireResult = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &availableSwapImage);
     if (acquireResult != VK_SUCCESS)
     {
         if (acquireResult == VK_SUBOPTIMAL_KHR || acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
@@ -304,26 +312,26 @@ void Renderer::render(F32 deltaTime)
         }
     }
 
-    const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
-    const FrameData& activeFrame = m_frames[m_currentFrame];
-
     VK_CHECK(vkWaitForFences(m_device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(m_device, 1, &activeFrame.frameReady));
 
+    VK_CHECK(vkResetFences(m_device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty rest flags */ 0));
+
+    const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
     recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
 
-    // Await swap image availability before submission
-    // Signal render finished for present
+    VkPipelineStageFlags waitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
+    };
 
     VkSubmitInfo presentPassSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     presentPassSubmit.commandBufferCount = 1;
     presentPassSubmit.pCommandBuffers = &activeFrame.commandBuffer;
-    presentPassSubmit.waitSemaphoreCount = 0;
-    presentPassSubmit.pWaitSemaphores = nullptr;
-    presentPassSubmit.pWaitDstStageMask = nullptr;
-    presentPassSubmit.signalSemaphoreCount = 0;
-    presentPassSubmit.pSignalSemaphores = nullptr;
+    presentPassSubmit.waitSemaphoreCount = 1;
+    presentPassSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
+    presentPassSubmit.pWaitDstStageMask = waitStages;
+    presentPassSubmit.signalSemaphoreCount = 1;
+    presentPassSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
 
     VK_CHECK(vkQueueSubmit(m_graphicsQueue, 1, &presentPassSubmit, activeFrame.frameReady));
 
@@ -332,8 +340,8 @@ void Renderer::render(F32 deltaTime)
     presentInfo.pSwapchains = &m_swapchain.swapchain;
     presentInfo.pImageIndices = &availableSwapImage;
     presentInfo.pResults = nullptr;
-    presentInfo.waitSemaphoreCount = 0;
-    presentInfo.pWaitSemaphores = nullptr;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
 
     VkResult presentResult = vkQueuePresentKHR(m_presentQueue, &presentInfo);
     if (presentResult != VK_SUCCESS)
