@@ -261,9 +261,16 @@ void Renderer::render(F32 deltaTime)
         }
     }
 
+    const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
+    const FrameData& activeFrame = m_frames[m_currentFrame];
+
+    // Record render commands
+    // Await swap image availability before submission
+    // Signal render finished for present
+
     VkSubmitInfo presentPassSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    presentPassSubmit.commandBufferCount = 0;
-    presentPassSubmit.pCommandBuffers = nullptr;
+    presentPassSubmit.commandBufferCount = 1;
+    presentPassSubmit.pCommandBuffers = &activeFrame.commandBuffer;
     presentPassSubmit.waitSemaphoreCount = 0;
     presentPassSubmit.pWaitSemaphores = nullptr;
     presentPassSubmit.pWaitDstStageMask = nullptr;
@@ -292,6 +299,8 @@ void Renderer::render(F32 deltaTime)
             // Abort execution
         }
     }
+
+    m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL Renderer::debugCallback(
