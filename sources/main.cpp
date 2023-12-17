@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <GLFW/glfw3.h>
 
+#include "render_context.h"
 #include "renderer.h"
 #include "timer.h"
 #include "types.h"
@@ -18,8 +19,8 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, PROGRAM_NAME, nullptr, nullptr);
-	Renderer renderer;
-	renderer.init(window);
+	RenderContext renderContext(window);
+	Renderer renderer(std::move(renderContext));
 
 	// TODO: load scene
 
@@ -48,7 +49,6 @@ int main()
 		glfwPollEvents();
 	}
 
-	renderer.destroy();
 	glfwTerminate();
 
 	printf("Goodbye!\n");

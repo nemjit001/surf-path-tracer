@@ -1,13 +1,8 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN
-
-#include <GLFW/glfw3.h>
-#include <VkBootstrap.h>
 #include <vector>
-#include <vk_mem_alloc.h>
-#include <vulkan/vulkan.h>
 
+#include "render_context.h"
 #include "types.h"
 #include "vk_layer/framebuffer.h"
 #include "vk_layer/pipeline.h"
@@ -27,11 +22,9 @@ struct FrameData
 class Renderer
 {
 public:
-    Renderer();
+    Renderer(RenderContext renderContext);
 
-    void init(GLFWwindow* window);
-
-    void destroy();
+    ~Renderer();
 
     void recordFrame(
         VkCommandBuffer commandBuffer,
@@ -42,29 +35,7 @@ public:
     void render(F32 deltaTime);
 
 private:
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-        VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-        void* pUserData
-    );
-
-private:
-    // Window pointer
-    GLFWwindow* m_window;
-
-    // Render context
-    vkb::Instance m_instace;
-    VkSurfaceKHR m_renderSurface;
-    vkb::PhysicalDevice m_gpu;
-    vkb::Device m_device;
-    vkb::Swapchain m_swapchain;
-    std::vector<VkImageView> m_swapImageViews;
-    VmaAllocator m_allocator;
-    VkQueue m_transferQueue;
-    VkQueue m_computeQueue;
-    VkQueue m_graphicsQueue;
-    VkQueue m_presentQueue;
+    RenderContext m_context;
 
     // Renderer Frame management
     SizeType m_currentFrame;
