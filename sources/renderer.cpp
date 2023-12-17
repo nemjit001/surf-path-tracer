@@ -60,20 +60,17 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution)
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 
-    // Set up a viewport for the window size
-    Viewport renderViewport = Viewport {
-        0, 0,   // Offset of viewport in (X, Y)
-        resolution.width, resolution.height,
-        0.0f, 1.0f
-    };
-
     // Instantiate shaders & pipeline
     Shader presentVertShader(m_context.device, ShaderType::Vertex, "shaders/fs_quad_vert.glsl.spv");
     Shader presentFragShader(m_context.device, ShaderType::Fragment, "shaders/fs_quad_frag.glsl.spv");
 
     m_presentPipeline.init(
         m_context.device,
-        renderViewport,
+        Viewport {
+            0, 0,   // Offset of viewport in (X, Y)
+            resolution.width, resolution.height,
+            0.0f, 1.0f
+        },
         m_presentPass,
         m_presentPipelineLayout,
         { &presentVertShader, &presentFragShader }
