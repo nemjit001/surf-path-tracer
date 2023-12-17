@@ -121,6 +121,7 @@ void Renderer::init(GLFWwindow* window)
         .build();
 
     m_swapchain = swapchainResult.value();
+    m_swapImageViews = m_swapchain.get_image_views().value();
 
     // Create an allocator for Vulkan resources
     VmaAllocatorCreateInfo allocatorCreateInfo = {};
@@ -177,8 +178,6 @@ void Renderer::init(GLFWwindow* window)
     // Create framebuffers for swapchain images
     int width = 0, height = 0;
     glfwGetFramebufferSize(window, &width, &height);
-
-    m_swapImageViews = m_swapchain.get_image_views().value();
     m_framebuffers.reserve(m_swapchain.image_count);
     for (const auto& imageView : m_swapImageViews)
     {
@@ -225,11 +224,6 @@ void Renderer::destroy()
         framebuffer.destroy();
     }
 
-    for (auto& view : m_swapImageViews)
-    {
-        vkDestroyImageView(m_device, view, nullptr);
-    }
-
     m_presentPass.destroy();
 
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
@@ -238,6 +232,12 @@ void Renderer::destroy()
     }
 
     vmaDestroyAllocator(m_allocator);
+
+    for (auto& view : m_swapImageViews)
+    {
+        vkDestroyImageView(m_device, view, nullptr);
+    }
+
     vkb::destroy_swapchain(m_swapchain);
     vkb::destroy_device(m_device);
     vkb::destroy_surface(m_instace, m_renderSurface);

@@ -50,6 +50,7 @@ private:
     vkb::PhysicalDevice m_gpu;
     vkb::Device m_device;
     vkb::Swapchain m_swapchain;
+    std::vector<VkImageView> m_swapImageViews;
     VmaAllocator m_allocator;
     VkQueue m_transferQueue;
     VkQueue m_computeQueue;
@@ -62,7 +63,6 @@ private:
 
     // Default render pass w/ framebuffers
     RenderPass m_presentPass;
-    std::vector<VkImageView> m_swapImageViews;
     std::vector<Framebuffer> m_framebuffers;
 
     // Custom shader pipeline & layout for use during render pass
