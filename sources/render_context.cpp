@@ -1,5 +1,8 @@
 #include "render_context.h"
 
+// First use of VMA -> define implementation here
+#define VMA_IMPLEMENTATION
+
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
 #include <vector>

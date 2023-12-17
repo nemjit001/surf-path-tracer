@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <vulkan/vulkan.h>
 
 #include "render_context.h"
 #include "types.h"

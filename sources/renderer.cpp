@@ -1,13 +1,7 @@
 #include "renderer.h"
 
-// First use of VMA -> define implementation here
-#define VMA_IMPLEMENTATION
-
 #include <cassert>
 #include <cstdio>
-#include <GLFW/glfw3.h>
-#include <VkBootstrap.h>
-#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 #include "surf.h"
