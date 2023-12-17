@@ -38,6 +38,10 @@ private:
     vkb::Device m_device;
     vkb::Swapchain m_swapchain;
     VmaAllocator m_allocator;
+    VkQueue m_transferQueue;
+    VkQueue m_computeQueue;
+    VkQueue m_graphicsQueue;
+    VkQueue m_presentQueue;
     RenderPass m_presentPass;
     PipelineLayout m_presentPipelineLayout;
     GraphicsPipeline m_presentPipeline;

@@ -25,6 +25,10 @@ Renderer::Renderer()
     m_device(),
     m_swapchain(),
     m_allocator(VK_NULL_HANDLE),
+    m_transferQueue(VK_NULL_HANDLE),
+    m_computeQueue(VK_NULL_HANDLE),
+    m_graphicsQueue(VK_NULL_HANDLE),
+    m_presentQueue(VK_NULL_HANDLE),
     m_presentPass(),
     m_presentPipelineLayout(),
     m_presentPipeline()
@@ -124,6 +128,28 @@ void Renderer::init(GLFWwindow* window)
 
     VK_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_allocator));
 
+    // Retrieve queue setup
+    vkb::Result<VkQueue> transferQueue = m_device.get_queue(vkb::QueueType::transfer);
+    vkb::Result<VkQueue> computeQueue = m_device.get_queue(vkb::QueueType::compute);
+    vkb::Result<VkQueue> graphicsQueue = m_device.get_queue(vkb::QueueType::graphics);
+    vkb::Result<VkQueue> presentQueue = m_device.get_queue(vkb::QueueType::present);
+
+    if (
+        transferQueue.matches_error(vkb::QueueError::transfer_unavailable)
+        || computeQueue.matches_error(vkb::QueueError::compute_unavailable)    
+    )
+    {
+        // If no dedicated transfer queue or compute queue is available, just use the available graphics queue
+        // as its guaranteed to support transfer and compute operations
+        transferQueue = m_device.get_queue(vkb::QueueType::graphics);
+        computeQueue = m_device.get_queue(vkb::QueueType::graphics);
+    }
+
+    m_transferQueue = transferQueue.value();
+    m_computeQueue = computeQueue.value();
+    m_graphicsQueue = graphicsQueue.value();
+    m_presentQueue = presentQueue.value();
+
     // Set up present pass, layout & pipeline
     m_presentPass.init(m_device, m_swapchain.image_format);
     m_presentPipelineLayout.init(m_device);
@@ -194,7 +220,7 @@ void Renderer::render(F32 deltaTime)
     presentPassSubmit.signalSemaphoreCount = 0;
     presentPassSubmit.pSignalSemaphores = nullptr;
 
-    VK_CHECK(vkQueueSubmit(VK_NULL_HANDLE, 1, &presentPassSubmit, VK_NULL_HANDLE));
+    VK_CHECK(vkQueueSubmit(m_graphicsQueue, 1, &presentPassSubmit, VK_NULL_HANDLE));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.swapchainCount = 1;
@@ -204,7 +230,7 @@ void Renderer::render(F32 deltaTime)
     presentInfo.waitSemaphoreCount = 0;
     presentInfo.pWaitSemaphores = nullptr;
 
-    VkResult presentResult = vkQueuePresentKHR(VK_NULL_HANDLE, &presentInfo);
+    VkResult presentResult = vkQueuePresentKHR(m_presentQueue, &presentInfo);
     if (presentResult != VK_SUCCESS)
     {
         if (presentResult == VK_SUBOPTIMAL_KHR || presentResult == VK_ERROR_OUT_OF_DATE_KHR)
