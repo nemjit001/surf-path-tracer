@@ -52,31 +52,6 @@ void Shader::destroy()
     vkDestroyShaderModule(m_device, m_shader, nullptr);
 }
 
-Shader::Shader(Shader&& other)
-    :
-    m_device(other.m_device),
-    m_type(other.m_type),
-    m_shader(other.m_shader)
-{
-    other.m_type = ShaderType::Undefined;
-    other.m_shader = VK_NULL_HANDLE;
-}
-
-Shader& Shader::operator=(Shader&& other)
-{
-    if (this == &other)
-    {
-        return *this;
-    }
-
-    this->destroy();
-    this->m_device = other.m_device;
-    this->m_type = other.m_type;
-    this->m_shader = other.m_shader;
-
-    return *this;
-}
-
 VkShaderStageFlagBits Shader::stage() const
 {
     VkShaderStageFlagBits stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;

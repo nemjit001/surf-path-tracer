@@ -26,12 +26,6 @@ public:
 
     void destroy();
 
-    PipelineLayout(const PipelineLayout&) = delete;
-    PipelineLayout& operator=(const PipelineLayout&) = delete;
-
-    PipelineLayout(PipelineLayout&& other);
-    PipelineLayout& operator=(PipelineLayout&& other);
-
     VkPipelineLayout handle() const;
 
 private:
@@ -49,16 +43,10 @@ public:
         Viewport viewport,
         const RenderPass& renderPass,
         const PipelineLayout& layout,
-        const std::vector<Shader*>& shaders
+        const std::vector<Shader>& shaders
     );
 
     void destroy();
-
-    GraphicsPipeline(const GraphicsPipeline&) = delete;
-    GraphicsPipeline& operator=(const GraphicsPipeline&) = delete;
-
-    GraphicsPipeline(GraphicsPipeline&& other);
-    GraphicsPipeline& operator=(GraphicsPipeline&& other);
 
 private:
     VkDevice m_device;

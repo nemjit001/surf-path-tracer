@@ -35,28 +35,6 @@ void PipelineLayout::destroy()
     vkDestroyPipelineLayout(m_device, m_layout, nullptr);
 }
 
-PipelineLayout::PipelineLayout(PipelineLayout&& other)
-    :
-    m_device(other.m_device),
-    m_layout(other.m_layout)
-{
-    other.m_layout = VK_NULL_HANDLE;
-}
-
-PipelineLayout& PipelineLayout::operator=(PipelineLayout&& other)
-{
-    if (this == &other)
-    {
-        return *this;
-    }
-
-    this->destroy();
-    this->m_device = other.m_device;
-    this->m_layout = other.m_layout;
-
-    return *this;
-}
-
 VkPipelineLayout PipelineLayout::handle() const
 {
     return m_layout;
@@ -75,7 +53,7 @@ void GraphicsPipeline::init(
     Viewport viewport,
     const RenderPass& renderPass,
     const PipelineLayout& layout,
-    const std::vector<Shader*>& shaders
+    const std::vector<Shader>& shaders
 )
 {
     m_device = device;
@@ -85,8 +63,8 @@ void GraphicsPipeline::init(
     {
         VkPipelineShaderStageCreateInfo shaderStage = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         shaderStage.flags = 0;
-        shaderStage.stage = shader->stage();
-        shaderStage.module = shader->handle();
+        shaderStage.stage = shader.stage();
+        shaderStage.module = shader.handle();
         shaderStage.pName = "main";
         shaderStage.pSpecializationInfo = nullptr;
 
@@ -206,27 +184,4 @@ void GraphicsPipeline::init(
 void GraphicsPipeline::destroy()
 {
     vkDestroyPipeline(m_device, m_pipeline, nullptr);
-}
-
-
-GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other)
-    :
-    m_device(other.m_device),
-    m_pipeline(other.m_pipeline)
-{
-    other.m_pipeline = VK_NULL_HANDLE;
-}
-
-GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other)
-{
-    if (this == &other)
-    {
-        return *this;
-    }
-
-    this->destroy();
-    this->m_device = other.m_device;
-    this->m_pipeline = other.m_pipeline;
-
-    return *this;
 }

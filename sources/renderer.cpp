@@ -24,6 +24,7 @@ Renderer::Renderer()
     m_gpu(),
     m_device(),
     m_swapchain(),
+    m_framebuffers(),
     m_allocator(VK_NULL_HANDLE),
     m_transferQueue(VK_NULL_HANDLE),
     m_computeQueue(VK_NULL_HANDLE),
@@ -150,13 +151,26 @@ void Renderer::init(GLFWwindow* window)
     m_graphicsQueue = graphicsQueue.value();
     m_presentQueue = presentQueue.value();
 
-    // Set up present pass, layout & pipeline
+    // Set up present pass
     m_presentPass.init(m_device, m_swapchain.image_format);
+
+    // Create framebuffers for swapchain images
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+
+    m_swapImageViews = m_swapchain.get_image_views().value();
+    m_framebuffers.reserve(m_swapchain.image_count);
+    for (const auto& imageView : m_swapImageViews)
+    {
+        Framebuffer swapFramebuffer;
+        swapFramebuffer.init(m_device, m_presentPass, { imageView }, 1280, 720);
+        m_framebuffers.push_back(swapFramebuffer);
+    }
+
+    // Set up pipeline layout & pipeline
     m_presentPipelineLayout.init(m_device);
 
     // Set up a viewport for the window size
-    int width = 0, height = 0;
-    glfwGetFramebufferSize(window, &width, &height);
     Viewport renderViewport = Viewport {
         0, 0,   // Offset of viewport in (X, Y)
         static_cast<U32>(width), static_cast<U32>(height),
@@ -174,7 +188,7 @@ void Renderer::init(GLFWwindow* window)
         renderViewport,
         m_presentPass,
         m_presentPipelineLayout,
-        { &presentVertShader, &presentFragShader }
+        { presentVertShader, presentFragShader }
     );
 
     presentVertShader.destroy();
@@ -185,6 +199,17 @@ void Renderer::destroy()
 {
     m_presentPipeline.destroy();
     m_presentPipelineLayout.destroy();
+
+    for (auto& framebuffer : m_framebuffers)
+    {
+        framebuffer.destroy();
+    }
+
+    for (auto& view : m_swapImageViews)
+    {
+        vkDestroyImageView(m_device, view, nullptr);
+    }
+
     m_presentPass.destroy();
 
     vmaDestroyAllocator(m_allocator);

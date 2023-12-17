@@ -11,12 +11,6 @@ public:
 
     void destroy();
 
-    RenderPass(const RenderPass&) = delete;
-    RenderPass& operator=(const RenderPass&) = delete;
-
-    RenderPass(RenderPass&& other);
-    RenderPass& operator=(RenderPass&& other);
-
     VkRenderPass handle() const;
 
 private:

@@ -61,28 +61,6 @@ void RenderPass::destroy()
     vkDestroyRenderPass(m_device, m_renderPass, nullptr);
 }
 
-RenderPass::RenderPass(RenderPass&& other)
-    :
-    m_device(other.m_device),
-    m_renderPass(other.m_renderPass)
-{
-    other.m_renderPass = VK_NULL_HANDLE;
-}
-
-RenderPass& RenderPass::operator=(RenderPass&& other)
-{
-    if (this == &other)
-    {
-        return *this;
-    }
-
-    this->destroy();
-    this->m_device = other.m_device;
-    this->m_renderPass = other.m_renderPass;
-
-    return *this;
-}
-
 VkRenderPass RenderPass::handle() const
 {
     return m_renderPass;

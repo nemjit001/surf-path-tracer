@@ -20,12 +20,6 @@ public:
 
     void destroy();
 
-    Shader(const Shader&) = delete;
-    Shader& operator=(const Shader&) = delete;
-
-    Shader(Shader&& other);
-    Shader& operator=(Shader&& other);
-
     VkShaderStageFlagBits stage() const;
 
     VkShaderModule handle() const;
