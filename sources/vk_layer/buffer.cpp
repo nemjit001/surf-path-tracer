@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 
 #include "types.h"
+#include "vk_layer/vk_check.h"
 
 Buffer::Buffer(
     VmaAllocator allocator,
@@ -30,7 +31,6 @@ Buffer::Buffer(
     bufferCreateInfo.size = size;
     bufferCreateInfo.usage = bufferUsage;
 
-    // FIXME: Check if memory alloc works this way
     VmaAllocationCreateInfo allocationCreateInfo = {};
     allocationCreateInfo.flags = allocationFlags;
     allocationCreateInfo.memoryTypeBits = 0;
@@ -41,14 +41,14 @@ Buffer::Buffer(
     allocationCreateInfo.pUserData = nullptr;
     allocationCreateInfo.usage = memoryUsage;
 
-    vmaCreateBuffer(
-        allocator,
+    VK_CHECK(vmaCreateBuffer(
+        m_allocator,
         &bufferCreateInfo,
         &allocationCreateInfo,
         &m_buffer,
         &m_allocation,
         &m_allocationInfo
-    );
+    ));
 }
 
 Buffer::~Buffer()

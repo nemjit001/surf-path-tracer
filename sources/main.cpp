@@ -28,7 +28,7 @@ int main()
 
 	PixelBuffer resultBuffer(resolution.width, resolution.height);
 	RenderContext renderContext(window);
-	Renderer renderer(std::move(renderContext), resolution, resultBuffer);
+	Renderer* renderer = new Renderer(std::move(renderContext), resolution, resultBuffer);
 
 	// TODO: load scene
 
@@ -51,12 +51,13 @@ int main()
 			ALPHA *= 0.5;
 
 		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
-    	printf("%08.2fms (%08.2ffps)\n", AVERAGE_FRAMETIME, inv_avg_frametime * 1'000.0f);
+		printf("%08.2fms (%08.2ffps)\n", AVERAGE_FRAMETIME, inv_avg_frametime * 1'000.0f);
 
-		renderer.render(deltaTime);
+		renderer->render(deltaTime);
 		glfwPollEvents();
 	}
 
+	delete renderer;
 	glfwTerminate();
 
 	printf("Goodbye!\n");

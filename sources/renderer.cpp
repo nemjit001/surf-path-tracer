@@ -21,13 +21,19 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
     m_framebuffers(),
     m_frameStagingBuffer(
         m_context.allocator,
-        resolution.width * resolution.height * sizeof(U32),
-        VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        resultBuffer.width * resultBuffer.height * sizeof(U32),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT,            // Used as staging bufer for GPU uploads
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT       // Needs to be visible from the CPU
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,   // And always coherent with CPU memory during uploads
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT // Should allow memcpy writes & mapping
     ),
-    m_frameImage(),
+    m_frameImage(
+        m_context.allocator,
+        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
+        resultBuffer.width, resultBuffer.height,
+        VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
+        | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
+    ),
     m_presentPipelineLayout(m_context.device),
     m_presentPipeline()
 {
