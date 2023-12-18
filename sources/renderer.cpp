@@ -14,6 +14,7 @@
 Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, PixelBuffer resultBuffer)
     :
     m_context(std::move(renderContext)),
+    m_descriptorPool(m_context.device),
     m_resultBuffer(resultBuffer),
     m_currentFrame(0),
     m_frames{},
@@ -92,6 +93,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
             resolution.width, resolution.height,
             0.0f, 1.0f
         },
+        m_descriptorPool,
         m_presentPass,
         m_presentPipelineLayout,
         { &presentVertShader, &presentFragShader }
@@ -140,7 +142,16 @@ void Renderer::recordFrame(
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    // Draw fullscreen quad
+    const std::vector<VkDescriptorSet>& descriptorSets = m_presentPipeline.descriptorSets();
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        m_presentPipeline.bindPoint(),
+        m_presentPipelineLayout.handle(),
+        0, static_cast<U32>(descriptorSets.size()),
+        descriptorSets.data(),
+        0, nullptr
+    );
+
     vkCmdBindPipeline(commandBuffer, m_presentPipeline.bindPoint(), m_presentPipeline.handle());
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);   // Single instance -> shader takes vertex index and transforms it to screen coords
 

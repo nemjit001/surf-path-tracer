@@ -7,6 +7,7 @@
 #include "types.h"
 #include "pixel_buffer.h"
 #include "vk_layer/buffer.h"
+#include "vk_layer/descriptor_pool.h"
 #include "vk_layer/framebuffer.h"
 #include "vk_layer/image.h"
 #include "vk_layer/pipeline.h"
@@ -46,6 +47,7 @@ public:
 
 private:
     RenderContext m_context;
+    DescriptorPool m_descriptorPool;
     PixelBuffer m_resultBuffer;
 
     // Renderer Frame management

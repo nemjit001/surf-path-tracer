@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 
 #include "types.h"
+#include "vk_layer/descriptor_pool.h"
 #include "vk_layer/render_pass.h"
 #include "vk_layer/shader.h"
 
@@ -45,6 +46,8 @@ public:
 
     VkPipelineLayout handle() const;
 
+    const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts() const;
+
 private:
     void release();
 
@@ -62,6 +65,7 @@ public:
     void init(
         VkDevice device,
         Viewport viewport,
+        const DescriptorPool& descriptorPool,
         const RenderPass& renderPass,
         const PipelineLayout& layout,
         const std::vector<Shader*>& shaders
@@ -73,7 +77,10 @@ public:
 
     VkPipeline handle() const;
 
+    const std::vector<VkDescriptorSet>& descriptorSets();
+
 private:
     VkDevice m_device;
     VkPipeline m_pipeline;
+    std::vector<VkDescriptorSet> m_descriptorSets;
 };

@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 
 #include "types.h"
+#include "vk_layer/descriptor_pool.h"
 #include "vk_layer/render_pass.h"
 #include "vk_layer/shader.h"
 #include "vk_layer/vk_check.h"
@@ -82,9 +83,19 @@ VkPipelineLayout PipelineLayout::handle() const
     return m_layout;
 }
 
+const std::vector<VkDescriptorSetLayout>& PipelineLayout::descriptorSetLayouts() const
+{
+    return m_descriptorSetLayouts;
+}
+
 void PipelineLayout::release()
 {
     vkDestroyPipelineLayout(m_device, m_layout, nullptr);
+
+    for (auto const& setLayout : m_descriptorSetLayouts)
+    {
+        vkDestroyDescriptorSetLayout(m_device, setLayout, nullptr);
+    }
 }
 
 GraphicsPipeline::GraphicsPipeline()
@@ -98,6 +109,7 @@ GraphicsPipeline::GraphicsPipeline()
 void GraphicsPipeline::init(
     VkDevice device,
     Viewport viewport,
+    const DescriptorPool& descriptorPool,
     const RenderPass& renderPass,
     const PipelineLayout& layout,
     const std::vector<Shader*>& shaders
@@ -226,6 +238,16 @@ void GraphicsPipeline::init(
     createInfo.basePipelineIndex = 0;
 
     VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &m_pipeline));
+
+    const std::vector<VkDescriptorSetLayout>& setLayouts = layout.descriptorSetLayouts();
+    m_descriptorSets.resize(setLayouts.size(), VK_NULL_HANDLE);
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    descriptorSetAllocateInfo.descriptorPool = descriptorPool.handle();
+    descriptorSetAllocateInfo.descriptorSetCount = setLayouts.size();
+    descriptorSetAllocateInfo.pSetLayouts = setLayouts.data();
+
+    VK_CHECK(vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, m_descriptorSets.data()));
 }
 
 void GraphicsPipeline::destroy()
@@ -241,4 +263,9 @@ VkPipelineBindPoint GraphicsPipeline::bindPoint() const
 VkPipeline GraphicsPipeline::handle() const
 {
     return m_pipeline;
+}
+
+const std::vector<VkDescriptorSet>& GraphicsPipeline::descriptorSets()
+{
+    return m_descriptorSets;
 }
