@@ -6,6 +6,7 @@
 #include "render_context.h"
 #include "types.h"
 #include "pixel_buffer.h"
+#include "vk_layer/buffer.h"
 #include "vk_layer/framebuffer.h"
 #include "vk_layer/pipeline.h"
 #include "vk_layer/render_pass.h"
@@ -53,6 +54,9 @@ private:
     // Default render pass w/ framebuffers
     RenderPass m_presentPass;
     std::vector<Framebuffer> m_framebuffers;
+
+    // Rendered frame staging buffer & target image
+    Buffer m_frameStagingBuffer;
 
     // Custom shader pipeline & layout for use during render pass
     PipelineLayout m_presentPipelineLayout;

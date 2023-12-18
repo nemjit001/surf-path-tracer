@@ -19,6 +19,14 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
     m_frames{},
     m_presentPass(m_context.device, m_context.swapchain.image_format),
     m_framebuffers(),
+    m_frameStagingBuffer(
+        m_context.allocator,
+        resolution.width * resolution.height * sizeof(U32),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    ),
     m_presentPipelineLayout(m_context.device),
     m_presentPipeline()
 {
@@ -134,9 +142,18 @@ void Renderer::render(F32 deltaTime)
     VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
 
-    // TODO: For pixel in screen buffer (CPU RAM buffer) do Kajiya Path Tracing -> massively parallel w/ openMP?
+    for (SizeType y = 0; y < m_resultBuffer.height; y++)
+    {
+        for (SizeType x = 0; x < m_resultBuffer.width; x++)
+        {
+            // TODO: Get primary ray from camera & trace
+            SizeType pixelIndex = x + y * m_resultBuffer.width;
+            m_resultBuffer.pixels[pixelIndex] = 0xFFFFFFFF; // Temp white clear before trace is implemented
+        }
+    }
 
-    // TODO: copy rendered frame to staging buffer + upload staging buffer to image
+    m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
+    // TODO: upload staging buffer to image -> use transfer queue + sync in frame
 
     const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
     recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);

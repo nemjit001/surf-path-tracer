@@ -7,7 +7,14 @@
 
 #include "types.h"
 
-Buffer::Buffer(VmaAllocator allocator, SizeType size, VkBufferUsageFlags bufferUsage, VmaMemoryUsage memoryUsage)
+Buffer::Buffer(
+    VmaAllocator allocator,
+    SizeType size,
+    VkBufferUsageFlags bufferUsage,
+    VkMemoryPropertyFlags memoryProperties,
+    VmaAllocationCreateFlags allocationFlags,
+    VmaMemoryUsage memoryUsage
+)
     :
     m_allocator(allocator),
     m_allocation(VK_NULL_HANDLE),
@@ -25,11 +32,11 @@ Buffer::Buffer(VmaAllocator allocator, SizeType size, VkBufferUsageFlags bufferU
 
     // FIXME: Check if memory alloc works this way
     VmaAllocationCreateInfo allocationCreateInfo = {};
-    allocationCreateInfo.flags = 0;
+    allocationCreateInfo.flags = allocationFlags;
     allocationCreateInfo.memoryTypeBits = 0;
     allocationCreateInfo.pool = VK_NULL_HANDLE;
     allocationCreateInfo.preferredFlags = 0;
-    allocationCreateInfo.requiredFlags = 0;
+    allocationCreateInfo.requiredFlags = memoryProperties;
     allocationCreateInfo.priority = 0.0f;
     allocationCreateInfo.pUserData = nullptr;
     allocationCreateInfo.usage = memoryUsage;
@@ -46,7 +53,7 @@ Buffer::Buffer(VmaAllocator allocator, SizeType size, VkBufferUsageFlags bufferU
 
 Buffer::~Buffer()
 {
-    destroy();
+    release();
 }
 
 Buffer::Buffer(Buffer&& other)
@@ -67,7 +74,7 @@ Buffer& Buffer::operator=(Buffer&& other)
         return *this;
     }
 
-    this->destroy();
+    this->release();
     this->m_allocator = other.m_allocator;
     this->m_allocation = other.m_allocation;
     this->m_allocationInfo = other.m_allocationInfo;
@@ -88,7 +95,7 @@ void Buffer::copyToBuffer(SizeType size, const void* data)
     vmaUnmapMemory(m_allocator, m_allocation);
 }
 
-void Buffer::destroy()
+void Buffer::release()
 {
     vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);
 }
