@@ -36,6 +36,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
         VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
         | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
     ),
+    m_frameImageSampler(m_context.device),
     m_presentPipelineLayout(
         m_context.device,
         {DescriptorSetLayout{{
@@ -104,7 +105,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
             0, 0,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VkDescriptorImageInfo{
-                VK_NULL_HANDLE, // TODO: set sampler
+                m_frameImageSampler.handle(),
                 m_frameImage.view(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             }

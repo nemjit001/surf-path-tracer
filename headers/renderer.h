@@ -12,6 +12,7 @@
 #include "vk_layer/image.h"
 #include "vk_layer/pipeline.h"
 #include "vk_layer/render_pass.h"
+#include "vk_layer/sampler.h"
 
 #define FRAMES_IN_FLIGHT 2
 
@@ -62,7 +63,8 @@ private:
     Buffer m_frameStagingBuffer;
     Image m_frameImage;
 
-    // Custom shader pipeline & layout for use during render pass
+    // Custom sampler, shader pipeline & layout for use during render pass
+    Sampler m_frameImageSampler;
     PipelineLayout m_presentPipelineLayout;
     GraphicsPipeline m_presentPipeline;
 };
