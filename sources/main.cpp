@@ -1,25 +1,20 @@
 #include "surf.h"
 
-#define GLFW_INCLUDE_NONE
-
 #include <cstdio>
-#include <GLFW/glfw3.h>
 
 #include "render_context.h"
 #include "renderer.h"
 #include "pixel_buffer.h"
 #include "timer.h"
 #include "types.h"
+#include "window_manager.h"
 
 #define NUM_SMOOTH_FRAMES 20	// Number of frames to smooth FPS / frame timing over
 
 int main()
 {
-	glfwInit();
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, PROGRAM_NAME, nullptr, nullptr);
+	WindowManager windowManager;
+	GLFWwindow* window = windowManager.createWindow(PROGRAM_NAME, SCR_WIDTH, SCR_HEIGHT);
 
 	RenderResulution resolution = RenderResulution{
 		SCR_WIDTH,
@@ -28,7 +23,7 @@ int main()
 
 	PixelBuffer resultBuffer(resolution.width, resolution.height);
 	RenderContext renderContext(window);
-	Renderer* renderer = new Renderer(std::move(renderContext), resolution, resultBuffer);
+	Renderer renderer(std::move(renderContext), resolution, resultBuffer);
 
 	// TODO: load scene
 
@@ -53,12 +48,9 @@ int main()
 		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
 		printf("%08.2fms (%08.2ffps)\n", AVERAGE_FRAMETIME, inv_avg_frametime * 1'000.0f);
 
-		renderer->render(deltaTime);
+		renderer.render(deltaTime);
 		glfwPollEvents();
 	}
-
-	delete renderer;
-	glfwTerminate();
 
 	printf("Goodbye!\n");
 	return 0;
