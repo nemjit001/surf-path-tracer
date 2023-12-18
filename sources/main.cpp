@@ -7,7 +7,7 @@
 
 #include "render_context.h"
 #include "renderer.h"
-#include "surface.h"
+#include "pixel_buffer.h"
 #include "timer.h"
 #include "types.h"
 
@@ -26,9 +26,9 @@ int main()
 		SCR_HEIGHT
 	};
 
-	Surface renderSurface(resolution.width, resolution.height);
+	PixelBuffer resultBuffer(resolution.width, resolution.height);
 	RenderContext renderContext(window);
-	Renderer renderer(std::move(renderContext), resolution, renderSurface);
+	Renderer renderer(std::move(renderContext), resolution, resultBuffer);
 
 	// TODO: load scene
 

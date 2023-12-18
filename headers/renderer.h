@@ -5,7 +5,7 @@
 
 #include "render_context.h"
 #include "types.h"
-#include "surface.h"
+#include "pixel_buffer.h"
 #include "vk_layer/framebuffer.h"
 #include "vk_layer/pipeline.h"
 #include "vk_layer/render_pass.h"
@@ -30,7 +30,7 @@ struct FrameData
 class Renderer
 {
 public:
-    Renderer(RenderContext renderContext, RenderResulution resolution, Surface surface);
+    Renderer(RenderContext renderContext, RenderResulution resolution, PixelBuffer resultBuffer);
 
     ~Renderer();
 
@@ -44,7 +44,7 @@ public:
 
 private:
     RenderContext m_context;
-    Surface m_renderResult;
+    PixelBuffer m_resultBuffer;
 
     // Renderer Frame management
     SizeType m_currentFrame;

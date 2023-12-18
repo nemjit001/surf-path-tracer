@@ -1,4 +1,4 @@
-#include "surface.h"
+#include "pixel_buffer.h"
 
 #include <cassert>
 #include <cstring>
@@ -6,7 +6,7 @@
 #include "surf.h"
 #include "types.h"
 
-Surface::Surface(U32 width, U32 height)
+PixelBuffer::PixelBuffer(U32 width, U32 height)
 	:
 	width(width),
 	height(height),
@@ -15,12 +15,12 @@ Surface::Surface(U32 width, U32 height)
 	pixels = static_cast<U32*>(MALLOC64(width * height * sizeof(U32)));
 }
 
-Surface::~Surface()
+PixelBuffer::~PixelBuffer()
 {
 	FREE64(pixels);
 }
 
-Surface::Surface(Surface& other)
+PixelBuffer::PixelBuffer(PixelBuffer& other)
 	:
 	width(other.width),
 	height(other.height),
@@ -31,7 +31,7 @@ Surface::Surface(Surface& other)
 	memcpy(pixels, other.pixels, width * height * sizeof(U32));
 }
 
-Surface& Surface::operator=(Surface& other)
+PixelBuffer& PixelBuffer::operator=(PixelBuffer& other)
 {
 	if (this == &other)
 	{
