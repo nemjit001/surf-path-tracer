@@ -95,6 +95,11 @@ void Buffer::copyToBuffer(SizeType size, const void* data)
     vmaUnmapMemory(m_allocator, m_allocation);
 }
 
+VkBuffer Buffer::handle() const
+{
+    return m_buffer;
+}
+
 void Buffer::release()
 {
     vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);

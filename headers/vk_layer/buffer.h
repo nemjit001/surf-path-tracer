@@ -27,6 +27,8 @@ public:
 
     void copyToBuffer(SizeType size, const void* data);
 
+    VkBuffer handle() const;
+
 private:
     void release();
 

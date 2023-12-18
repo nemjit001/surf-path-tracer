@@ -16,6 +16,9 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
     m_context(std::move(renderContext)),
     m_descriptorPool(m_context.device),
     m_resultBuffer(resultBuffer),
+    m_copyFinishedFence(VK_NULL_HANDLE),
+    m_copyPool(VK_NULL_HANDLE),
+    m_oneshotCopyBuffer(VK_NULL_HANDLE),
     m_currentFrame(0),
     m_frames{},
     m_presentPass(m_context.device, m_context.swapchain.image_format),
@@ -49,12 +52,29 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
     ),
     m_presentPipeline()
 {
+    // Set up oneshot command pool, fence & copy buffer
+    VkFenceCreateInfo copyFinishedCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    copyFinishedCreateInfo.flags = 0;
+    VK_CHECK(vkCreateFence(m_context.device, &copyFinishedCreateInfo, nullptr, &m_copyFinishedFence));
+
+    VkCommandPoolCreateInfo copyPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+    copyPoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    copyPoolInfo.queueFamilyIndex = m_context.queues.graphicsQueue.familyIndex;
+    VK_CHECK(vkCreateCommandPool(m_context.device, &copyPoolInfo, nullptr, &m_copyPool));
+
+    VkCommandBufferAllocateInfo oneshotCopyAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    oneshotCopyAllocateInfo.commandPool = m_copyPool;
+    oneshotCopyAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    oneshotCopyAllocateInfo.commandBufferCount = 1;
+
+    VK_CHECK(vkAllocateCommandBuffers(m_context.device, &oneshotCopyAllocateInfo, &m_oneshotCopyBuffer));
+
     // Set up per frame structures
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
         VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
         poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolCreateInfo.queueFamilyIndex = m_context.device.get_queue_index(vkb::QueueType::graphics).value();
+        poolCreateInfo.queueFamilyIndex = m_context.queues.graphicsQueue.familyIndex;
 
         VK_CHECK(vkCreateCommandPool(m_context.device, &poolCreateInfo, nullptr, &m_frames[i].pool));
 
@@ -127,6 +147,104 @@ Renderer::~Renderer()
         vkDestroySemaphore(m_context.device, m_frames[i].swapImageAvailable, nullptr);
         vkDestroySemaphore(m_context.device, m_frames[i].renderingFinished, nullptr);
     }
+
+    vkDestroyCommandPool(m_context.device, m_copyPool, nullptr);
+    vkDestroyFence(m_context.device, m_copyFinishedFence, nullptr);
+}
+
+void Renderer::copyBufferToImage(
+    const Buffer& staging,
+    const Image& target
+)
+{
+    VkCommandBufferBeginInfo oneshotBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    oneshotBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    oneshotBeginInfo.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(m_oneshotCopyBuffer, &oneshotBeginInfo));
+
+    VkImageMemoryBarrier transferTransitionBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    transferTransitionBarrier.srcAccessMask = 0;
+    transferTransitionBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    transferTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transferTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transferTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transferTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transferTransitionBarrier.image = target.handle();
+    transferTransitionBarrier.subresourceRange = VkImageSubresourceRange{
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0, 1,
+        0, 1
+    };
+
+    vkCmdPipelineBarrier(
+        m_oneshotCopyBuffer,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &transferTransitionBarrier
+    );
+
+    VkBufferImageCopy copyRegion = {};
+    copyRegion.bufferOffset = 0;
+    copyRegion.bufferRowLength = 0;
+    copyRegion.bufferImageHeight = 0;
+    copyRegion.imageOffset = { 0, 0, 0 };
+    copyRegion.imageExtent = { m_resultBuffer.width, m_resultBuffer.height, 1 };
+    copyRegion.imageSubresource = VkImageSubresourceLayers{
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0,  // 0th mip level
+        0, 1
+    };
+
+    vkCmdCopyBufferToImage(
+        m_oneshotCopyBuffer,
+        staging.handle(),
+        target.handle(),
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1, &copyRegion
+    );
+
+    VkImageMemoryBarrier shaderTransitionBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    shaderTransitionBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    shaderTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    shaderTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    shaderTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    shaderTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    shaderTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    shaderTransitionBarrier.image = target.handle();
+    shaderTransitionBarrier.subresourceRange = VkImageSubresourceRange{
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0, 1,
+        0, 1
+    };
+
+    vkCmdPipelineBarrier(
+        m_oneshotCopyBuffer,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &shaderTransitionBarrier
+    );
+
+    VK_CHECK(vkEndCommandBuffer(m_oneshotCopyBuffer));
+
+    VkSubmitInfo oneshotSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    oneshotSubmit.commandBufferCount = 1;
+    oneshotSubmit.pCommandBuffers = &m_oneshotCopyBuffer;
+    oneshotSubmit.waitSemaphoreCount = 0;
+    oneshotSubmit.pWaitSemaphores = nullptr;
+    oneshotSubmit.pWaitDstStageMask = nullptr;
+    oneshotSubmit.signalSemaphoreCount = 0;
+    oneshotSubmit.pSignalSemaphores = nullptr;
+    
+    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &oneshotSubmit, m_copyFinishedFence));
+    VK_CHECK(vkWaitForFences(m_context.device, 1, &m_copyFinishedFence, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context.device, 1, &m_copyFinishedFence));
 }
 
 void Renderer::recordFrame(
@@ -189,12 +307,17 @@ void Renderer::render(F32 deltaTime)
         {
             // TODO: Get primary ray from camera & trace
             SizeType pixelIndex = x + y * m_resultBuffer.width;
-            m_resultBuffer.pixels[pixelIndex] = 0xFFFFFFFF; // Temp white clear before trace is implemented
+
+            // Temp gradient clear before trace is implemented
+            U32 color = 0xFF000000;
+            color |= x & 0xFF;
+            color |= (y & 0xFF) << 8;
+            m_resultBuffer.pixels[pixelIndex] = color;
         }
     }
 
     m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
-    // TODO: upload staging buffer to image -> use transfer queue + sync in frame
+    copyBufferToImage(m_frameStagingBuffer, m_frameImage);
 
     const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
     recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
@@ -212,7 +335,7 @@ void Renderer::render(F32 deltaTime)
     presentPassSubmit.signalSemaphoreCount = 1;
     presentPassSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
 
-    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue, 1, &presentPassSubmit, activeFrame.frameReady));
+    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &presentPassSubmit, activeFrame.frameReady));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.swapchainCount = 1;
@@ -222,6 +345,6 @@ void Renderer::render(F32 deltaTime)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
 
-    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue, &presentInfo));
+    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue.handle, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }

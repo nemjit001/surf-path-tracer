@@ -119,6 +119,11 @@ Image& Image::operator=(Image&& other) noexcept
     return *this;
 }
 
+VkImage Image::handle() const
+{
+    return m_image;
+}
+
 VkImageView Image::view() const
 {
     return m_view;

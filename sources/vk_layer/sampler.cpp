@@ -9,6 +9,7 @@ Sampler::Sampler(VkDevice device)
 	m_device(device),
 	m_sampler(VK_NULL_HANDLE)
 {
+	// FIXME: expose parts of sampler that need configuration in constructor call
 	VkSamplerCreateInfo samplerCreateInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 	samplerCreateInfo.flags = 0;
 	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;

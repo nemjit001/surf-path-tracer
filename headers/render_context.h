@@ -10,12 +10,18 @@
 
 #include "types.h"
 
+struct GPUQueue
+{
+    U32 familyIndex;
+    VkQueue handle;
+};
+
 struct GPUQueues
 {
-    VkQueue transferQueue;
-    VkQueue computeQueue;
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
+    GPUQueue transferQueue;
+    GPUQueue computeQueue;
+    GPUQueue graphicsQueue;
+    GPUQueue presentQueue;
 };
 
 class RenderContext

@@ -26,6 +26,8 @@ public:
     Image(Image&& other) noexcept;
     Image& operator=(Image&& other) noexcept;
 
+    VkImage handle() const;
+
     VkImageView view() const;
 
 private:

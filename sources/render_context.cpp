@@ -117,9 +117,16 @@ RenderContext::RenderContext(GLFWwindow* window)
 
     // Retrieve queue setup
     vkb::Result<VkQueue> transferQueue = device.get_queue(vkb::QueueType::transfer);
+    vkb::Result<U32> transferQueueIndex = device.get_queue_index(vkb::QueueType::transfer);
+
     vkb::Result<VkQueue> computeQueue = device.get_queue(vkb::QueueType::compute);
+    vkb::Result<U32> computeQueueIndex = device.get_queue_index(vkb::QueueType::compute);
+
     vkb::Result<VkQueue> graphicsQueue = device.get_queue(vkb::QueueType::graphics);
+    vkb::Result<U32> graphicsQueueIndex = device.get_queue_index(vkb::QueueType::graphics);
+
     vkb::Result<VkQueue> presentQueue = device.get_queue(vkb::QueueType::present);
+    vkb::Result<U32> presentQueueIndex = device.get_queue_index(vkb::QueueType::present);
 
     if (
         transferQueue.matches_error(vkb::QueueError::transfer_unavailable)
@@ -128,14 +135,16 @@ RenderContext::RenderContext(GLFWwindow* window)
     {
         // If no dedicated transfer queue or compute queue is available, just use the available graphics queue
         // as its guaranteed to support transfer and compute operations
-        transferQueue = device.get_queue(vkb::QueueType::graphics);
-        computeQueue = device.get_queue(vkb::QueueType::graphics);
+        transferQueue = graphicsQueue;
+        transferQueueIndex = graphicsQueueIndex;
+        computeQueue = graphicsQueue;
+        computeQueueIndex = graphicsQueueIndex;
     }
 
-    queues.transferQueue = transferQueue.value();
-    queues.computeQueue = computeQueue.value();
-    queues.graphicsQueue = graphicsQueue.value();
-    queues.presentQueue = presentQueue.value();
+    queues.transferQueue = GPUQueue{ transferQueueIndex.value(), transferQueue.value() };
+    queues.computeQueue = GPUQueue{ computeQueueIndex.value(), computeQueue.value() };
+    queues.graphicsQueue = GPUQueue{ graphicsQueueIndex.value(), graphicsQueue.value() };
+    queues.presentQueue = GPUQueue{ presentQueueIndex.value(), presentQueue.value() };
 }
 
 RenderContext::~RenderContext()
@@ -162,12 +171,7 @@ RenderContext::RenderContext(RenderContext&& other) noexcept
     other.swapchain = vkb::Swapchain();
     other.swapImageViews.clear();
     other.allocator = VK_NULL_HANDLE;
-    other.queues = GPUQueues {
-        VK_NULL_HANDLE,
-        VK_NULL_HANDLE,
-        VK_NULL_HANDLE,
-        VK_NULL_HANDLE
-    };
+    other.queues = GPUQueues {};
 }
 
 RenderContext& RenderContext::operator=(RenderContext&& other) noexcept

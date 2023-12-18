@@ -38,6 +38,11 @@ public:
 
     ~Renderer();
 
+    void copyBufferToImage(
+        const Buffer& staging,
+        const Image& target
+    );
+
     void recordFrame(
         VkCommandBuffer commandBuffer,
         const Framebuffer& framebuffer,
@@ -50,6 +55,11 @@ private:
     RenderContext m_context;
     DescriptorPool m_descriptorPool;
     PixelBuffer m_resultBuffer;
+
+    // Setup for copy operations
+    VkFence m_copyFinishedFence;
+    VkCommandPool m_copyPool;
+    VkCommandBuffer m_oneshotCopyBuffer;
 
     // Renderer Frame management
     SizeType m_currentFrame;
