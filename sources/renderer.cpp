@@ -34,7 +34,17 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
         VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
         | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
     ),
-    m_presentPipelineLayout(m_context.device),
+    m_presentPipelineLayout(
+        m_context.device,
+        {DescriptorSetLayout{{
+            DescriptorSetBinding{
+                0,                                          // Binding
+                VK_SHADER_STAGE_FRAGMENT_BIT,               // Shader stage
+                1,                                          // Descriptor count
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER   // Descriptor Type
+            }
+        }}}
+    ),
     m_presentPipeline()
 {
     // Set up per frame structures

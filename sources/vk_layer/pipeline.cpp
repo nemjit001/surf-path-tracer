@@ -8,17 +8,44 @@
 #include "vk_layer/shader.h"
 #include "vk_layer/vk_check.h"
 
-PipelineLayout::PipelineLayout(VkDevice device)
+PipelineLayout::PipelineLayout(VkDevice device, std::vector<DescriptorSetLayout> setLayouts)
     :
     m_device(device),
     m_layout(VK_NULL_HANDLE)
 {
+    SizeType descriptorSetCount = setLayouts.size();
+    m_descriptorSetLayouts.resize(descriptorSetCount, VK_NULL_HANDLE);
+    for (SizeType i = 0; i < descriptorSetCount; i++)
+    {
+        DescriptorSetLayout& layoutInfo = setLayouts[i];
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings;
+        bindings.reserve(layoutInfo.bindings.size());
+        for (auto const& bindingInfo : layoutInfo.bindings)
+        {
+            VkDescriptorSetLayoutBinding layoutBinding = {};
+            layoutBinding.binding = bindingInfo.binding;
+            layoutBinding.stageFlags = bindingInfo.shaderStage;
+            layoutBinding.descriptorCount = bindingInfo.descriptorCount;
+            layoutBinding.descriptorType = bindingInfo.descriptorType;
+
+            bindings.push_back(layoutBinding);
+        }
+
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        descriptorSetLayoutCreateInfo.flags = 0;
+        descriptorSetLayoutCreateInfo.bindingCount = static_cast<U32>(bindings.size());
+        descriptorSetLayoutCreateInfo.pBindings = bindings.data();
+
+        VK_CHECK(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &m_descriptorSetLayouts[i]));
+    }
+
     VkPipelineLayoutCreateInfo createInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
     createInfo.flags = 0;
     createInfo.pushConstantRangeCount = 0;
     createInfo.pPushConstantRanges = nullptr;
-    createInfo.setLayoutCount = 0;
-    createInfo.pSetLayouts = nullptr;
+    createInfo.setLayoutCount = m_descriptorSetLayouts.size();
+    createInfo.pSetLayouts = m_descriptorSetLayouts.data();
 
     VK_CHECK(vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_layout));
 }

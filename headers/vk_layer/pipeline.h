@@ -17,18 +17,31 @@ struct Viewport
     F32 maxDepth;
 };
 
+struct DescriptorSetBinding
+{
+    U32 binding;
+    VkShaderStageFlags shaderStage;
+    U32 descriptorCount;
+    VkDescriptorType descriptorType;
+};
+
+struct DescriptorSetLayout
+{
+    std::vector<DescriptorSetBinding> bindings;
+};
+
 class PipelineLayout
 {
 public:
-    PipelineLayout(VkDevice device);
+    PipelineLayout(VkDevice device, std::vector<DescriptorSetLayout> setLayouts);
 
     ~PipelineLayout();
 
     PipelineLayout(PipelineLayout&) = delete;
     PipelineLayout& operator=(PipelineLayout&) = delete;
 
-    PipelineLayout(PipelineLayout&&other) noexcept;
-    PipelineLayout& operator=(PipelineLayout&&other) noexcept;
+    PipelineLayout(PipelineLayout&& other) noexcept;
+    PipelineLayout& operator=(PipelineLayout&& other) noexcept;
 
     VkPipelineLayout handle() const;
 
@@ -37,6 +50,7 @@ private:
 
 private:
     VkDevice m_device;
+    std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
     VkPipelineLayout m_layout;
 };
 
