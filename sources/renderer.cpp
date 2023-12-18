@@ -27,6 +27,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
         | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     ),
+    m_frameImage(),
     m_presentPipelineLayout(m_context.device),
     m_presentPipeline()
 {

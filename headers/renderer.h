@@ -8,6 +8,7 @@
 #include "pixel_buffer.h"
 #include "vk_layer/buffer.h"
 #include "vk_layer/framebuffer.h"
+#include "vk_layer/image.h"
 #include "vk_layer/pipeline.h"
 #include "vk_layer/render_pass.h"
 
@@ -57,6 +58,7 @@ private:
 
     // Rendered frame staging buffer & target image
     Buffer m_frameStagingBuffer;
+    Image m_frameImage;
 
     // Custom shader pipeline & layout for use during render pass
     PipelineLayout m_presentPipelineLayout;
