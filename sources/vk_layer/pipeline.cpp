@@ -27,8 +27,9 @@ PipelineLayout::PipelineLayout(VkDevice device, std::vector<DescriptorSetLayout>
             VkDescriptorSetLayoutBinding layoutBinding = {};
             layoutBinding.binding = bindingInfo.binding;
             layoutBinding.stageFlags = bindingInfo.shaderStage;
-            layoutBinding.descriptorCount = bindingInfo.descriptorCount;
+            layoutBinding.descriptorCount = 1;
             layoutBinding.descriptorType = bindingInfo.descriptorType;
+            layoutBinding.pImmutableSamplers = nullptr;
 
             bindings.push_back(layoutBinding);
         }
@@ -45,7 +46,7 @@ PipelineLayout::PipelineLayout(VkDevice device, std::vector<DescriptorSetLayout>
     createInfo.flags = 0;
     createInfo.pushConstantRangeCount = 0;
     createInfo.pPushConstantRanges = nullptr;
-    createInfo.setLayoutCount = m_descriptorSetLayouts.size();
+    createInfo.setLayoutCount = static_cast<U32>(m_descriptorSetLayouts.size());
     createInfo.pSetLayouts = m_descriptorSetLayouts.data();
 
     VK_CHECK(vkCreatePipelineLayout(m_device, &createInfo, nullptr, &m_layout));
@@ -244,7 +245,7 @@ void GraphicsPipeline::init(
 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
     descriptorSetAllocateInfo.descriptorPool = descriptorPool.handle();
-    descriptorSetAllocateInfo.descriptorSetCount = setLayouts.size();
+    descriptorSetAllocateInfo.descriptorSetCount = static_cast<U32>(setLayouts.size());
     descriptorSetAllocateInfo.pSetLayouts = setLayouts.data();
 
     VK_CHECK(vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, m_descriptorSets.data()));
@@ -253,6 +254,59 @@ void GraphicsPipeline::init(
 void GraphicsPipeline::destroy()
 {
     vkDestroyPipeline(m_device, m_pipeline, nullptr);
+}
+
+void GraphicsPipeline::updateDescriptorSets(const std::vector<WriteDescriptorSet>& sets)
+{
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets;
+    writeDescriptorSets.reserve(sets.size());
+
+    for (auto const& set : sets)
+    {
+        assert(set.set < m_descriptorSets.size());
+
+        VkWriteDescriptorSet writeSet = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        writeSet.dstSet = m_descriptorSets[set.set];
+        writeSet.dstBinding = set.binding;
+        writeSet.dstArrayElement = 0;
+        writeSet.descriptorCount = 1;
+        writeSet.descriptorType = set.descriptorType;
+        
+        switch (set.descriptorType)
+        {
+            case VK_DESCRIPTOR_TYPE_SAMPLER:
+            case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+            case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                writeSet.pImageInfo = &set.imageInfo;
+                break;
+            case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+            case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+                // TODO: handle pTexelInfo
+                break;
+            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+                // TODO: handle pBufferInfo
+                break;
+            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+            default:
+                fprintf(stderr, "Cannot handle input attachment descriptor set\n");
+                abort();
+                break;
+        }
+
+        writeDescriptorSets.push_back(writeSet);
+    }
+
+    vkUpdateDescriptorSets(
+        m_device,
+        static_cast<U32>(writeDescriptorSets.size()),
+        writeDescriptorSets.data(),
+        0,
+        nullptr
+    );
 }
 
 VkPipelineBindPoint GraphicsPipeline::bindPoint() const

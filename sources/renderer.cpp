@@ -41,7 +41,6 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
             DescriptorSetBinding{
                 0,                                          // Binding
                 VK_SHADER_STAGE_FRAGMENT_BIT,               // Shader stage
-                1,                                          // Descriptor count
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER   // Descriptor Type
             }
         }}}
@@ -98,6 +97,18 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
         m_presentPipelineLayout,
         { &presentVertShader, &presentFragShader }
     );
+
+    m_presentPipeline.updateDescriptorSets({
+        WriteDescriptorSet{
+            0, 0,
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VkDescriptorImageInfo{
+                VK_NULL_HANDLE, // TODO: set sampler
+                VK_NULL_HANDLE, // TODO: set image view
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            }
+        }
+    });
 }
 
 Renderer::~Renderer()

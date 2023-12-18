@@ -22,13 +22,20 @@ struct DescriptorSetBinding
 {
     U32 binding;
     VkShaderStageFlags shaderStage;
-    U32 descriptorCount;
     VkDescriptorType descriptorType;
 };
 
 struct DescriptorSetLayout
 {
     std::vector<DescriptorSetBinding> bindings;
+};
+
+struct WriteDescriptorSet
+{
+    U32 set;
+    U32 binding;
+    VkDescriptorType descriptorType;
+    VkDescriptorImageInfo imageInfo;
 };
 
 class PipelineLayout
@@ -72,6 +79,8 @@ public:
     );
 
     void destroy();
+
+    void updateDescriptorSets(const std::vector<WriteDescriptorSet>& sets);
 
     VkPipelineBindPoint bindPoint() const;
 
