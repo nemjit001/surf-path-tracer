@@ -38,6 +38,9 @@ public:
 
     ~Renderer();
 
+    void render(F32 deltaTime);
+
+private:
     void copyBufferToImage(
         const Buffer& staging,
         const Image& target
@@ -48,8 +51,6 @@ public:
         const Framebuffer& framebuffer,
         const RenderPass& renderPass
     );
-
-    void render(F32 deltaTime);
 
 private:
     RenderContext m_context;

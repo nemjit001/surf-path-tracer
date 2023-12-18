@@ -152,6 +152,65 @@ Renderer::~Renderer()
     vkDestroyFence(m_context.device, m_copyFinishedFence, nullptr);
 }
 
+void Renderer::render(F32 deltaTime)
+{
+    const FrameData& activeFrame = m_frames[m_currentFrame];
+
+    U32 availableSwapImage = 0;
+    VK_CHECK(vkAcquireNextImageKHR(m_context.device, m_context.swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &availableSwapImage));
+
+    VK_CHECK(vkWaitForFences(m_context.device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
+    VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
+
+    for (SizeType y = 0; y < m_resultBuffer.height; y++)
+    {
+        for (SizeType x = 0; x < m_resultBuffer.width; x++)
+        {
+            // TODO: Get primary ray from camera & trace
+            SizeType pixelIndex = x + y * m_resultBuffer.width;
+
+            // Temp gradient clear before trace is implemented
+            U32 color = 0xFF000000;
+            color |= x & 0xFF;
+            color |= (y & 0xFF) << 8;
+            m_resultBuffer.pixels[pixelIndex] = color;
+        }
+    }
+
+    m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
+    copyBufferToImage(m_frameStagingBuffer, m_frameImage);
+
+    const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
+    recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
+
+    VkPipelineStageFlags waitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
+    };
+
+    VkSubmitInfo presentPassSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    presentPassSubmit.commandBufferCount = 1;
+    presentPassSubmit.pCommandBuffers = &activeFrame.commandBuffer;
+    presentPassSubmit.waitSemaphoreCount = 1;
+    presentPassSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
+    presentPassSubmit.pWaitDstStageMask = waitStages;
+    presentPassSubmit.signalSemaphoreCount = 1;
+    presentPassSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
+
+    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &presentPassSubmit, activeFrame.frameReady));
+
+    VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &m_context.swapchain.swapchain;
+    presentInfo.pImageIndices = &availableSwapImage;
+    presentInfo.pResults = nullptr;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
+
+    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue.handle, &presentInfo));
+    m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
+}
+
 void Renderer::copyBufferToImage(
     const Buffer& staging,
     const Image& target
@@ -288,63 +347,4 @@ void Renderer::recordFrame(
 
     vkCmdEndRenderPass(commandBuffer);
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
-}
-
-void Renderer::render(F32 deltaTime)
-{
-    const FrameData& activeFrame = m_frames[m_currentFrame];
-
-    U32 availableSwapImage = 0;
-    VK_CHECK(vkAcquireNextImageKHR(m_context.device, m_context.swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &availableSwapImage));
-
-    VK_CHECK(vkWaitForFences(m_context.device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
-    VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
-
-    for (SizeType y = 0; y < m_resultBuffer.height; y++)
-    {
-        for (SizeType x = 0; x < m_resultBuffer.width; x++)
-        {
-            // TODO: Get primary ray from camera & trace
-            SizeType pixelIndex = x + y * m_resultBuffer.width;
-
-            // Temp gradient clear before trace is implemented
-            U32 color = 0xFF000000;
-            color |= x & 0xFF;
-            color |= (y & 0xFF) << 8;
-            m_resultBuffer.pixels[pixelIndex] = color;
-        }
-    }
-
-    m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
-    copyBufferToImage(m_frameStagingBuffer, m_frameImage);
-
-    const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
-    recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
-
-    VkPipelineStageFlags waitStages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
-    };
-
-    VkSubmitInfo presentPassSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    presentPassSubmit.commandBufferCount = 1;
-    presentPassSubmit.pCommandBuffers = &activeFrame.commandBuffer;
-    presentPassSubmit.waitSemaphoreCount = 1;
-    presentPassSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
-    presentPassSubmit.pWaitDstStageMask = waitStages;
-    presentPassSubmit.signalSemaphoreCount = 1;
-    presentPassSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
-
-    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &presentPassSubmit, activeFrame.frameReady));
-
-    VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &m_context.swapchain.swapchain;
-    presentInfo.pImageIndices = &availableSwapImage;
-    presentInfo.pResults = nullptr;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
-
-    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue.handle, &presentInfo));
-    m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }
