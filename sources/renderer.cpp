@@ -29,6 +29,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
         VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT // Should allow memcpy writes & mapping
     ),
     m_frameImage(
+        m_context.device,
         m_context.allocator,
         VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
         resultBuffer.width, resultBuffer.height,
@@ -104,7 +105,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             VkDescriptorImageInfo{
                 VK_NULL_HANDLE, // TODO: set sampler
-                VK_NULL_HANDLE, // TODO: set image view
+                m_frameImage.view(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             }
         }

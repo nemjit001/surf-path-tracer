@@ -9,6 +9,7 @@ class Image
 {
 public:
     Image(
+        VkDevice device,
         VmaAllocator allocator,
         VkFormat imageFormat,
         U32 width,
@@ -22,15 +23,19 @@ public:
     Image(const Image&) = delete;
     Image& operator=(const Image&) = delete;
 
-    Image(Image&& other);
-    Image& operator=(Image&& other);
+    Image(Image&& other) noexcept;
+    Image& operator=(Image&& other) noexcept;
+
+    VkImageView view() const;
 
 private:
     void release();
 
 private:
+    VkDevice m_device;
     VmaAllocator m_allocator;
     VmaAllocation m_allocation;
     VmaAllocationInfo m_allocationInfo;
     VkImage m_image;
+    VkImageView m_view;
 };

@@ -7,6 +7,7 @@
 #include "vk_layer/vk_check.h"
 
 Image::Image(
+    VkDevice device,
     VmaAllocator allocator,
     VkFormat imageFormat,
     U32 width,
@@ -15,10 +16,12 @@ Image::Image(
     VmaMemoryUsage memoryUsage
 )
     :
+    m_device(device),
     m_allocator(allocator),
     m_allocation(VK_NULL_HANDLE),
     m_allocationInfo{},
-    m_image(VK_NULL_HANDLE)
+    m_image(VK_NULL_HANDLE),
+    m_view(VK_NULL_HANDLE)
 {
     VkImageCreateInfo imageCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     imageCreateInfo.flags = 0;
@@ -53,6 +56,30 @@ Image::Image(
         &m_allocation,
         &m_allocationInfo
     ));
+
+    VkImageViewCreateInfo viewCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    viewCreateInfo.flags = 0;
+    viewCreateInfo.image = m_image;
+    viewCreateInfo.format = imageFormat;
+    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewCreateInfo.components = VkComponentMapping{
+        VK_COMPONENT_SWIZZLE_IDENTITY,  // R
+        VK_COMPONENT_SWIZZLE_IDENTITY,  // G
+        VK_COMPONENT_SWIZZLE_IDENTITY,  // B
+        VK_COMPONENT_SWIZZLE_IDENTITY   // A
+    };
+    viewCreateInfo.subresourceRange = VkImageSubresourceRange{
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0, 1,   // 0th mip level, 1 level
+        0, 1    // 0th array layer, 1 layer
+    };
+
+    VK_CHECK(vkCreateImageView(
+        m_device,
+        &viewCreateInfo,
+        nullptr,
+        &m_view
+    ));
 }
 
 Image::~Image()
@@ -60,18 +87,21 @@ Image::~Image()
     release();
 }
 
-Image::Image(Image&& other)
+Image::Image(Image&& other) noexcept
     :
+    m_device(other.m_device),
     m_allocator(other.m_allocator),
     m_allocation(other.m_allocation),
     m_allocationInfo(other.m_allocationInfo),
-    m_image(other.m_image)
+    m_image(other.m_image),
+    m_view(other.m_view)
 {
     other.m_allocation = VK_NULL_HANDLE;
     other.m_image = VK_NULL_HANDLE;
+    other.m_view = VK_NULL_HANDLE;
 }
 
-Image& Image::operator=(Image&& other)
+Image& Image::operator=(Image&& other) noexcept
 {
     if (this == &other)
     {
@@ -79,15 +109,23 @@ Image& Image::operator=(Image&& other)
     }
 
     this->release();
+    this->m_device = other.m_device;
     this->m_allocator = other.m_allocator;
     this->m_allocation = other.m_allocation;
     this->m_allocationInfo = other.m_allocationInfo;
     this->m_image = other.m_image;
+    this->m_view = other.m_view;
 
     return *this;
+}
+
+VkImageView Image::view() const
+{
+    return m_view;
 }
 
 void Image::release()
 {
     vmaDestroyImage(m_allocator, m_image, m_allocation);
+    vkDestroyImageView(m_device, m_view, nullptr);
 }
