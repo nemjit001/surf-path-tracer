@@ -5,6 +5,7 @@
 #include "camera.h"
 #include "render_context.h"
 #include "renderer.h"
+#include "scene.h"
 #include "surf_math.h"
 #include "pixel_buffer.h"
 #include "timer.h"
@@ -101,9 +102,8 @@ int main()
 		resultBuffer.height
 	);
 
-	// TODO: load scene
-
-	Renderer renderer(std::move(renderContext), resultBuffer, &worldCam);
+	Scene scene;
+	Renderer renderer(std::move(renderContext), resultBuffer, &worldCam, &scene);
 
 	// Create frame timer
 	Timer frameTimer;

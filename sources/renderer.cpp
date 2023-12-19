@@ -7,6 +7,7 @@
 #include "camera.h"
 #include "ray.h"
 #include "render_context.h"
+#include "scene.h"
 #include "surf_math.h"
 #include "types.h"
 #include "pixel_buffer.h"
@@ -19,13 +20,14 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
-Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera)
+Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera, Scene* scene)
     :
     m_context(std::move(renderContext)),
     m_descriptorPool(m_context.device),
     m_framebufferSize(m_context.getFramebufferSize()),
     m_resultBuffer(resultBuffer),
     m_camera(camera),
+    m_scene(scene),
     m_copyFinishedFence(VK_NULL_HANDLE),
     m_copyPool(VK_NULL_HANDLE),
     m_oneshotCopyBuffer(VK_NULL_HANDLE),
@@ -162,9 +164,28 @@ Renderer::~Renderer()
     vkDestroyFence(m_context.device, m_copyFinishedFence, nullptr);
 }
 
-Float3 Renderer::trace(Ray& ray)
+RgbColor Renderer::trace(Ray& ray)
 {
-    return 0.5f * (Float3(1.0f) + ray.direction);
+    if (!m_scene->intersect(ray))
+        return RgbColor(0.0f, 0.0f, 0.0f);
+
+    // TODO: Retrieve hit object from scene by index stored in Ray
+    // TODO: Fetch normal, material (emittance, albedo, specularity, reflectivity)
+
+    Float3 hitNormal = Float3(0.0f);        // TODO: Retrieve from hit instance mesh
+    RgbColor emittance = RgbColor(0.0f);    // TODO: Retrieve from hit instance material
+    RgbColor albedo = RgbColor(1.0f, 0.0f, 0.0f);
+
+    RgbColor brdf = albedo * F32_INV_PI;
+
+    Float3 newDirection = randomOnHemisphere(hitNormal);
+    Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+    Ray newRay(newOrigin, newDirection);
+
+    F32 cosTheta = glm::dot(newDirection, hitNormal);
+    RgbColor incomingColor = trace(newRay);
+
+    return emittance + F32_2PI * cosTheta * brdf * incomingColor;
 }
 
 void Renderer::render(F32 deltaTime)

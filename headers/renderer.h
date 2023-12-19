@@ -6,6 +6,7 @@
 #include "camera.h"
 #include "ray.h"
 #include "render_context.h"
+#include "scene.h"
 #include "surf_math.h"
 #include "types.h"
 #include "pixel_buffer.h"
@@ -31,11 +32,11 @@ struct FrameData
 class Renderer
 {
 public:
-    Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera);
+    Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera, Scene* scene);
 
     ~Renderer();
 
-    Float3 trace(Ray& ray);
+    RgbColor trace(Ray& ray);
 
     void render(F32 deltaTime);
 
@@ -57,6 +58,7 @@ private:
     FramebufferSize m_framebufferSize;
     PixelBuffer m_resultBuffer;
     Camera* m_camera;
+    Scene* m_scene;
 
     // Setup for copy operations
     VkFence m_copyFinishedFence;
