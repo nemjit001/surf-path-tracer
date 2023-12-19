@@ -3,7 +3,10 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
+#include "camera.h"
+#include "ray.h"
 #include "render_context.h"
+#include "surf_math.h"
 #include "types.h"
 #include "pixel_buffer.h"
 #include "vk_layer/buffer.h"
@@ -15,12 +18,6 @@
 #include "vk_layer/sampler.h"
 
 #define FRAMES_IN_FLIGHT 2
-
-struct RenderResulution
-{
-    U32 width;
-    U32 height;
-};
 
 struct FrameData
 {
@@ -34,9 +31,11 @@ struct FrameData
 class Renderer
 {
 public:
-    Renderer(RenderContext renderContext, RenderResulution resolution, PixelBuffer resultBuffer);
+    Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera);
 
     ~Renderer();
+
+    Float3 trace(Ray& ray);
 
     void render(F32 deltaTime);
 
@@ -55,7 +54,9 @@ private:
 private:
     RenderContext m_context;
     DescriptorPool m_descriptorPool;
+    FramebufferSize m_framebufferSize;
     PixelBuffer m_resultBuffer;
+    Camera* m_camera;
 
     // Setup for copy operations
     VkFence m_copyFinishedFence;

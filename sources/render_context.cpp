@@ -195,13 +195,15 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept
     return *this;
 }
 
-void RenderContext::getFramebufferSize(U32& width, U32& height)
+FramebufferSize RenderContext::getFramebufferSize()
 {
     int glfwWidth = 0, glfwHeight = 0;
     glfwGetFramebufferSize(m_window, &glfwWidth, &glfwHeight);
 
-    width = static_cast<U32>(glfwWidth);
-    height = static_cast<U32>(glfwHeight);
+    return FramebufferSize{
+        static_cast<U32>(glfwWidth),
+        static_cast<U32>(glfwHeight)
+    };
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL RenderContext::debugCallback(

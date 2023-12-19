@@ -9,5 +9,5 @@ layout(binding = 0, set = 0) uniform sampler2D renderResult;
 
 void main()
 {
-	fragColor = texture(renderResult, screenCoords);
+	fragColor = sqrt(texture(renderResult, screenCoords));
 }

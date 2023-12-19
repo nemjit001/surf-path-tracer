@@ -4,18 +4,28 @@
 #include <cstdio>
 #include <vulkan/vulkan.h>
 
-#include "surf.h"
+#include "camera.h"
+#include "ray.h"
+#include "render_context.h"
+#include "surf_math.h"
 #include "types.h"
 #include "pixel_buffer.h"
+#include "vk_layer/buffer.h"
+#include "vk_layer/descriptor_pool.h"
+#include "vk_layer/framebuffer.h"
+#include "vk_layer/image.h"
+#include "vk_layer/pipeline.h"
 #include "vk_layer/render_pass.h"
-#include "vk_layer/shader.h"
+#include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
-Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, PixelBuffer resultBuffer)
+Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera)
     :
     m_context(std::move(renderContext)),
     m_descriptorPool(m_context.device),
+    m_framebufferSize(m_context.getFramebufferSize()),
     m_resultBuffer(resultBuffer),
+    m_camera(camera),
     m_copyFinishedFence(VK_NULL_HANDLE),
     m_copyPool(VK_NULL_HANDLE),
     m_oneshotCopyBuffer(VK_NULL_HANDLE),
@@ -99,7 +109,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
     m_framebuffers.reserve(m_context.swapchain.image_count);
     for (const auto& imageView : m_context.swapImageViews)
     {
-        Framebuffer swapFramebuffer(m_context.device, m_presentPass, { imageView }, resolution.width, resolution.height);
+        Framebuffer swapFramebuffer(m_context.device, m_presentPass, { imageView }, m_framebufferSize.width, m_framebufferSize.height);
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 
@@ -111,7 +121,7 @@ Renderer::Renderer(RenderContext renderContext, RenderResulution resolution, Pix
         m_context.device,
         Viewport {
             0, 0,   // Offset of viewport in (X, Y)
-            resolution.width, resolution.height,
+            m_framebufferSize.width, m_framebufferSize.height,
             0.0f, 1.0f
         },
         m_descriptorPool,
@@ -152,6 +162,11 @@ Renderer::~Renderer()
     vkDestroyFence(m_context.device, m_copyFinishedFence, nullptr);
 }
 
+Float3 Renderer::trace(Ray& ray)
+{
+    return 0.5f * (Float3(1.0f) + ray.direction);
+}
+
 void Renderer::render(F32 deltaTime)
 {
     const FrameData& activeFrame = m_frames[m_currentFrame];
@@ -167,14 +182,12 @@ void Renderer::render(F32 deltaTime)
     {
         for (SizeType x = 0; x < m_resultBuffer.width; x++)
         {
-            // TODO: Get primary ray from camera & trace
             SizeType pixelIndex = x + y * m_resultBuffer.width;
+            Ray primaryRay = m_camera->getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));
 
-            // Temp gradient clear before trace is implemented
-            U32 color = 0xFF000000;
-            color |= x & 0xFF;
-            color |= (y & 0xFF) << 8;
-            m_resultBuffer.pixels[pixelIndex] = color;
+            Float3 color = trace(primaryRay);
+
+            m_resultBuffer.pixels[pixelIndex] = RgbaToU32(RgbaColor(color, 1.0f));
         }
     }
 
@@ -325,9 +338,9 @@ void Renderer::recordFrame(
     renderPassBeginInfo.framebuffer = framebuffer.handle();
     renderPassBeginInfo.clearValueCount = 1;
     renderPassBeginInfo.pClearValues = &clearValue;
-    renderPassBeginInfo.renderArea = {  // FIXME: take from some value stored in renderer
+    renderPassBeginInfo.renderArea = {
         0, 0,
-        1280, 720
+        m_framebufferSize.width, m_framebufferSize.height
     };
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);

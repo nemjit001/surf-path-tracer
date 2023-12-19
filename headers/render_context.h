@@ -10,6 +10,12 @@
 
 #include "types.h"
 
+struct FramebufferSize
+{
+    U32 width;
+    U32 height;
+};
+
 struct GPUQueue
 {
     U32 familyIndex;
@@ -37,7 +43,7 @@ public:
     RenderContext(RenderContext&& other) noexcept;
     RenderContext& operator=(RenderContext&& other) noexcept;
 
-    void getFramebufferSize(U32& width, U32& height);
+    FramebufferSize getFramebufferSize();
 
 private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(

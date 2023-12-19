@@ -2,28 +2,40 @@
 
 #include <cstdio>
 
+#include "camera.h"
 #include "render_context.h"
 #include "renderer.h"
+#include "surf_math.h"
 #include "pixel_buffer.h"
 #include "timer.h"
 #include "types.h"
 #include "window_manager.h"
 
-#define NUM_SMOOTH_FRAMES 20	// Number of frames to smooth FPS / frame timing over
+#define RESOLUTION_SCALE	1.0
+
+#define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
 int main()
 {
 	WindowManager windowManager;
 	GLFWwindow* window = windowManager.createWindow(PROGRAM_NAME, SCR_WIDTH, SCR_HEIGHT);
 
-	RenderResulution resolution = RenderResulution{
-		SCR_WIDTH,
-		SCR_HEIGHT
-	};
-
-	PixelBuffer resultBuffer(resolution.width, resolution.height);
 	RenderContext renderContext(window);
-	Renderer renderer(std::move(renderContext), resolution, resultBuffer);
+	FramebufferSize resolution = renderContext.getFramebufferSize();
+
+	PixelBuffer resultBuffer(
+		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
+		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
+	);
+
+	Camera worldCam(
+		Float3(0.0f, 0.0f, -2.0f),
+		Float3(0.0f, 0.0f, 0.0f),
+		resultBuffer.width,
+		resultBuffer.height
+	);
+
+	Renderer renderer(std::move(renderContext), resultBuffer, &worldCam);
 
 	// TODO: load scene
 
