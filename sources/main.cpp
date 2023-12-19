@@ -27,25 +27,25 @@ void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime)
 
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 	{
-		deltaPosition += CAMERA_SPEED * forward * deltaTime;
+		deltaPosition += 2.0f * CAMERA_SPEED * forward * deltaTime;
 		updated = true;
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 	{
-		deltaPosition -= CAMERA_SPEED * forward * deltaTime;
+		deltaPosition -= 2.0f * CAMERA_SPEED * forward * deltaTime;
 		updated = true;
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 	{
-		deltaPosition += CAMERA_SPEED * right * deltaTime;
+		deltaPosition += 2.0f * CAMERA_SPEED * right * deltaTime;
 		updated = true;
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 	{
-		deltaPosition -= CAMERA_SPEED * right * deltaTime;
+		deltaPosition -= 2.0f * CAMERA_SPEED * right * deltaTime;
 		updated = true;
 	}
 
