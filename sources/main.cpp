@@ -101,9 +101,9 @@ int main()
 		resultBuffer.height
 	);
 
-	Renderer renderer(std::move(renderContext), resultBuffer, &worldCam);
-
 	// TODO: load scene
+
+	Renderer renderer(std::move(renderContext), resultBuffer, &worldCam);
 
 	// Create frame timer
 	Timer frameTimer;
