@@ -199,9 +199,10 @@ void Renderer::render(F32 deltaTime)
     VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
 
-    for (SizeType y = 0; y < m_resultBuffer.height; y++)
+#pragma omp parallel for schedule(dynamic)
+    for (I32 y = 0; y < static_cast<I32>(m_resultBuffer.height); y++)
     {
-        for (SizeType x = 0; x < m_resultBuffer.width; x++)
+        for (I32 x = 0; x < static_cast<I32>(m_resultBuffer.width); x++)
         {
             SizeType pixelIndex = x + y * m_resultBuffer.width;
             Ray primaryRay = m_camera->getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));

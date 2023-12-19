@@ -3,6 +3,9 @@ project("Surf" VERSION 0.0.0)
 set(TARGET_NAME "surf")
 
 # Dependency setup
+# OpenMP
+find_package(OpenMP REQUIRED)
+
 # Vulkan
 find_package(Vulkan REQUIRED)
 
@@ -56,6 +59,7 @@ target_link_libraries(${TARGET_NAME}
 	tinyobjloader
 	VulkanMemoryAllocator
 	vk-bootstrap
+	optimized OpenMP::OpenMP_CXX
 )
 
 # Generate shader output directory + build shaders for Surf
