@@ -1,5 +1,8 @@
 #include "mesh.h"
 
+#include <iostream>
+#include <string>
+#include <tiny_obj_loader.h>
 #include <vector>
 
 #include "ray.h"
@@ -63,19 +66,59 @@ Float3 Triangle::normal() const
 	return glm::normalize(glm::cross(v1 - v0, v2 - v0));
 }
 
-Mesh::Mesh()
+Mesh::Mesh(const std::string& path)
 	:
 	m_triangles()
 {
-	m_triangles.reserve(100);
+	tinyobj::ObjReaderConfig config;
+	config.triangulate = true;
 
-	for (SizeType i = 0; i < 100; i++)
+	tinyobj::ObjReader reader;
+	if (!reader.ParseFromFile(path, config))
 	{
-		Float3 v0(randomRange(10.0f) - 5.0f, randomRange(10.0f) - 5.0f, randomRange(10.0f) - 5.0f);
-		Float3 v1(v0.x + randomF32(), v0.y + randomF32(), v0.z + randomF32());
-		Float3 v2(v0.x + randomF32(), v0.y + randomF32(), v0.z + randomF32());
+		std::cerr << "Failed to read OBJ file: " << path << '\n';
+		if (!reader.Error().empty())
+		{
+			std::cerr << reader.Error() << '\n';
+		}
 
-		m_triangles.push_back(Triangle(v0, v1, v2));
+		abort();
+	}
+
+	if (!reader.Warning().empty())
+	{
+		std::cerr << reader.Warning() << '\n';
+	}
+
+	const tinyobj::attrib_t& attributes = reader.GetAttrib();
+	const std::vector<tinyobj::shape_t>& shapes = reader.GetShapes();
+
+	std::vector<Float3> vertices;
+	std::vector<U32> indices;
+	for (const auto& shape : shapes)
+	{
+		for (const auto& index : shape.mesh.indices)
+		{
+			SizeType vertexIndex = 3 * index.vertex_index;
+			Float3 position(
+				attributes.vertices[vertexIndex + 0],
+				attributes.vertices[vertexIndex + 1],
+				attributes.vertices[vertexIndex + 2]
+			);
+
+			vertices.push_back(position);
+			indices.push_back(static_cast<U32>(indices.size()));
+		}
+	}
+
+	m_triangles.reserve(indices.size() / 3);
+	for (SizeType i = 0; i < indices.size(); i += 3)
+	{
+		m_triangles.push_back(Triangle(
+			vertices[indices[i]],
+			vertices[indices[i + 1]],
+			vertices[indices[i + 2]]
+		));
 	}
 }
 

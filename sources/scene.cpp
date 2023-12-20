@@ -5,7 +5,7 @@
 
 Scene::Scene()
 	:
-	m_testMesh()
+	m_testMesh("assets/cube.obj")
 {
 	//
 }

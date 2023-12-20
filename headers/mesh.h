@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "ray.h"
@@ -23,7 +24,7 @@ struct Triangle
 class Mesh
 {
 public:
-	Mesh();
+	Mesh(const std::string& path);
 
 	Float3 normal(SizeType primitiveIndex) const;
 

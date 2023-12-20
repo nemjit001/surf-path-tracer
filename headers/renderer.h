@@ -47,7 +47,7 @@ public:
 
     ~Renderer();
 
-    RgbColor trace(Ray& ray);
+    RgbColor trace(Ray& ray, U32 depth = 0);
 
     void clearAccumulator();
 

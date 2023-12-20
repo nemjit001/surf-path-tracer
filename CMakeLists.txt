@@ -62,6 +62,12 @@ target_link_libraries(${TARGET_NAME}
 	optimized OpenMP::OpenMP_CXX
 )
 
+# Copy asset output directory for Surf
+add_custom_target(copy-asset-dir ALL
+	COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/" $<TARGET_FILE_DIR:${TARGET_NAME}>/assets
+	COMMENT "Copying asset directory"
+)
+
 # Generate shader output directory + build shaders for Surf
 add_custom_target(create-shader-dir ALL
 	COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET_NAME}>/shaders

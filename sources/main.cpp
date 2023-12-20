@@ -108,7 +108,7 @@ int main()
 	);
 
 	Camera worldCam(
-		Float3(0.0f, 0.0f, -2.0f),
+		Float3(0.0f, 0.0f, -5.0f),
 		Float3(0.0f, 0.0f, 0.0f),
 		resultBuffer.width,
 		resultBuffer.height

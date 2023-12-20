@@ -20,6 +20,10 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
+// TODO: expose as settings for renderer
+#define MAX_BOUNCES         5
+#define SAMPLES_PER_FRAME   1
+
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
     totalSamples(0),
@@ -179,8 +183,11 @@ Renderer::~Renderer()
     vkDestroyFence(m_context.device, m_copyFinishedFence, nullptr);
 }
 
-RgbColor Renderer::trace(Ray& ray)
+RgbColor Renderer::trace(Ray& ray, U32 depth)
 {
+    if (depth > MAX_BOUNCES)
+        return RgbColor(0.0f, 0.0f, 0.0f);
+
     if (!m_scene->intersect(ray))
         return RgbColor(0.0f, 0.0f, 0.0f);
 
@@ -191,7 +198,7 @@ RgbColor Renderer::trace(Ray& ray)
     RgbColor emittance = 0.5f * (RgbColor(1.0f) + hitNormal);   // For now set color as tri normal
     RgbColor albedo = RgbColor(0.0f, 0.0f, 0.0f);               // TODO: Retrieve from hit instance material
 
-    if (ray.metadata.primitiveIndex % 3 == 0)
+    if (ray.metadata.primitiveIndex % 2 == 0)
     {
         albedo = emittance;
         emittance = Float3(0.0f);
@@ -204,7 +211,7 @@ RgbColor Renderer::trace(Ray& ray)
     Ray newRay(newOrigin, newDirection);
 
     F32 cosTheta = glm::dot(newDirection, hitNormal);
-    RgbColor incomingColor = trace(newRay);
+    RgbColor incomingColor = trace(newRay, depth + 1);
 
     return emittance + F32_2PI * cosTheta * brdf * incomingColor;
 }
@@ -226,7 +233,8 @@ void Renderer::render(F32 deltaTime)
     VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
 
-    const F32 invSamples = 1.0f / (static_cast<F32>(m_accumulator.totalSamples) + 1.0f);
+    // Start CPU ray tracing loop
+    const F32 invSamples = 1.0f / static_cast<F32>(m_accumulator.totalSamples + SAMPLES_PER_FRAME);
 
 #pragma omp parallel for schedule(dynamic)
     for (I32 y = 0; y < static_cast<I32>(m_resultBuffer.height); y++)
@@ -242,7 +250,8 @@ void Renderer::render(F32 deltaTime)
         }
     }
 
-    m_accumulator.totalSamples += 1;
+    m_accumulator.totalSamples += SAMPLES_PER_FRAME;
+    // End CPU ray tracing loop
 
     m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
     copyBufferToImage(m_frameStagingBuffer, m_frameImage);
