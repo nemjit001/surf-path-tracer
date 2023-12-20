@@ -20,6 +20,17 @@
 
 #define FRAMES_IN_FLIGHT 2
 
+struct AccumulatorState
+{
+    SizeType totalSamples;
+    SizeType bufferSize;
+    RgbaColor* buffer;
+
+    AccumulatorState(U32 width, U32 height);
+
+    ~AccumulatorState();
+};
+
 struct FrameData
 {
     VkCommandPool pool;
@@ -37,6 +48,8 @@ public:
     ~Renderer();
 
     RgbColor trace(Ray& ray);
+
+    void clearAccumulator();
 
     void render(F32 deltaTime);
 
@@ -57,6 +70,7 @@ private:
     DescriptorPool m_descriptorPool;
     FramebufferSize m_framebufferSize;
     PixelBuffer m_resultBuffer;
+    AccumulatorState m_accumulator;
     Camera* m_camera;
     Scene* m_scene;
 

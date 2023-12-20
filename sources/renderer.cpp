@@ -20,12 +20,27 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
+AccumulatorState::AccumulatorState(U32 width, U32 height)
+    :
+    totalSamples(0),
+    bufferSize(width * height),
+    buffer(new RgbaColor[bufferSize]{})
+{
+    //
+}
+
+AccumulatorState::~AccumulatorState()
+{
+    delete[] buffer;
+}
+
 Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera, Scene* scene)
     :
     m_context(std::move(renderContext)),
     m_descriptorPool(m_context.device),
     m_framebufferSize(m_context.getFramebufferSize()),
     m_resultBuffer(resultBuffer),
+    m_accumulator(resultBuffer.width, resultBuffer.height),
     m_camera(camera),
     m_scene(scene),
     m_copyFinishedFence(VK_NULL_HANDLE),
@@ -194,6 +209,12 @@ RgbColor Renderer::trace(Ray& ray)
     return emittance + F32_2PI * cosTheta * brdf * incomingColor;
 }
 
+void Renderer::clearAccumulator()
+{
+    m_accumulator.totalSamples = 0;
+    memset(m_accumulator.buffer, 0, m_accumulator.bufferSize * sizeof(RgbaColor));
+}
+
 void Renderer::render(F32 deltaTime)
 {
     const FrameData& activeFrame = m_frames[m_currentFrame];
@@ -205,6 +226,8 @@ void Renderer::render(F32 deltaTime)
     VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
 
+    const F32 invSamples = 1.0f / (static_cast<F32>(m_accumulator.totalSamples) + 1.0f);
+
 #pragma omp parallel for schedule(dynamic)
     for (I32 y = 0; y < static_cast<I32>(m_resultBuffer.height); y++)
     {
@@ -212,12 +235,14 @@ void Renderer::render(F32 deltaTime)
         {
             SizeType pixelIndex = x + y * m_resultBuffer.width;
             Ray primaryRay = m_camera->getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));
+            RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
 
-            Float3 color = trace(primaryRay);
-
-            m_resultBuffer.pixels[pixelIndex] = RgbaToU32(RgbaColor(color, 1.0f));
+            m_accumulator.buffer[pixelIndex] += color;
+            m_resultBuffer.pixels[pixelIndex] = RgbaToU32(m_accumulator.buffer[pixelIndex] * invSamples);
         }
     }
+
+    m_accumulator.totalSamples += 1;
 
     m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
     copyBufferToImage(m_frameStagingBuffer, m_frameImage);

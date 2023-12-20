@@ -16,9 +16,9 @@
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
-void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime)
+void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
-	bool updated = false;
+	updated = false;
 
 	Float3 forward = camera.forward;
 	Float3 right = glm::normalize(glm::cross(WORLD_UP, forward));
@@ -47,6 +47,18 @@ void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime)
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 	{
 		deltaPosition -= 2.0f * CAMERA_SPEED * right * deltaTime;
+		updated = true;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+	{
+		deltaPosition += 2.0f * CAMERA_SPEED * up * deltaTime;
+		updated = true;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+	{
+		deltaPosition -= 2.0f * CAMERA_SPEED * up * deltaTime;
 		updated = true;
 	}
 
@@ -130,9 +142,13 @@ int main()
 		renderer.render(deltaTime);
 
 		// Handle input
-		handleCameraInput(window, worldCam, deltaTime);
+		bool cameraUpdated = false;
+		handleCameraInput(window, worldCam, deltaTime, cameraUpdated);
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
+
+		if (cameraUpdated)
+			renderer.clearAccumulator();
 
 		glfwPollEvents();
 	}
