@@ -78,3 +78,8 @@ Float3 randomOnHemisphere(const Float3& normal)
 
 	return glm::normalize(direction);
 }
+
+bool depthInBounds(F32 depth, F32 maxDepth)
+{
+	return F32_EPSILON <= depth && depth < maxDepth;
+}

@@ -172,10 +172,16 @@ RgbColor Renderer::trace(Ray& ray)
     // TODO: Retrieve hit object from scene by index stored in Ray
     // TODO: Fetch normal, material (emittance, albedo, specularity, reflectivity)
 
-    Float3 hitNormal = Float3(0.0f);        // TODO: Retrieve from hit instance mesh
-    RgbColor emittance = RgbColor(0.0f);    // TODO: Retrieve from hit instance material
-    RgbColor albedo = RgbColor(1.0f, 0.0f, 0.0f);
+    Float3 hitNormal = m_scene->normal(ray.metadata.instanceIndex, ray.metadata.primitiveIndex);
+    RgbColor emittance = 0.5f * (RgbColor(1.0f) + hitNormal);   // For now set color as tri normal
+    RgbColor albedo = RgbColor(0.0f, 0.0f, 0.0f);               // TODO: Retrieve from hit instance material
 
+    if (ray.metadata.primitiveIndex % 3 == 0)
+    {
+        albedo = emittance;
+        emittance = Float3(0.0f);
+    }
+    
     RgbColor brdf = albedo * F32_INV_PI;
 
     Float3 newDirection = randomOnHemisphere(hitNormal);

@@ -4,7 +4,7 @@
 #include "surf_math.h"
 #include "types.h"
 
-#define FOCAL_LENGTH	1.0f
+#define FOCAL_LENGTH	2.0f
 #define VIEWPORT_HEIGHT	2.0f
 
 Camera::Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight)
@@ -13,7 +13,7 @@ Camera::Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight
 	forward(0.0f),
 	up(0.0f),
 	screenWidth(static_cast<F32>(screenWidth)),
-	screenHeight(static_cast<F32>(screenWidth)),
+	screenHeight(static_cast<F32>(screenHeight)),
 	viewPlane{}
 {
 	forward = glm::normalize(target - position);

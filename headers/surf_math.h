@@ -37,3 +37,5 @@ F32 randomRange(F32 range);
 F32 randomRange(U32& seed, F32 range);
 
 Float3 randomOnHemisphere(const Float3& normal);
+
+bool depthInBounds(F32 depth, F32 maxDepth);
