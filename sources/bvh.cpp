@@ -1,5 +1,7 @@
 #include "bvh.h"
 
+#include <cassert>
+
 #include "mesh.h"
 #include "ray.h"
 #include "surf.h"

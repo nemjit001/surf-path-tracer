@@ -1,8 +1,5 @@
 #include "surf_math.h"
 
-#define GLM_FORCE_LEFT_HANDED
-
-#include <glm/glm.hpp>
 #include <cmath>
 
 #include "types.h"
@@ -64,7 +61,7 @@ Float3 randomOnHemisphere(const Float3& normal)
 		randomF32() * 2.0f - 1.0f
 	);
 
-	while (glm::dot(direction, direction) > 1.0f)
+	while (direction.dot(direction) > 1.0f)
 	{
 		direction = Float3(
 			randomF32() * 2.0f - 1.0f,
@@ -73,10 +70,10 @@ Float3 randomOnHemisphere(const Float3& normal)
 		);
 	}
 
-	if (glm::dot(direction, normal) < 0.0f)
+	if (direction.dot(direction) < 0.0f)
 		direction *= -1.0f;
 
-	return glm::normalize(direction);
+	return direction.normalize();
 }
 
 bool depthInBounds(F32 depth, F32 maxDepth)

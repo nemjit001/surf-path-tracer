@@ -16,9 +16,9 @@ Camera::Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight
 	screenHeight(static_cast<F32>(screenHeight)),
 	viewPlane{}
 {
-	forward = glm::normalize(target - position);
-	Float3 right = glm::normalize(glm::cross(WORLD_UP, forward));
-	up = glm::normalize(glm::cross(forward, right));
+	forward = (target - position).normalize();
+	Float3 right = WORLD_UP.cross(forward).normalize();
+	up = forward.cross(right).normalize();
 
 	generateViewPlane();
 }

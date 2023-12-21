@@ -15,9 +15,6 @@ option(GLFW_BUILD_EXAMPLES OFF)
 option(GLFW_BUILD_TESTS OFF)
 add_subdirectory(dependencies/glfw/)
 
-# GLM
-add_subdirectory(dependencies/glm/)
-
 # TINYOBJ
 add_subdirectory(dependencies/tinyobjloader/)
 
@@ -49,7 +46,6 @@ target_include_directories(${TARGET_NAME} PUBLIC
 	"dependencies/glfw/include/"
 	"dependencies/VulkanMemoryAllocator/include/"
 	"dependencies/vk-bootstrap/src/"
-	"dependencies/glm/"
 )
 
 target_link_libraries(${TARGET_NAME}

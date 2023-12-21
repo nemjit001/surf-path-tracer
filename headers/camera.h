@@ -37,7 +37,7 @@ public:
 
 Float3 Camera::right() const
 {
-	return glm::normalize(glm::cross(up, forward));
+	return up.cross(forward).normalize();
 }
 
 Ray Camera::getPrimaryRay(F32 x, F32 y)
@@ -46,7 +46,7 @@ Ray Camera::getPrimaryRay(F32 x, F32 y)
 	const F32 v = y * (1.0f / screenHeight);
 
 	const Float3 planePosition = viewPlane.topLeft + u * viewPlane.uVector + v * viewPlane.vVector;
-	Float3 direction = glm::normalize(planePosition - position);
+	Float3 direction = (planePosition - position).normalize();
 
 	return Ray(position, direction);
 }

@@ -33,9 +33,9 @@ void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& 
 {
 	updated = false;
 
-	Float3 forward = camera.forward;
-	Float3 right = glm::normalize(glm::cross(WORLD_UP, forward));
-	Float3 up = glm::normalize(glm::cross(forward, right));
+	Float3 forward = camera.forward.normalize();
+	Float3 right = WORLD_UP.cross(forward).normalize();
+	Float3 up = forward.cross(right).normalize();
 
 	Float3 deltaPosition(0.0f);
 
@@ -102,8 +102,8 @@ void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& 
 	if (!updated)
 		return;
 
-	camera.forward = glm::normalize(target - camera.position);
-	camera.up = glm::normalize(glm::cross(forward, right));
+	camera.forward = (target - camera.position).normalize();
+	camera.up = forward.cross(right).normalize();
 	camera.generateViewPlane();
 }
 

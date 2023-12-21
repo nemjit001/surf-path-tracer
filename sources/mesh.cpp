@@ -1,5 +1,6 @@
 #include "mesh.h"
 
+#include <cassert>
 #include <iostream>
 #include <string>
 #include <tiny_obj_loader.h>
@@ -24,8 +25,8 @@ bool Triangle::intersect(Ray& ray) const
 	Float3 e1 = v1 - v0;
 	Float3 e2 = v2 - v0;
 
-	Float3 h = glm::cross(ray.direction, e2);
-	F32 a = glm::dot(e1, h);
+	Float3 h = ray.direction.cross(e2);
+	F32 a = e1.dot(h);
 
 	if (fabsf(a) < F32_EPSILON)
 	{
@@ -34,22 +35,22 @@ bool Triangle::intersect(Ray& ray) const
 
 	F32 f = 1.0f / a;
 	Float3 s = ray.origin - v0;
-	F32 u = f * glm::dot(s, h);
+	F32 u = f * s.dot(h);
 
 	if (0.0f > u || u > 1.0f)
 	{
 		return false;
 	}
 
-	Float3 q = glm::cross(s, e1);
-	F32 v = f * glm::dot(ray.direction, q);
+	Float3 q = s.cross(e1);
+	F32 v = f * ray.direction.dot(q);
 
 	if (0.0f > v || (u + v) > 1.0f)
 	{
 		return false;
 	}
 
-	F32 depth = f * glm::dot(e2, q);
+	F32 depth = f * e2.dot(q);
 	if (!depthInBounds(depth, ray.depth))
 	{
 		return false;
@@ -63,7 +64,7 @@ bool Triangle::intersect(Ray& ray) const
 
 Float3 Triangle::normal() const
 {
-	return glm::normalize(glm::cross(v1 - v0, v2 - v0));
+	return (v1 - v0).cross(v2 - v0).normalize();
 }
 
 Mesh::Mesh(const std::string& path)

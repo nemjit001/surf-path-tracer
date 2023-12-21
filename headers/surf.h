@@ -9,11 +9,19 @@
 #define SCR_HEIGHT		720
 
 #if defined(_WIN32)
+
 #define MALLOC64(size)  _aligned_malloc(size, 64)
 #define FREE64(block)	_aligned_free(block)
+
+#define ALIGN(alignment)	__declspec(align(alignment))
+
 #elif defined(__unix)
+
 #define MALLOC64(size)  aligned_alloc(64, size)
 #define FREE64(block)	free(block)
+
+#define ALIGN(alignment)	__attribute__((aligned(alignment)))
+
 #endif
 
 #if defined(_WIN32)

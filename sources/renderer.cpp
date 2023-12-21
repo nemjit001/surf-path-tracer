@@ -215,7 +215,7 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
     Ray newRay(newOrigin, newDirection);
 
-    F32 cosTheta = glm::dot(newDirection, hitNormal);
+    F32 cosTheta = newDirection.dot(hitNormal);
     RgbColor incomingColor = trace(newRay, depth + 1);
 
     return emittance + F32_2PI * cosTheta * brdf * incomingColor;
