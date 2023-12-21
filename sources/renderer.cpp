@@ -24,6 +24,8 @@
 #define MAX_BOUNCES         5
 #define SAMPLES_PER_FRAME   1
 
+#define COLOR_BLACK RgbColor(0.0f, 0.0f, 0.0f)
+
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
     totalSamples(0),
@@ -186,7 +188,7 @@ Renderer::~Renderer()
 RgbColor Renderer::trace(Ray& ray, U32 depth)
 {
     if (depth > MAX_BOUNCES)
-        return RgbColor(0.0f, 0.0f, 0.0f);
+        return COLOR_BLACK;
 
     if (!m_scene.intersect(ray))
         return RgbColor(0.2f, 0.2f, 0.2f);
