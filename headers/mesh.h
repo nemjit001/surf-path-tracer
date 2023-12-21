@@ -21,6 +21,12 @@ struct Triangle
 	Float3 normal() const;
 };
 
+struct TriExtension
+{
+	Float3 n0, n1, n2;
+	Float2 uv0, uv1, uv2;
+};
+
 class Mesh
 {
 public:
@@ -28,6 +34,13 @@ public:
 
 	Float3 normal(SizeType primitiveIndex) const;
 
+	Float3 normal(SizeType primitiveIndex, const Float2& barycentric) const;
+
+	Float2 textureCoordinate(SizeType primitiveIndex, const Float2& barycentric) const;
+
 public:
 	std::vector<Triangle> triangles;
+
+private:
+	std::vector<TriExtension> m_triExtensions;
 };

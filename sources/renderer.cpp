@@ -189,18 +189,15 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
         return RgbColor(0.0f, 0.0f, 0.0f);
 
     if (!m_scene.intersect(ray))
-        return RgbColor(0.0f, 0.0f, 0.0f);
+        return RgbColor(0.2f, 0.2f, 0.2f);
 
     // TODO: Fetch material (emittance, albedo, specularity, reflectivity)
-    Float3 hitNormal = m_scene.normal(ray.metadata.instanceIndex, ray.metadata.primitiveIndex);
-    RgbColor emittance = 0.5f * (RgbColor(1.0f) + hitNormal);   // For now set color as tri normal
-    RgbColor albedo = RgbColor(0.0f, 0.0f, 0.0f);               // TODO: Retrieve from hit instance material
+    const Mesh* mesh = m_scene.hitMesh(ray.metadata.instanceIndex);
+    Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+    Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
-    if (ray.metadata.primitiveIndex % 2 == 0)
-    {
-        albedo = emittance;
-        emittance = Float3(0.0f);
-    }
+    RgbColor emittance = RgbColor(0.0f, 0.0f, 0.0f);
+    RgbColor albedo = RgbColor(textureCoordinate, 0.0f);
 
     // Simple isLight check for emittance
     // TODO: replace with material.isLight()
@@ -211,11 +208,11 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     
     RgbColor brdf = albedo * F32_INV_PI;
 
-    Float3 newDirection = randomOnHemisphere(hitNormal);
+    Float3 newDirection = randomOnHemisphere(normal);
     Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
     Ray newRay(newOrigin, newDirection);
 
-    F32 cosTheta = newDirection.dot(hitNormal);
+    F32 cosTheta = newDirection.dot(normal);
     RgbColor incomingColor = trace(newRay, depth + 1);
 
     return emittance + F32_2PI * cosTheta * brdf * incomingColor;

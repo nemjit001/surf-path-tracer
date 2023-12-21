@@ -8,7 +8,7 @@ Ray::Ray(Float3 origin, Float3 direction)
 	metadata{
 		UNSET_INDEX,
 		UNSET_INDEX,
-		0.0f, 0.0f
+		Float2(0.0f)
 	}
 {
 	//

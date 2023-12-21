@@ -43,9 +43,10 @@ F32 randomF32(U32& seed)
 	return randomU32(seed) * 2.3283064365387e-10f;
 }
 
-F32 randomRange(F32 range)
+F32 randomRange(F32 min, F32 max)
 {
-	return randomF32() * range;
+	F32 range = max - min;
+	return (randomF32() * range) + min;
 }
 
 F32 randomRange(U32& seed, F32 range)
@@ -56,17 +57,17 @@ F32 randomRange(U32& seed, F32 range)
 Float3 randomOnHemisphere(const Float3& normal)
 {
 	Float3 direction = Float3(
-		randomF32() * 2.0f - 1.0f,
-		randomF32() * 2.0f - 1.0f,
-		randomF32() * 2.0f - 1.0f
+		randomRange(-1.0f, 1.0f),
+		randomRange(-1.0f, 1.0f),
+		randomRange(-1.0f, 1.0f)
 	);
 
 	while (direction.dot(direction) > 1.0f)
 	{
 		direction = Float3(
-			randomF32() * 2.0f - 1.0f,
-			randomF32() * 2.0f - 1.0f,
-			randomF32() * 2.0f - 1.0f
+			randomRange(-1.0f, 1.0f),
+			randomRange(-1.0f, 1.0f),
+			randomRange(-1.0f, 1.0f)
 		);
 	}
 

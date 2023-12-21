@@ -9,8 +9,7 @@ struct RayMetadata
 {
 	U32 primitiveIndex;
 	U32 instanceIndex;
-	F32 u;
-	F32 v;
+	Float2 hitCoordinates;
 };
 
 struct Ray

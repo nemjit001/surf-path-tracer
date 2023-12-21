@@ -21,6 +21,7 @@
 struct ALIGN(8) Float2
 {
 	union {
+		struct { F32 u, v; };
 		struct { F32 x, y; };
 		F32 xy[2];
 	};

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "bvh.h"
+#include "mesh.h"
 #include "ray.h"
+#include "surf_math.h"
 
 class Scene
 {
@@ -10,7 +12,7 @@ public:
 
 	bool intersect(Ray& ray) const;
 
-	Float3 normal(SizeType instanceIndex, SizeType primitiveIndex) const;
+	const Mesh* hitMesh(SizeType instanceIndex) const;
 
 private:
 	BvhBLAS* m_bvh;

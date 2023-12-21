@@ -134,7 +134,7 @@ int main()
 		resultBuffer.height
 	);
 
-	Mesh testMesh("assets/cube.obj");
+	Mesh testMesh("assets/susanne.obj");
 	BvhBLAS testBvh(&testMesh);
 
 	Scene scene(&testBvh);

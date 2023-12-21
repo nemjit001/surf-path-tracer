@@ -16,7 +16,7 @@ bool Scene::intersect(Ray& ray) const
 	return m_bvh->intersect(ray);
 }
 
-Float3 Scene::normal(SizeType instanceIndex, SizeType primitiveIndex) const
+const Mesh* Scene::hitMesh(SizeType instanceIndex) const
 {
-	return m_bvh->mesh()->normal(primitiveIndex);
+	return m_bvh->mesh();
 }
