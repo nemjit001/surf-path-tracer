@@ -29,5 +29,5 @@ public:
 	Float3 normal(SizeType primitiveIndex) const;
 
 public:
-	std::vector<Triangle> m_triangles;
+	std::vector<Triangle> triangles;
 };

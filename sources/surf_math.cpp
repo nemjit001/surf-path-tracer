@@ -83,3 +83,21 @@ bool depthInBounds(F32 depth, F32 maxDepth)
 {
 	return F32_EPSILON <= depth && depth < maxDepth;
 }
+
+Float3 float3Min(const Float3& a, const Float3& b)
+{
+	F32 x = fminf(a.x, b.x);
+	F32 y = fminf(a.y, b.y);
+	F32 z = fminf(a.z, b.z);
+
+	return Float3(x, y, z);
+}
+
+Float3 float3Max(const Float3& a, const Float3& b)
+{
+	F32 x = fmaxf(a.x, b.x);
+	F32 y = fmaxf(a.y, b.y);
+	F32 z = fmaxf(a.z, b.z);
+
+	return Float3(x, y, z);
+}

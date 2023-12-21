@@ -1,17 +1,17 @@
 #pragma once
 
-#include "mesh.h"
+#include "bvh.h"
 #include "ray.h"
 
 class Scene
 {
 public:
-	Scene();
+	Scene(BvhBLAS& bvh);
 
 	bool intersect(Ray& ray) const;
 
 	Float3 normal(SizeType instanceIndex, SizeType primitiveIndex) const;
 
 private:
-	Mesh m_testMesh;
+	BvhBLAS& m_bvh;
 };

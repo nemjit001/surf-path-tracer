@@ -247,10 +247,15 @@ void Renderer::render(F32 deltaTime)
         for (I32 x = 0; x < static_cast<I32>(m_resultBuffer.width); x++)
         {
             SizeType pixelIndex = x + y * m_resultBuffer.width;
-            Ray primaryRay = m_camera->getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));
-            RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
 
-            m_accumulator.buffer[pixelIndex] += color;
+            for (SizeType sample = 0; sample < SAMPLES_PER_FRAME; sample++)
+            {
+                Ray primaryRay = m_camera->getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));
+                RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
+
+                m_accumulator.buffer[pixelIndex] += color;
+            }
+
             m_resultBuffer.pixels[pixelIndex] = RgbaToU32(m_accumulator.buffer[pixelIndex] * invSamples);
         }
     }

@@ -2,7 +2,9 @@
 
 #include <cstdio>
 
+#include "bvh.h"
 #include "camera.h"
+#include "mesh.h"
 #include "render_context.h"
 #include "renderer.h"
 #include "scene.h"
@@ -11,6 +13,17 @@
 #include "timer.h"
 #include "types.h"
 #include "window_manager.h"
+
+#ifdef _WIN32
+#ifndef NDEBUG
+
+// Windows debug mem leak detection
+#define _CRTDBG_MAP_ALLOC
+#include <cstdlib>
+#include <crtdbg.h>
+
+#endif
+#endif // _WIN32
 
 #define RESOLUTION_SCALE	1.0f
 #define	CAMERA_SPEED		2.0f
@@ -96,6 +109,13 @@ void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& 
 
 int main()
 {
+#ifdef _WIN32
+#ifndef NDEBUG
+	// Enable debug mem heap tracking
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+#endif
+
 	WindowManager windowManager;
 	GLFWwindow* window = windowManager.createWindow(PROGRAM_NAME, SCR_WIDTH, SCR_HEIGHT);
 
@@ -114,7 +134,10 @@ int main()
 		resultBuffer.height
 	);
 
-	Scene scene;
+	Mesh testMesh("assets/cube.obj");
+	BvhBLAS testBvh(testMesh);
+
+	Scene scene(testBvh);
 	Renderer renderer(std::move(renderContext), resultBuffer, &worldCam, &scene);
 
 	// Create frame timer

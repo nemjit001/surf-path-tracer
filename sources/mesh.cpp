@@ -68,7 +68,7 @@ Float3 Triangle::normal() const
 
 Mesh::Mesh(const std::string& path)
 	:
-	m_triangles()
+	triangles()
 {
 	tinyobj::ObjReaderConfig config;
 	config.triangulate = true;
@@ -111,10 +111,10 @@ Mesh::Mesh(const std::string& path)
 		}
 	}
 
-	m_triangles.reserve(indices.size() / 3);
+	triangles.reserve(indices.size() / 3);
 	for (SizeType i = 0; i < indices.size(); i += 3)
 	{
-		m_triangles.push_back(Triangle(
+		triangles.push_back(Triangle(
 			vertices[indices[i]],
 			vertices[indices[i + 1]],
 			vertices[indices[i + 2]]
@@ -124,6 +124,6 @@ Mesh::Mesh(const std::string& path)
 
 Float3 Mesh::normal(SizeType primitiveIndex) const
 {
-	assert(primitiveIndex < m_triangles.size());
-	return m_triangles[primitiveIndex].normal();
+	assert(primitiveIndex < triangles.size());
+	return triangles[primitiveIndex].normal();
 }
