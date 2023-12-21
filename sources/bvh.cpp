@@ -113,11 +113,11 @@ BvhBLAS& BvhBLAS::operator=(const BvhBLAS& other) noexcept
 bool BvhBLAS::intersect(Ray& ray) const
 {
 	BvhNode* node = &m_nodePool[BVH_ROOT_INDEX];
-	BvhNode* stack[TRAVERSAL_STACK_SIZE];
+	BvhNode* stack[TRAVERSAL_STACK_SIZE]{};
 	SizeType stackPtr = 0;
 
 	bool intersected = false;
-	for (;;)
+	while(true)
 	{
 		if (node->isLeaf())
 		{

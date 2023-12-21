@@ -128,13 +128,13 @@ int main()
 	);
 
 	Camera worldCam(
-		Float3(0.0f, 0.0f, -5.0f),
+		Float3(0.0f, 0.0f, 5.0f),
 		Float3(0.0f, 0.0f, 0.0f),
 		resultBuffer.width,
 		resultBuffer.height
 	);
 
-	Mesh testMesh("assets/cube.obj");
+	Mesh testMesh("assets/susanne.obj");
 	BvhBLAS testBvh(testMesh);
 
 	Scene scene(testBvh);
