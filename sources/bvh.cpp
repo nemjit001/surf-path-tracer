@@ -1,6 +1,7 @@
 #include "bvh.h"
 
 #include <cassert>
+#include <cstring>
 
 #include "mesh.h"
 #include "ray.h"
@@ -31,20 +32,23 @@ F32 AABB::area() const
 
 F32 AABB::intersect(Ray& ray) const
 {
-	F32 txNear = (bbMin.x - ray.origin.x) / ray.direction.x;
-	F32 txFar = (bbMax.x - ray.origin.x) / ray.direction.x;
+	// calculate direction reciprocal once
+	Float3 rDir = Float3(1.0f) / ray.direction;
+
+	F32 txNear = (bbMin.x - ray.origin.x) * rDir.x;
+	F32 txFar = (bbMax.x - ray.origin.x) * rDir.x;
 	F32 tmin = min(txNear, txFar);
 	F32 tmax = max(txNear, txFar);
 
-	F32 tyNear = (bbMin.y - ray.origin.y) / ray.direction.y;
-	F32 tyFar = (bbMax.y - ray.origin.y) / ray.direction.y;
-	tmin = min(tmin, min(tyNear, tyFar));
-	tmax = max(tmax, max(tyNear, tyFar));
+	F32 tyNear = (bbMin.y - ray.origin.y) * rDir.y;
+	F32 tyFar = (bbMax.y - ray.origin.y) * rDir.y;
+	tmin = max(tmin, min(tyNear, tyFar));
+	tmax = min(tmax, max(tyNear, tyFar));
 
-	F32 tzNear = (bbMin.z - ray.origin.z) / ray.direction.z;
-	F32 tzFar = (bbMax.z - ray.origin.z) / ray.direction.z;
-	tmin = min(tmin, min(tzNear, tzFar));
-	tmax = max(tmax, max(tzNear, tzFar));
+	F32 tzNear = (bbMin.z - ray.origin.z) * rDir.z;
+	F32 tzFar = (bbMax.z - ray.origin.z) * rDir.z;
+	tmin = max(tmin, min(tzNear, tzFar));
+	tmax = min(tmax, max(tzNear, tzFar));
 
 	if (tmax >= tmin && tmin < ray.depth && tmax > 0.0f)
 	{

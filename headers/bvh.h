@@ -57,6 +57,8 @@ public:
 
 	inline const Mesh* mesh() const;
 
+	inline const AABB& bounds() const;
+
 private:
 	F32 calculateNodeCost(const BvhNode& node) const;
 
@@ -79,4 +81,9 @@ private:
 const Mesh* BvhBLAS::mesh() const
 {
 	return m_mesh;
+}
+
+const AABB& BvhBLAS::bounds() const
+{
+	return m_nodePool[BVH_ROOT_INDEX].boundingBox;
 }
