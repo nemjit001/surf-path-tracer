@@ -38,7 +38,7 @@ AccumulatorState::~AccumulatorState()
     delete[] buffer;
 }
 
-Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera, Scene* scene)
+Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
     :
     m_context(std::move(renderContext)),
     m_descriptorPool(m_context.device),
@@ -188,11 +188,11 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     if (depth > MAX_BOUNCES)
         return RgbColor(0.0f, 0.0f, 0.0f);
 
-    if (!m_scene->intersect(ray))
+    if (!m_scene.intersect(ray))
         return RgbColor(0.0f, 0.0f, 0.0f);
 
     // TODO: Fetch material (emittance, albedo, specularity, reflectivity)
-    Float3 hitNormal = m_scene->normal(ray.metadata.instanceIndex, ray.metadata.primitiveIndex);
+    Float3 hitNormal = m_scene.normal(ray.metadata.instanceIndex, ray.metadata.primitiveIndex);
     RgbColor emittance = 0.5f * (RgbColor(1.0f) + hitNormal);   // For now set color as tri normal
     RgbColor albedo = RgbColor(0.0f, 0.0f, 0.0f);               // TODO: Retrieve from hit instance material
 
@@ -250,7 +250,7 @@ void Renderer::render(F32 deltaTime)
 
             for (SizeType sample = 0; sample < SAMPLES_PER_FRAME; sample++)
             {
-                Ray primaryRay = m_camera->getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));
+                Ray primaryRay = m_camera.getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));
                 RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
 
                 m_accumulator.buffer[pixelIndex] += color;

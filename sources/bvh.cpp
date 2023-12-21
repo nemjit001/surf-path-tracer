@@ -52,10 +52,10 @@ F32 AABB::intersect(Ray& ray) const
 	return F32_FAR_AWAY;
 }
 
-BvhBLAS::BvhBLAS(Mesh mesh)
+BvhBLAS::BvhBLAS(Mesh* mesh)
 	:
 	m_mesh(mesh),
-	m_triCount(mesh.triangles.size()),
+	m_triCount(mesh->triangles.size()),
 	m_indices(new U32[m_triCount]{}),
 	m_nodesUsed(2),
 	m_nodePool(static_cast<BvhNode*>(MALLOC64(2 * m_triCount * sizeof(BvhNode))))
@@ -82,7 +82,7 @@ BvhBLAS::BvhBLAS(const BvhBLAS& other) noexcept
 	m_nodesUsed(other.m_nodesUsed),
 	m_nodePool(nullptr)
 {
-	m_indices = new U32[m_mesh.triangles.size()];
+	m_indices = new U32[m_triCount];
 	m_nodePool = static_cast<BvhNode*>(MALLOC64(2 * m_triCount * sizeof(BvhNode)));
 
 	assert(m_nodePool != nullptr && m_indices != nullptr);
@@ -124,7 +124,7 @@ bool BvhBLAS::intersect(Ray& ray) const
 			for (U32 i = 0; i < node->count; i++)
 			{
 				U32 primitiveIndex = m_indices[node->first() + i];
-				const Triangle& tri = m_mesh.triangles[primitiveIndex];
+				const Triangle& tri = m_mesh->triangles[primitiveIndex];
 
 				if (tri.intersect(ray))
 				{
@@ -211,7 +211,7 @@ F32 BvhBLAS::findSplitPlane(const BvhNode& node, F32& cost, U32& axis) const
 		for (SizeType i = 0; i < node.count; i++)
 		{
 			SizeType idx = node.first() + i;
-			const Triangle& tri = m_mesh.triangles[m_indices[idx]];
+			const Triangle& tri = m_mesh->triangles[m_indices[idx]];
 
 			boundsMin = min(boundsMin, tri.centroid[axis]);
 			boundsMax = max(boundsMax, tri.centroid[axis]);
@@ -229,7 +229,7 @@ F32 BvhBLAS::findSplitPlane(const BvhNode& node, F32& cost, U32& axis) const
 		for (SizeType i = 0; i < node.count; i++)
 		{
 			SizeType idx = node.first() + i;
-			const Triangle& tri = m_mesh.triangles[m_indices[idx]];
+			const Triangle& tri = m_mesh->triangles[m_indices[idx]];
 
 			SizeType section = static_cast<SizeType>((tri.centroid[axis] - boundsMin) * binScale);
 			SizeType binIndex = min(BIN_COUNT - 1, section);
@@ -291,7 +291,7 @@ U32 BvhBLAS::partitionNode(const BvhNode& node, F32 splitPosition, U32 axis) con
 
 	while (pivot <= last)
 	{
-		const Triangle& tri = m_mesh.triangles[m_indices[pivot]];
+		const Triangle& tri = m_mesh->triangles[m_indices[pivot]];
 		if (tri.centroid[axis] < splitPosition)
 		{
 			pivot++;
@@ -314,7 +314,7 @@ void BvhBLAS::updateNodeBounds(SizeType nodeIndex)
 	for (SizeType i = 0; i < node.count; i++)
 	{
 		SizeType idx = node.first() + i;
-		const Triangle& tri = m_mesh.triangles[m_indices[idx]];
+		const Triangle& tri = m_mesh->triangles[m_indices[idx]];
 		node.boundingBox.grow(tri.v0);
 		node.boundingBox.grow(tri.v1);
 		node.boundingBox.grow(tri.v2);

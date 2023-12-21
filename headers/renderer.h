@@ -43,7 +43,7 @@ struct FrameData
 class Renderer
 {
 public:
-    Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera* camera, Scene* scene);
+    Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
 
     ~Renderer();
 
@@ -71,8 +71,8 @@ private:
     FramebufferSize m_framebufferSize;
     PixelBuffer m_resultBuffer;
     AccumulatorState m_accumulator;
-    Camera* m_camera;
-    Scene* m_scene;
+    Camera& m_camera;
+    Scene& m_scene;
 
     // Setup for copy operations
     VkFence m_copyFinishedFence;

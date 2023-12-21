@@ -134,11 +134,11 @@ int main()
 		resultBuffer.height
 	);
 
-	Mesh testMesh("assets/susanne.obj");
-	BvhBLAS testBvh(testMesh);
+	Mesh testMesh("assets/cube.obj");
+	BvhBLAS testBvh(&testMesh);
 
-	Scene scene(testBvh);
-	Renderer renderer(std::move(renderContext), resultBuffer, &worldCam, &scene);
+	Scene scene(&testBvh);
+	Renderer renderer(std::move(renderContext), resultBuffer, worldCam, scene);
 
 	// Create frame timer
 	Timer frameTimer;

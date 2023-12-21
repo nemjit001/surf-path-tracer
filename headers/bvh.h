@@ -42,7 +42,7 @@ struct BvhNode
 class BvhBLAS
 {
 public:
-	BvhBLAS(Mesh mesh);
+	BvhBLAS(Mesh* mesh);
 
 	~BvhBLAS();
 
@@ -55,7 +55,7 @@ public:
 
 	void refit();
 
-	inline const Mesh& mesh() const;
+	inline const Mesh* mesh() const;
 
 private:
 	F32 calculateNodeCost(const BvhNode& node) const;
@@ -69,14 +69,14 @@ private:
 	void subdivide(SizeType nodeIndex);
 
 private:
-	Mesh m_mesh;
+	Mesh* m_mesh;
 	SizeType m_triCount;
 	U32* m_indices;
 	U32 m_nodesUsed;
 	BvhNode* m_nodePool;
 };
 
-const Mesh& BvhBLAS::mesh() const
+const Mesh* BvhBLAS::mesh() const
 {
 	return m_mesh;
 }

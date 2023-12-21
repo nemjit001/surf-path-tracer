@@ -6,12 +6,12 @@
 class Scene
 {
 public:
-	Scene(BvhBLAS& bvh);
+	Scene(BvhBLAS* bvh);
 
 	bool intersect(Ray& ray) const;
 
 	Float3 normal(SizeType instanceIndex, SizeType primitiveIndex) const;
 
 private:
-	BvhBLAS& m_bvh;
+	BvhBLAS* m_bvh;
 };
