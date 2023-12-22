@@ -1,6 +1,6 @@
 #include "scene.h"
 
-#include "instance.h"
+#include "bvh.h"
 #include "ray.h"
 #include "surf_math.h"
 

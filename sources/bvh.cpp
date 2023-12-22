@@ -3,9 +3,11 @@
 #include <cassert>
 #include <cstring>
 
+#include "material.h"
 #include "mesh.h"
 #include "ray.h"
 #include "surf.h"
+#include "surf_math.h"
 #include "types.h"
 
 #define TRAVERSAL_STACK_SIZE	64
@@ -378,4 +380,32 @@ void BvhBLAS::subdivide(SizeType nodeIndex)
 	updateNodeBounds(rightIndex);
 	subdivide(leftIndex);
 	subdivide(rightIndex);
+}
+
+Instance::Instance(BvhBLAS* blas, Material* material, Mat4 transform)
+	:
+	bvh(blas),
+	material(material),
+	m_transform(transform),
+	m_invTransform(glm::inverse(transform))
+{
+	assert(bvh != nullptr);
+	assert(material != nullptr);
+}
+
+bool Instance::intersect(Ray& ray) const
+{
+	assert(bvh != nullptr);
+	Ray oldRay = ray;
+
+	glm::vec4 tPos = m_invTransform * static_cast<glm::vec4>(Float4(ray.origin, 1.0f));
+	glm::vec4 tDir = m_invTransform * static_cast<glm::vec4>(Float4(ray.direction, 0.0f));
+	ray.origin = Float3(tPos.x, tPos.y, tPos.z) / tPos.w;
+	ray.direction = Float3(tDir.x, tDir.y, tDir.z);
+
+	bool intersected = bvh->intersect(ray);
+	ray.origin = oldRay.origin;
+	ray.direction = oldRay.direction;
+
+	return intersected;
 }

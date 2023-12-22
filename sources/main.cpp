@@ -4,6 +4,7 @@
 
 #include "bvh.h"
 #include "camera.h"
+#include "material.h"
 #include "mesh.h"
 #include "render_context.h"
 #include "renderer.h"
@@ -134,12 +135,20 @@ int main()
 		resultBuffer.height
 	);
 
-	Mesh testMesh("assets/susanne.obj");
-	BvhBLAS testBvh(&testMesh);
-	Instance testInstance = Instance(
-		&testBvh,
-		Mat4(1.0f)
-	);
+	Mesh susanneMesh("assets/susanne.obj");
+	BvhBLAS susanneBVH(&susanneMesh);
+
+	Material diffuseMaterial = Material{
+		RgbColor(0.0f),
+		RgbColor(1.0f, 0.0f, 0.0f),
+	};
+
+	Material lightMaterial = Material{
+		RgbColor(1.0f, 1.0f, 0.7f),
+		RgbColor(0.0f),
+	};
+
+	Instance testInstance(&susanneBVH, &lightMaterial, Mat4(1.0f));
 
 	Scene scene(testInstance);
 	Renderer renderer(std::move(renderContext), resultBuffer, worldCam, scene);

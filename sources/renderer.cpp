@@ -192,19 +192,17 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     // TODO: Fetch material (emittance, albedo, specularity, reflectivity)
     const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
     const Mesh* mesh = instance.bvh->mesh();
+    const Material* material = instance.material;
+
+    if (material->isLight())
+    {
+        return material->emittance;
+    }
 
     Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
     Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
-    RgbColor emittance = 0.5f * (RgbColor(1.0f) + normal);
-    RgbColor albedo = COLOR_BLACK;
-
-    if (emittance.r > 0.0f || emittance.g > 0.0f || emittance.b > 0.0f)
-    {
-        return emittance;
-    }
-
-    RgbColor brdf = albedo * F32_INV_PI;
+    RgbColor brdf = material->albedo * F32_INV_PI;
 
     Float3 newDirection = randomOnHemisphere(normal);
     Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
@@ -213,7 +211,7 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     F32 cosTheta = newDirection.dot(normal);
     RgbColor incomingColor = trace(newRay, depth + 1);
 
-    return emittance + F32_2PI * cosTheta * brdf * incomingColor;
+    return material->emittance + F32_2PI * cosTheta * brdf * incomingColor;
 }
 
 void Renderer::clearAccumulator()

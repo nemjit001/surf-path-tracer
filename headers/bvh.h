@@ -1,5 +1,6 @@
 #pragma once
 
+#include "material.h"
 #include "mesh.h"
 #include "ray.h"
 #include "surf_math.h"
@@ -78,6 +79,26 @@ private:
 	BvhNode* m_nodePool;
 };
 
+class Instance
+{
+public:
+	Instance(BvhBLAS* blas, Material* material, Mat4 transform);
+
+	bool intersect(Ray& ray) const;
+
+	inline const Mat4& transform() const { return m_transform; }
+
+	inline void setTransform(const Mat4& transform);
+
+public:
+	BvhBLAS* bvh;
+	Material* material;
+
+private:
+	Mat4 m_transform;
+	Mat4 m_invTransform;
+};
+
 const Mesh* BvhBLAS::mesh() const
 {
 	return m_mesh;
@@ -86,4 +107,10 @@ const Mesh* BvhBLAS::mesh() const
 const AABB& BvhBLAS::bounds() const
 {
 	return m_nodePool[BVH_ROOT_INDEX].boundingBox;
+}
+
+void Instance::setTransform(const Mat4& transform)
+{
+	m_invTransform = glm::inverse(transform);
+	m_transform = transform;
 }
