@@ -185,6 +185,68 @@ bool BvhBLAS::intersect(Ray& ray) const
 	return intersected;
 }
 
+bool BvhBLAS::intersectAny(Ray& ray) const
+{
+	BvhNode* node = &m_nodePool[BVH_ROOT_INDEX];
+	BvhNode* stack[TRAVERSAL_STACK_SIZE]{};
+	SizeType stackPtr = 0;
+
+	while (true)
+	{
+		if (node->isLeaf())
+		{
+			for (U32 i = 0; i < node->count; i++)
+			{
+				U32 primitiveIndex = m_indices[node->first() + i];
+				const Triangle& tri = m_mesh->triangles[primitiveIndex];
+
+				if (tri.intersect(ray))
+				{
+					return true;
+				}
+			}
+
+			if (stackPtr == 0)
+				break;
+
+			node = stack[stackPtr - 1];
+			stackPtr--;
+			continue;
+		}
+
+		BvhNode* childNear = &m_nodePool[node->left()];
+		BvhNode* childFar = &m_nodePool[node->right()];
+
+		F32 distNear = childNear->boundingBox.intersect(ray);
+		F32 distFar = childFar->boundingBox.intersect(ray);
+
+		if (distNear > distFar) {
+			swap(distNear, distFar);
+			swap(childNear, childFar);
+		}
+
+		if (distNear == F32_FAR_AWAY)
+		{
+			if (stackPtr == 0)
+				break;
+
+			node = stack[stackPtr - 1];
+			stackPtr--;
+		}
+		else
+		{
+			node = childNear;
+			if (distFar != F32_FAR_AWAY)
+			{
+				stack[stackPtr] = childFar;
+				stackPtr++;
+			}
+		}
+	}
+
+	return false;
+}
+
 void BvhBLAS::build()
 {
 	// Reset nodes used

@@ -52,6 +52,8 @@ public:
 
 	bool intersect(Ray& ray) const;
 
+	bool intersectAny(Ray& ray) const;
+
 	void build();
 
 	void refit();
