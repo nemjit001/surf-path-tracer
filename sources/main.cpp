@@ -137,7 +137,11 @@ int main()
 	Mesh testMesh("assets/susanne.obj");
 	BvhBLAS testBvh(&testMesh);
 
-	Scene scene(&testBvh);
+	Instance testInstance = Instance{
+		&testBvh
+	};
+
+	Scene scene(testInstance);
 	Renderer renderer(std::move(renderContext), resultBuffer, worldCam, scene);
 
 	// Create frame timer

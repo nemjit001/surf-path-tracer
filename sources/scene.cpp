@@ -1,22 +1,23 @@
 #include "scene.h"
 
-#include "mesh.h"
+#include "instance.h"
 #include "ray.h"
+#include "surf_math.h"
 
-Scene::Scene(BvhBLAS* bvh)
+Scene::Scene(Instance instance)
 	:
-	m_bvh(bvh)
+	m_instance(instance)
 {
-	m_bvh->build();
+	//
 }
 
 bool Scene::intersect(Ray& ray) const
 {
 	// TODO: intersect scene TLAS
-	return m_bvh->intersect(ray);
+	return m_instance.intersect(ray);
 }
 
-const Mesh* Scene::hitMesh(SizeType instanceIndex) const
+const Instance& Scene::hitInstance(SizeType instanceIndex) const
 {
-	return m_bvh->mesh();
+	return m_instance;
 }

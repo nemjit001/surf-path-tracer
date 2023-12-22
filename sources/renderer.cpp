@@ -191,10 +191,12 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
         return COLOR_BLACK;
 
     if (!m_scene.intersect(ray))
-        return RgbColor(0.2f, 0.2f, 0.2f);
+        return COLOR_BLACK; // TODO: sample HDRI or sky color from scene
 
     // TODO: Fetch material (emittance, albedo, specularity, reflectivity)
-    const Mesh* mesh = m_scene.hitMesh(ray.metadata.instanceIndex);
+    const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
+    const Mesh* mesh = instance.bvh->mesh();
+
     Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
     Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
@@ -247,17 +249,10 @@ void Renderer::render(F32 deltaTime)
 
             for (SizeType sample = 0; sample < SAMPLES_PER_FRAME; sample++)
             {
-#if 0
                 Ray primaryRay = m_camera.getPrimaryRay(
                     static_cast<F32>(x) + randomRange(-0.5f, 0.5f),
                     static_cast<F32>(y) + randomRange(-0.5f, 0.5f)
                 );
-#else
-                Ray primaryRay = m_camera.getPrimaryRay(
-                    static_cast<F32>(x),
-                    static_cast<F32>(y)
-                );
-#endif
 
                 RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
                 m_accumulator.buffer[pixelIndex] += color;

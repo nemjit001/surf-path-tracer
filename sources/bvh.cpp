@@ -72,6 +72,9 @@ BvhBLAS::BvhBLAS(Mesh* mesh)
 	// Fill out indices array
 	for (SizeType idx = 0; idx < m_triCount; idx++)
 		m_indices[idx] = static_cast<U32>(idx);
+
+	// Build BVH based on loaded mesh
+	build();
 }
 
 BvhBLAS::~BvhBLAS()

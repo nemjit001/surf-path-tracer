@@ -1,19 +1,18 @@
 #pragma once
 
-#include "bvh.h"
-#include "mesh.h"
+#include "instance.h"
 #include "ray.h"
 #include "surf_math.h"
 
 class Scene
 {
 public:
-	Scene(BvhBLAS* bvh);
+	Scene(Instance instance);
 
 	bool intersect(Ray& ray) const;
 
-	const Mesh* hitMesh(SizeType instanceIndex) const;
+	const Instance& hitInstance(SizeType instanceIndex) const;
 
 private:
-	BvhBLAS* m_bvh;
+	Instance m_instance;
 };
