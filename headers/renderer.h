@@ -20,6 +20,10 @@
 
 #define FRAMES_IN_FLIGHT 2
 
+// TODO: expose as settings for renderer
+#define MAX_BOUNCES         5
+#define SAMPLES_PER_FRAME   1
+
 struct AccumulatorState
 {
     SizeType totalSamples;

@@ -149,21 +149,12 @@ int main()
 
 	printf("Initialized Surf\n");
 
+	F32 deltaTime = frameTimer.deltaTime();
 	while (!glfwWindowShouldClose(window))
 	{
 		static F32 SMOOTH_FRAC = 1.0f / NUM_SMOOTH_FRAMES;
 		static F32 AVERAGE_FRAMETIME = 10.0f;
 		static F32 ALPHA = 1.0f;
-
-		frameTimer.tick();
-		F32 deltaTime  = frameTimer.deltaTime();
-
-		AVERAGE_FRAMETIME = (1.0f - ALPHA) * AVERAGE_FRAMETIME + ALPHA * (deltaTime * 1'000.0f);
-		if (ALPHA > SMOOTH_FRAC)
-			ALPHA *= 0.5;
-
-		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
-		printf("%08.2fms (%08.2ffps)\n", AVERAGE_FRAMETIME, inv_avg_frametime * 1'000.0f);
 
 		// Render frame
 		renderer.render(deltaTime);
@@ -176,6 +167,16 @@ int main()
 
 		if (cameraUpdated)
 			renderer.clearAccumulator();
+
+		frameTimer.tick();
+		deltaTime = frameTimer.deltaTime();
+
+		AVERAGE_FRAMETIME = (1.0f - ALPHA) * AVERAGE_FRAMETIME + ALPHA * (deltaTime * 1'000.0f);
+		if (ALPHA > SMOOTH_FRAC) ALPHA *= 0.5;
+
+		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
+		F32 rps = (resultBuffer.width * resultBuffer.height * SAMPLES_PER_FRAME) * inv_avg_frametime;
+		printf("%08.2fms (%05.1f fps) - %08.2fMrays/s\n", AVERAGE_FRAMETIME, inv_avg_frametime * 1'000.0f, rps / 1'000.0f);
 
 		glfwPollEvents();
 	}

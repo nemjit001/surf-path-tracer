@@ -20,10 +20,6 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
-// TODO: expose as settings for renderer
-#define MAX_BOUNCES         5
-#define SAMPLES_PER_FRAME   1
-
 #define COLOR_BLACK RgbColor(0.0f, 0.0f, 0.0f)
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
