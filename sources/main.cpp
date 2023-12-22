@@ -223,7 +223,6 @@ int main()
 
 		// Render frame
 		RendererConfig& config = renderer.config();
-		const FrameInstrumentationData& frameInfo = renderer.frameInfo();
 		renderer.render(deltaTime);
 
 		// Handle input
@@ -243,6 +242,8 @@ int main()
 
 		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
 		F32 rps = (resultBuffer.width * resultBuffer.height * config.samplesPerFrame) * inv_avg_frametime;
+		const FrameInstrumentationData& frameInfo = renderer.frameInfo();
+		
 		printf(
 			"%08.2fms (%05.1f fps) - %08.2fMrays/s - %05u samples (%u spp) - %010.2f Lumen\n",
 			AVERAGE_FRAMETIME,
