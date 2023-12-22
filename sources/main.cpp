@@ -136,10 +136,10 @@ int main()
 
 	Mesh testMesh("assets/susanne.obj");
 	BvhBLAS testBvh(&testMesh);
-
-	Instance testInstance = Instance{
-		&testBvh
-	};
+	Instance testInstance = Instance(
+		&testBvh,
+		Mat4(1.0f)
+	);
 
 	Scene scene(testInstance);
 	Renderer renderer(std::move(renderContext), resultBuffer, worldCam, scene);

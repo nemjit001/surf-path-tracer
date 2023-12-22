@@ -1,7 +1,11 @@
 #pragma once
 
+#define GLM_FORCE_LEFT_HANDED
+
 #include <cfloat>
 #include <cmath>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "surf.h"
 #include "types.h"
@@ -35,6 +39,7 @@ struct ALIGN(8) Float2
 	inline Float2 normalize() const;
 
 	inline F32 operator[](SizeType index) const { return xy[index]; }
+	inline operator glm::vec2() const { return glm::vec2(x, y); }
 };
 
 struct ALIGN(16) Float3
@@ -56,6 +61,7 @@ struct ALIGN(16) Float3
 	inline Float3 cross(const Float3& other) const;
 
 	inline F32 operator[](SizeType index) const { return xyz[index]; }
+	inline operator glm::vec3() const { return glm::vec3(x, y, z); }
 };
 
 struct ALIGN(16) Float4
@@ -76,10 +82,13 @@ struct ALIGN(16) Float4
 	inline Float4 normalize() const;
 
 	inline F32 operator[](SizeType index) const { return xyzw[index]; }
+	inline operator glm::vec4() const { return glm::vec4(x, y, z, w); }
 };
 
 using RgbColor	= Float3;
 using RgbaColor = Float4;
+
+using Mat4 = glm::mat4;	// Matrix stuff is hard, so steal it from GLM
 
 U32 RgbaToU32(const RgbaColor& color);
 
