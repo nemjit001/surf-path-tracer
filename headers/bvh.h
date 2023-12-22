@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cassert>
+#include <vector>
+
 #include "material.h"
 #include "mesh.h"
 #include "ray.h"
@@ -18,6 +21,8 @@ struct AABB
 	void grow(const AABB& boundingBox);
 
 	F32 area() const;
+
+	Float3 center() const;
 
 	F32 intersect(Ray& ray) const;
 };
@@ -90,15 +95,56 @@ public:
 
 	inline const Mat4& transform() const { return m_transform; }
 
-	inline void setTransform(const Mat4& transform);
+	void setTransform(const Mat4& transform);
 
 public:
 	BvhBLAS* bvh;
 	Material* material;
+	AABB bounds;
 
 private:
 	Mat4 m_transform;
 	Mat4 m_invTransform;
+};
+
+class BvhTLAS
+{
+public:
+	BvhTLAS(std::vector<Instance> instances);
+
+	~BvhTLAS();
+
+	BvhTLAS(const BvhTLAS& other) noexcept;
+	BvhTLAS& operator=(const BvhTLAS& other) noexcept;
+
+	bool intersect(Ray& ray) const;
+
+	bool intersectAny(Ray& ray) const;
+
+	void build();
+
+	void refit();
+
+	inline const Instance& instance(SizeType index) const;
+
+	inline const std::vector<Instance>& instances() const;
+
+private:
+	F32 calculateNodeCost(const BvhNode& node) const;
+
+	F32 findSplitPlane(const BvhNode& node, F32& cost, U32& axis) const;
+
+	U32 partitionNode(const BvhNode& node, F32 splitPosition, U32 axis) const;
+
+	void updateNodeBounds(SizeType nodeIndex);
+
+	void subdivide(SizeType nodeIndex);
+
+private:
+	std::vector<Instance> m_instances;
+	U32* m_indices;
+	U32 m_nodesUsed;
+	BvhNode* m_nodePool;
 };
 
 const Mesh* BvhBLAS::mesh() const
@@ -111,8 +157,13 @@ const AABB& BvhBLAS::bounds() const
 	return m_nodePool[BVH_ROOT_INDEX].boundingBox;
 }
 
-void Instance::setTransform(const Mat4& transform)
+const Instance& BvhTLAS::instance(SizeType index) const
 {
-	m_invTransform = glm::inverse(transform);
-	m_transform = transform;
+	assert(index < m_instances.size());
+	return m_instances[index];
+}
+
+const std::vector<Instance>& BvhTLAS::instances() const
+{
+	return m_instances;
 }

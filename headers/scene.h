@@ -16,5 +16,5 @@ public:
 	const Instance& hitInstance(SizeType instanceIndex) const;
 
 private:
-	std::vector<Instance> m_instances;
+	BvhTLAS m_sceneTlas;
 };

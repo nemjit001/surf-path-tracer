@@ -9,29 +9,17 @@
 
 Scene::Scene(std::vector<Instance> instances)
 	:
-	m_instances(instances)
+	m_sceneTlas(instances)
 {
 	//
 }
 
 bool Scene::intersect(Ray& ray) const
 {
-	bool intersected = false;
-	for (SizeType i = 0; i < m_instances.size(); i++)
-	{
-		const Instance& instance = m_instances[i];
-		if (instance.intersect(ray))
-		{
-			ray.metadata.instanceIndex = static_cast<U32>(i);
-			intersected = true;
-		}
-	}
-
-	return intersected;
+	return m_sceneTlas.intersect(ray);
 }
 
 const Instance& Scene::hitInstance(SizeType instanceIndex) const
 {
-	assert(instanceIndex < m_instances.size());
-	return m_instances[instanceIndex];
+	return m_sceneTlas.instance(instanceIndex);
 }
