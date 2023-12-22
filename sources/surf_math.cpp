@@ -9,10 +9,10 @@ static U32 RAND_SEED = 0x12345678;
 U32 RgbaToU32(const RgbaColor& color)
 {
 	// TODO: implement color SIMD implementation
-	U32 r = static_cast<U32>(color.r * 255.99f);
-	U32 g = static_cast<U32>(color.g * 255.99f);
-	U32 b = static_cast<U32>(color.b * 255.99f);
-	U32 a = static_cast<U32>(color.a * 255.99f);
+	U32 r = static_cast<U32>(color.r * 255.00f);
+	U32 g = static_cast<U32>(color.g * 255.00f);
+	U32 b = static_cast<U32>(color.b * 255.00f);
+	U32 a = static_cast<U32>(color.a * 255.00f);
 
 	return ((a & 0xFF) << 24) + ((b & 0xFF) << 16) + ((g & 0xFF) << 8) + (r & 0xFF);
 }
@@ -56,22 +56,18 @@ F32 randomRange(U32& seed, F32 range)
 
 Float3 randomOnHemisphere(const Float3& normal)
 {
-	Float3 direction = Float3(
-		randomRange(-1.0f, 1.0f),
-		randomRange(-1.0f, 1.0f),
-		randomRange(-1.0f, 1.0f)
-	);
+	Float3 direction = Float3(0.0f);
 
-	while (direction.dot(direction) > 1.0f)
+	do
 	{
 		direction = Float3(
 			randomRange(-1.0f, 1.0f),
 			randomRange(-1.0f, 1.0f),
 			randomRange(-1.0f, 1.0f)
 		);
-	}
+	} while (direction.dot(direction) > 1.0f);
 
-	if (direction.dot(direction) < 0.0f)
+	if (direction.dot(normal) < 0.0f)
 		direction *= -1.0f;
 
 	return direction.normalize();

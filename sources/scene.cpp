@@ -1,23 +1,37 @@
 #include "scene.h"
 
+#include <cassert>
+#include <vector>
+
 #include "bvh.h"
 #include "ray.h"
 #include "surf_math.h"
 
-Scene::Scene(Instance instance)
+Scene::Scene(std::vector<Instance> instances)
 	:
-	m_instance(instance)
+	m_instances(instances)
 {
 	//
 }
 
 bool Scene::intersect(Ray& ray) const
 {
-	// TODO: intersect scene TLAS
-	return m_instance.intersect(ray);
+	bool intersected = false;
+	for (SizeType i = 0; i < m_instances.size(); i++)
+	{
+		const Instance& instance = m_instances[i];
+		if (instance.intersect(ray))
+		{
+			ray.metadata.instanceIndex = static_cast<U32>(i);
+			intersected = true;
+		}
+	}
+
+	return intersected;
 }
 
 const Instance& Scene::hitInstance(SizeType instanceIndex) const
 {
-	return m_instance;
+	assert(instanceIndex < m_instances.size());
+	return m_instances[instanceIndex];
 }

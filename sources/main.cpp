@@ -136,7 +136,16 @@ int main()
 	);
 
 	Mesh susanneMesh("assets/susanne.obj");
+	Mesh cubeMesh("assets/cube.obj");
+	Mesh planeMesh("assets/plane.obj");
 	BvhBLAS susanneBVH(&susanneMesh);
+	BvhBLAS cubeBVH(&cubeMesh);
+	BvhBLAS planeBVH(&planeMesh);
+
+	Material floorMaterial = Material{
+		RgbColor(0.0f),
+		RgbColor(0.8f),
+	};
 
 	Material diffuseMaterial = Material{
 		RgbColor(0.0f),
@@ -148,9 +157,46 @@ int main()
 		RgbColor(0.0f),
 	};
 
-	Instance testInstance(&susanneBVH, &lightMaterial, Mat4(1.0f));
+	Instance cubeL(
+		&cubeBVH,
+		&lightMaterial,
+		glm::translate(
+			Mat4(1.0f),
+			static_cast<glm::vec3>(Float3( 7.5f, 5.0f, 0.0f))
+		)
+	);
 
-	Scene scene(testInstance);
+	Instance cubeR(
+		&cubeBVH,
+		&lightMaterial,
+		glm::translate(
+			Mat4(1.0f),
+			static_cast<glm::vec3>(Float3(-7.5f, 5.0f, 0.0f))
+		)
+	);
+
+	Instance floor(
+		&planeBVH,
+		&floorMaterial,
+		glm::scale(
+			glm::translate(
+				Mat4(1.0f),
+				static_cast<glm::vec3>(Float3(0.0f, -1.0f, 0.0f))
+			),
+			static_cast<glm::vec3>(Float3(5.0f, 5.0f, 5.0f))
+		)
+	);
+
+	Instance redHeaded(
+		&susanneBVH,
+		&diffuseMaterial,
+		glm::translate(
+			Mat4(1.0f),
+			static_cast<glm::vec3>(Float3(0.0f, 0.0f, -1.0f))
+		)
+	);
+
+	Scene scene({ floor, cubeL, cubeR, redHeaded });
 	Renderer renderer(std::move(renderContext), resultBuffer, worldCam, scene);
 
 	// Create frame timer
