@@ -135,6 +135,8 @@ int main()
 		resultBuffer.height
 	);
 
+	// -- BEGIN Scene setup
+
 	Mesh susanneMesh("assets/susanne.obj");
 	Mesh cubeMesh("assets/cube.obj");
 	Mesh planeMesh("assets/plane.obj");
@@ -197,7 +199,15 @@ int main()
 	);
 
 	Scene scene({ floor, cubeL, cubeR, redHeaded });
-	Renderer renderer(std::move(renderContext), resultBuffer, worldCam, scene);
+
+	// -- END Scene setup
+
+	RendererConfig rendererConfig = RendererConfig{
+		5,	// Max bounces
+		1	// Samples per frame
+	};
+
+	Renderer renderer(std::move(renderContext), rendererConfig, resultBuffer, worldCam, scene);
 
 	// Create frame timer
 	Timer frameTimer;
@@ -212,6 +222,8 @@ int main()
 		static F32 ALPHA = 1.0f;
 
 		// Render frame
+		RendererConfig& config = renderer.config();
+		const FrameInstrumentationData& frameInfo = renderer.frameInfo();
 		renderer.render(deltaTime);
 
 		// Handle input
@@ -230,8 +242,16 @@ int main()
 		if (ALPHA > SMOOTH_FRAC) ALPHA *= 0.5;
 
 		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
-		F32 rps = (resultBuffer.width * resultBuffer.height * SAMPLES_PER_FRAME) * inv_avg_frametime;
-		printf("%08.2fms (%05.1f fps) - %08.2fMrays/s\n", AVERAGE_FRAMETIME, inv_avg_frametime * 1'000.0f, rps / 1'000.0f);
+		F32 rps = (resultBuffer.width * resultBuffer.height * config.samplesPerFrame) * inv_avg_frametime;
+		printf(
+			"%08.2fms (%05.1f fps) - %08.2fMrays/s - %05u samples (%u spp) - %010.2f Lumen\n",
+			AVERAGE_FRAMETIME,
+			inv_avg_frametime * 1'000.0f,
+			rps / 1'000.0f,
+			frameInfo.totalSamples,
+			config.samplesPerFrame,
+			frameInfo.energy
+		);
 
 		glfwPollEvents();
 	}

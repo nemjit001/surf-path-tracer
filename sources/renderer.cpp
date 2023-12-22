@@ -36,15 +36,17 @@ AccumulatorState::~AccumulatorState()
     delete[] buffer;
 }
 
-Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
+Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
     :
     m_context(std::move(renderContext)),
     m_descriptorPool(m_context.device),
     m_framebufferSize(m_context.getFramebufferSize()),
+    m_config(config),
     m_resultBuffer(resultBuffer),
     m_accumulator(resultBuffer.width, resultBuffer.height),
     m_camera(camera),
     m_scene(scene),
+    m_frameInstrumentationData{},
     m_copyFinishedFence(VK_NULL_HANDLE),
     m_copyPool(VK_NULL_HANDLE),
     m_oneshotCopyBuffer(VK_NULL_HANDLE),
@@ -181,39 +183,6 @@ Renderer::~Renderer()
     vkDestroyFence(m_context.device, m_copyFinishedFence, nullptr);
 }
 
-RgbColor Renderer::trace(Ray& ray, U32 depth)
-{
-    if (depth > MAX_BOUNCES)
-        return COLOR_BLACK;
-
-    if (!m_scene.intersect(ray))
-        return COLOR_BLACK; // TODO: sample HDRI or sky color from scene
-
-    // TODO: Fetch material (emittance, albedo, specularity, reflectivity)
-    const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
-    const Mesh* mesh = instance.bvh->mesh();
-    const Material* material = instance.material;
-
-    if (material->isLight())
-    {
-        return material->emittance;
-    }
-
-    Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
-    Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
-
-    RgbColor brdf = material->albedo * F32_INV_PI;
-
-    Float3 newDirection = randomOnHemisphere(normal);
-    Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
-    Ray newRay(newOrigin, newDirection);
-
-    F32 cosTheta = newDirection.dot(normal);
-    RgbColor incomingColor = trace(newRay, depth + 1);
-
-    return material->emittance + F32_2PI * cosTheta * brdf * incomingColor;
-}
-
 void Renderer::clearAccumulator()
 {
     m_accumulator.totalSamples = 0;
@@ -232,7 +201,7 @@ void Renderer::render(F32 deltaTime)
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
 
     // Start CPU ray tracing loop
-    const F32 invSamples = 1.0f / static_cast<F32>(m_accumulator.totalSamples + SAMPLES_PER_FRAME);
+    const F32 invSamples = 1.0f / static_cast<F32>(m_accumulator.totalSamples + m_config.samplesPerFrame);
 
 #pragma omp parallel for schedule(dynamic)
     for (I32 y = 0; y < static_cast<I32>(m_resultBuffer.height); y++)
@@ -241,7 +210,7 @@ void Renderer::render(F32 deltaTime)
         {
             SizeType pixelIndex = x + y * m_resultBuffer.width;
 
-            for (SizeType sample = 0; sample < SAMPLES_PER_FRAME; sample++)
+            for (SizeType sample = 0; sample < m_config.samplesPerFrame; sample++)
             {
                 Ray primaryRay = m_camera.getPrimaryRay(
                     static_cast<F32>(x) + randomRange(-0.5f, 0.5f),
@@ -252,11 +221,26 @@ void Renderer::render(F32 deltaTime)
                 m_accumulator.buffer[pixelIndex] += color;
             }
 
-            m_resultBuffer.pixels[pixelIndex] = RgbaToU32(m_accumulator.buffer[pixelIndex] * invSamples);
+            RgbaColor outColor = m_accumulator.buffer[pixelIndex] * invSamples;
+            m_resultBuffer.pixels[pixelIndex] = RgbaToU32(outColor);
         }
     }
 
-    m_accumulator.totalSamples += SAMPLES_PER_FRAME;
+    m_accumulator.totalSamples += m_config.samplesPerFrame;
+
+    // Update instrumentation data
+    m_frameInstrumentationData.energy = 0.0f;
+    m_frameInstrumentationData.totalSamples = static_cast<U32>(m_accumulator.totalSamples);
+    for (SizeType y = 0; y < m_resultBuffer.height; y++)
+    {
+        for (SizeType x = 0; x < m_resultBuffer.width; x++)
+        {
+            SizeType pixelIndex = x + y * m_resultBuffer.width;
+            RgbaColor outColor = m_accumulator.buffer[pixelIndex] * invSamples;
+            m_frameInstrumentationData.energy += outColor.r + outColor.g + outColor.b;
+        }
+    }
+
     // End CPU ray tracing loop
 
     m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
@@ -290,6 +274,38 @@ void Renderer::render(F32 deltaTime)
 
     VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue.handle, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
+}
+
+RgbColor Renderer::trace(Ray& ray, U32 depth)
+{
+    if (depth > m_config.maxBounces)
+        return COLOR_BLACK;
+
+    if (!m_scene.intersect(ray))
+        return COLOR_BLACK; // TODO: sample HDRI or sky color from scene
+
+    const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
+    const Mesh* mesh = instance.bvh->mesh();
+    const Material* material = instance.material;
+
+    if (material->isLight())
+    {
+        return material->emittance;
+    }
+
+    Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+    Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+
+    RgbColor brdf = material->albedo * F32_INV_PI;
+
+    Float3 newDirection = randomOnHemisphere(normal);
+    Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+    Ray newRay(newOrigin, newDirection);
+
+    F32 cosTheta = newDirection.dot(normal);
+    RgbColor incomingColor = trace(newRay, depth + 1);
+
+    return material->emittance + F32_2PI * cosTheta * brdf * incomingColor;
 }
 
 void Renderer::copyBufferToImage(

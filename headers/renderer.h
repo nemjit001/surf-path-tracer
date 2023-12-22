@@ -20,9 +20,17 @@
 
 #define FRAMES_IN_FLIGHT 2
 
-// TODO: expose as settings for renderer
-#define MAX_BOUNCES         5
-#define SAMPLES_PER_FRAME   1
+struct RendererConfig
+{
+    U32 maxBounces          = 5;
+    U32 samplesPerFrame     = 1;
+};
+
+struct FrameInstrumentationData
+{
+    F32 energy              = 0.0f;
+    U32 totalSamples        = 0;
+};
 
 struct AccumulatorState
 {
@@ -47,17 +55,21 @@ struct FrameData
 class Renderer
 {
 public:
-    Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
+    Renderer(RenderContext renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
 
     ~Renderer();
-
-    RgbColor trace(Ray& ray, U32 depth = 0);
 
     void clearAccumulator();
 
     void render(F32 deltaTime);
 
+    inline RendererConfig& config();
+
+    inline const FrameInstrumentationData& frameInfo();
+
 private:
+    RgbColor trace(Ray& ray, U32 depth = 0);
+
     void copyBufferToImage(
         const Buffer& staging,
         const Image& target
@@ -73,10 +85,14 @@ private:
     RenderContext m_context;
     DescriptorPool m_descriptorPool;
     FramebufferSize m_framebufferSize;
+    RendererConfig m_config;
     PixelBuffer m_resultBuffer;
     AccumulatorState m_accumulator;
     Camera& m_camera;
     Scene& m_scene;
+
+    // Frame instrumentation data
+    FrameInstrumentationData m_frameInstrumentationData;
 
     // Setup for copy operations
     VkFence m_copyFinishedFence;
@@ -100,3 +116,13 @@ private:
     PipelineLayout m_presentPipelineLayout;
     GraphicsPipeline m_presentPipeline;
 };
+
+RendererConfig& Renderer::config()
+{
+    return m_config;
+}
+
+const FrameInstrumentationData& Renderer::frameInfo()
+{
+    return m_frameInstrumentationData;
+}
