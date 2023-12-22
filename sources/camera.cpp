@@ -31,7 +31,11 @@ void Camera::generateViewPlane()
 	const Float3 uVector = right() * viewportWidth;
 	const Float3 vVector = -1.0f * up * VIEWPORT_HEIGHT;
 
-	viewPlane.topLeft = position + (forward * FOCAL_LENGTH) - (0.5f * uVector) - (0.5f * vVector);
+	const Float3 uDelta = uVector / screenWidth;
+	const Float3 vDelta = vVector / screenHeight;
+
+	const Float3 topLeft = position + (forward * FOCAL_LENGTH) - (0.5f * uVector) - (0.5f * vVector);
+	viewPlane.firstPixel = topLeft + 0.5f * (uDelta + vDelta);
 	viewPlane.uVector = uVector;
 	viewPlane.vVector = vVector;
 }

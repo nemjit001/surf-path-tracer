@@ -77,13 +77,13 @@ Mesh::Mesh(const std::string& path)
 	tinyobj::ObjReader reader;
 	if (!reader.ParseFromFile(path, config))
 	{
-		std::cerr << "Failed to read OBJ file: " << path << '\n';
+		std::cerr << "Error reading file: " << path << '\n';
 		if (!reader.Error().empty())
 		{
 			std::cerr << reader.Error() << '\n';
 		}
 
-		abort();
+		FATAL_ERROR("Failed to read OBJ file");
 	}
 
 	if (!reader.Warning().empty())
@@ -94,59 +94,62 @@ Mesh::Mesh(const std::string& path)
 	const tinyobj::attrib_t& attributes = reader.GetAttrib();
 	const std::vector<tinyobj::shape_t>& shapes = reader.GetShapes();
 
-	std::vector<Float3> vertices;
-	std::vector<Float3> normals;
-	std::vector<Float2> textureCoordinates;
-	std::vector<U32> indices;
 	for (const auto& shape : shapes)
 	{
-		for (const auto& index : shape.mesh.indices)
+		for (SizeType i = 0; i < shape.mesh.indices.size(); i+= 3)
 		{
-			SizeType vertexIndex = 3 * index.vertex_index;
-			Float3 position(
-				attributes.vertices[vertexIndex + 0],
-				attributes.vertices[vertexIndex + 1],
-				attributes.vertices[vertexIndex + 2]
-			);
+			tinyobj::index_t index0 = shape.mesh.indices[i + 0];
+			tinyobj::index_t index1 = shape.mesh.indices[i + 1];
+			tinyobj::index_t index2 = shape.mesh.indices[i + 2];
 
-			SizeType normalIndex = 3 * index.normal_index;
-			Float3 normal(
-				attributes.normals[normalIndex + 0],
-				attributes.normals[normalIndex + 1],
-				attributes.normals[normalIndex + 2]
-			);
+			triangles.push_back(Triangle(
+				Float3(
+					attributes.vertices[3 * index0.vertex_index + 0],
+					attributes.vertices[3 * index0.vertex_index + 1],
+					attributes.vertices[3 * index0.vertex_index + 2]
+				),
+				Float3(
+					attributes.vertices[3 * index1.vertex_index + 0],
+					attributes.vertices[3 * index1.vertex_index + 1],
+					attributes.vertices[3 * index1.vertex_index + 2]
+				),
+				Float3(
+					attributes.vertices[3 * index2.vertex_index + 0],
+					attributes.vertices[3 * index2.vertex_index + 1],
+					attributes.vertices[3 * index2.vertex_index + 2]
+				)
+			));
 
-			SizeType textureIndex = 2 * index.texcoord_index;
-			Float2 textureUV(
-				attributes.texcoords[textureIndex + 0],
-				attributes.texcoords[textureIndex + 1]
-			);
-
-			vertices.push_back(position);
-			normals.push_back(normal);
-			textureCoordinates.push_back(textureUV);
-			indices.push_back(static_cast<U32>(indices.size()));
+			m_triExtensions.push_back(TriExtension{
+				Float3(
+					attributes.normals[3 * index0.normal_index + 0],
+					attributes.normals[3 * index0.normal_index + 1],
+					attributes.normals[3 * index0.normal_index + 2]
+				),
+				Float3(
+					attributes.normals[3 * index1.normal_index + 0],
+					attributes.normals[3 * index1.normal_index + 1],
+					attributes.normals[3 * index1.normal_index + 2]
+				),
+				Float3(
+					attributes.normals[3 * index2.normal_index + 0],
+					attributes.normals[3 * index2.normal_index + 1],
+					attributes.normals[3 * index2.normal_index + 2]
+				),
+				Float2(
+					attributes.texcoords[2 * index0.texcoord_index + 0],
+					attributes.texcoords[2 * index0.texcoord_index + 1]
+				),
+				Float2(
+					attributes.texcoords[2 * index1.texcoord_index + 0],
+					attributes.texcoords[2 * index1.texcoord_index + 1]
+				),
+				Float2(
+					attributes.texcoords[2 * index2.texcoord_index + 0],
+					attributes.texcoords[2 * index2.texcoord_index + 1]
+				)
+			});
 		}
-	}
-
-	triangles.reserve(indices.size() / 3);
-	m_triExtensions.reserve(indices.size() / 3);
-	for (SizeType i = 0; i < indices.size(); i += 3)
-	{
-		triangles.push_back(Triangle(
-			vertices[indices[i]],
-			vertices[indices[i + 1]],
-			vertices[indices[i + 2]]
-		));
-
-		m_triExtensions.push_back(TriExtension{
-			normals[indices[i]],
-			normals[indices[i + 1]],
-			normals[indices[i + 2]],
-			textureCoordinates[indices[i]],
-			textureCoordinates[indices[i + 1]],
-			textureCoordinates[indices[i + 2]]
-		});
 	}
 }
 
@@ -160,12 +163,12 @@ Float3 Mesh::normal(SizeType primitiveIndex, const Float2& barycentric) const
 {
 	assert(primitiveIndex < triangles.size());
 	const TriExtension& ext = m_triExtensions[primitiveIndex];
-	return barycentric.u * ext.n1 + barycentric.v * ext.n2 + (1.0f - barycentric.u - barycentric.v) * ext.n0;
+	return barycentric.u * ext.n0 + barycentric.v * ext.n2 + (1.0f - barycentric.u - barycentric.v) * ext.n1;
 }
 
 Float2 Mesh::textureCoordinate(SizeType primitiveIndex, const Float2& barycentric) const
 {
 	assert(primitiveIndex < triangles.size());
 	const TriExtension& ext = m_triExtensions[primitiveIndex];
-	return (1.0f - barycentric.u - barycentric.v) * ext.uv0 + barycentric.u * ext.uv1 + barycentric.v * ext.uv2;
+	return barycentric.u * ext.uv0 + barycentric.v * ext.uv2 + (1.0f - barycentric.u - barycentric.v) * ext.uv1;
 }

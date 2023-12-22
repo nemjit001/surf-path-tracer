@@ -67,7 +67,7 @@ Renderer::Renderer(RenderContext renderContext, PixelBuffer resultBuffer, Camera
     m_frameImage(
         m_context.device,
         m_context.allocator,
-        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
+        VkFormat::VK_FORMAT_R8G8B8A8_UNORM,                     // Standard RGBA format
         resultBuffer.width, resultBuffer.height,
         VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
         | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
@@ -198,16 +198,14 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
     Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
-    RgbColor emittance = RgbColor(0.0f, 0.0f, 0.0f);
-    RgbColor albedo = RgbColor(textureCoordinate, 0.0f);
+    RgbColor emittance = 0.5f * (RgbColor(1.0f) + normal);
+    RgbColor albedo = COLOR_BLACK;
 
-    // Simple isLight check for emittance
-    // TODO: replace with material.isLight()
     if (emittance.r > 0.0f || emittance.g > 0.0f || emittance.b > 0.0f)
     {
         return emittance;
     }
-    
+
     RgbColor brdf = albedo * F32_INV_PI;
 
     Float3 newDirection = randomOnHemisphere(normal);
@@ -249,9 +247,19 @@ void Renderer::render(F32 deltaTime)
 
             for (SizeType sample = 0; sample < SAMPLES_PER_FRAME; sample++)
             {
-                Ray primaryRay = m_camera.getPrimaryRay(static_cast<F32>(x), static_cast<F32>(y));
-                RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
+#if 0
+                Ray primaryRay = m_camera.getPrimaryRay(
+                    static_cast<F32>(x) + randomRange(-0.5f, 0.5f),
+                    static_cast<F32>(y) + randomRange(-0.5f, 0.5f)
+                );
+#else
+                Ray primaryRay = m_camera.getPrimaryRay(
+                    static_cast<F32>(x),
+                    static_cast<F32>(y)
+                );
+#endif
 
+                RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
                 m_accumulator.buffer[pixelIndex] += color;
             }
 

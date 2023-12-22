@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdio>
+#include <cstdlib>
 #include <vulkan/vulkan.h>
 
 // Surf main header file
@@ -7,6 +9,10 @@
 #define PROGRAM_VERSION VK_MAKE_API_VERSION(0, 0, 0, 0)
 #define SCR_WIDTH		1280
 #define SCR_HEIGHT		720
+
+#define FATAL_ERROR(msg) (										\
+	(fprintf(stderr, "Surf Fatal Error: %s\n", #msg)), abort()	\
+)
 
 #if defined(_WIN32)
 

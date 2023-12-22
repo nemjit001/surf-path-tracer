@@ -196,8 +196,7 @@ void BvhBLAS::build()
 void BvhBLAS::refit()
 {
 	// refit bvh
-	fprintf(stderr, "Refitting not yet implemented!\n");
-	abort();
+	FATAL_ERROR("Refitting not yet implemented!\n");
 }
 
 F32 BvhBLAS::calculateNodeCost(const BvhNode& node) const

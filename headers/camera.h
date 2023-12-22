@@ -10,7 +10,7 @@
 
 struct ViewPlane
 {
-	Float3 topLeft;
+	Float3 firstPixel;
 	Float3 uVector;
 	Float3 vVector;
 };
@@ -45,7 +45,7 @@ Ray Camera::getPrimaryRay(F32 x, F32 y)
 	const F32 u = x * (1.0f / screenWidth);
 	const F32 v = y * (1.0f / screenHeight);
 
-	const Float3 planePosition = viewPlane.topLeft + u * viewPlane.uVector + v * viewPlane.vVector;
+	const Float3 planePosition = viewPlane.firstPixel + u * viewPlane.uVector + v * viewPlane.vVector;
 	Float3 direction = (planePosition - position).normalize();
 
 	return Ray(position, direction);

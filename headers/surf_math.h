@@ -21,8 +21,8 @@
 struct ALIGN(8) Float2
 {
 	union {
-		struct { F32 u, v; };
 		struct { F32 x, y; };
+		struct { F32 u, v; };
 		F32 xy[2];
 	};
 
@@ -40,8 +40,8 @@ struct ALIGN(8) Float2
 struct ALIGN(16) Float3
 {
 	union {
-		struct { F32 r, g, b; };
 		struct { F32 x, y, z; };
+		struct { F32 r, g, b; };
 		F32 xyz[3];
 	};
 
@@ -61,8 +61,8 @@ struct ALIGN(16) Float3
 struct ALIGN(16) Float4
 {
 	union {
-		struct { F32 r, g, b, a; };
 		struct { F32 x, y, z, w; };
+		struct { F32 r, g, b, a; };
 		F32 xyzw[4];
 	};
 
@@ -91,7 +91,7 @@ F32 randomF32();
 
 F32 randomF32(U32& seed);
 
-F32 randomRange(F32 range);
+F32 randomRange(F32 min, F32 max);
 
 F32 randomRange(U32& seed, F32 range);
 
@@ -117,10 +117,20 @@ inline Float3 min(const Float3& a, const Float3& b) { return Float3(min(a.x, b.x
 inline Float3 max(const Float3& a, const Float3& b) { return Float3(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z)); }
 
 // Float2 operators
+inline Float2 operator+(const Float2& a, F32 b) { return Float2(a.x + b, a.y + b); }
+inline Float2 operator-(const Float2& a, F32 b) { return Float2(a.x - b, a.y - b); }
+inline Float2 operator*(const Float2& a, F32 b) { return Float2(a.x * b, a.y * b); }
+inline Float2 operator/(const Float2& a, F32 b) { return Float2(a.x / b, a.y / b); }
+
 inline Float2 operator+(const Float2& a, const Float2& b) { return Float2(a.x + b.x, a.y + b.y); }
 inline Float2 operator-(const Float2& a, const Float2& b) { return Float2(a.x - b.x, a.y - b.y); }
 inline Float2 operator*(const Float2& a, const Float2& b) { return Float2(a.x * b.x, a.y * b.y); }
 inline Float2 operator/(const Float2& a, const Float2& b) { return Float2(a.x / b.x, a.y / b.y); }
+
+inline void operator+=(Float2& a, F32 b) { a.x += b; a.y += b; }
+inline void operator-=(Float2& a, F32 b) { a.x -= b; a.y -= b; }
+inline void operator*=(Float2& a, F32 b) { a.x *= b; a.y *= b; }
+inline void operator/=(Float2& a, F32 b) { a.x /= b; a.y /= b; }
 
 inline void operator+=(Float2& a, const Float2& b) { a.x += b.x; a.y += b.y; }
 inline void operator-=(Float2& a, const Float2& b) { a.x -= b.x; a.y -= b.y; }
@@ -132,10 +142,20 @@ inline F32 Float2::dot(const Float2& other) const { return x * other.x + y * oth
 inline Float2 Float2::normalize() const { F32 invLen = rsqrtf(this->dot(*this)); return *this * invLen; }
 
 // Float3 operators
+inline Float3 operator+(const Float3& a, F32 b) { return Float3(a.x + b, a.y + b, a.z + b); }
+inline Float3 operator-(const Float3& a, F32 b) { return Float3(a.x - b, a.y - b, a.z - b); }
+inline Float3 operator*(const Float3& a, F32 b) { return Float3(a.x * b, a.y * b, a.z * b); }
+inline Float3 operator/(const Float3& a, F32 b) { return Float3(a.x / b, a.y / b, a.z / b); }
+
 inline Float3 operator+(const Float3& a, const Float3& b) { return Float3(a.x + b.x, a.y + b.y, a.z + b.z); }
 inline Float3 operator-(const Float3& a, const Float3& b) { return Float3(a.x - b.x, a.y - b.y, a.z - b.z); }
 inline Float3 operator*(const Float3& a, const Float3& b) { return Float3(a.x * b.x, a.y * b.y, a.z * b.z); }
 inline Float3 operator/(const Float3& a, const Float3& b) { return Float3(a.x / b.x, a.y / b.y, a.z / b.z); }
+
+inline void operator+=(Float3& a, F32 b) { a.x += b; a.y += b; a.z += b; }
+inline void operator-=(Float3& a, F32 b) { a.x -= b; a.y -= b; a.z -= b; }
+inline void operator*=(Float3& a, F32 b) { a.x *= b; a.y *= b; a.z *= b; }
+inline void operator/=(Float3& a, F32 b) { a.x /= b; a.y /= b; a.z /= b; }
 
 inline void operator+=(Float3& a, const Float3& b) { a.x += b.x; a.y += b.y; a.z += b.z; }
 inline void operator-=(Float3& a, const Float3& b) { a.x -= b.x; a.y -= b.y; a.z -= b.z; }
@@ -156,10 +176,20 @@ inline Float3 Float3::cross(const Float3& other) const
 }
 
 // Float4 operators
+inline Float4 operator+(const Float4& a, F32 b) { return Float4(a.x + b, a.y + b, a.z + b, a.w + b); }
+inline Float4 operator-(const Float4& a, F32 b) { return Float4(a.x - b, a.y - b, a.z - b, a.w - b); }
+inline Float4 operator*(const Float4& a, F32 b) { return Float4(a.x * b, a.y * b, a.z * b, a.w * b); }
+inline Float4 operator/(const Float4& a, F32 b) { return Float4(a.x / b, a.y / b, a.z / b, a.w / b); }
+
 inline Float4 operator+(const Float4& a, const Float4& b) { return Float4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w); }
 inline Float4 operator-(const Float4& a, const Float4& b) { return Float4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
 inline Float4 operator*(const Float4& a, const Float4& b) { return Float4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w); }
 inline Float4 operator/(const Float4& a, const Float4& b) { return Float4(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w); }
+
+inline void operator+=(Float4& a, F32 b) { a.x += b; a.y += b; a.z += b; a.w += b; }
+inline void operator-=(Float4& a, F32 b) { a.x -= b; a.y -= b; a.z -= b; a.w -= b; }
+inline void operator*=(Float4& a, F32 b) { a.x *= b; a.y *= b; a.z *= b; a.w *= b; }
+inline void operator/=(Float4& a, F32 b) { a.x /= b; a.y /= b; a.z /= b; a.w /= b; }
 
 inline void operator+=(Float4& a, const Float4& b) { a.x += b.x; a.y += b.y; a.z += b.z; a.w += b.w; }
 inline void operator-=(Float4& a, const Float4& b) { a.x -= b.x; a.y -= b.y; a.z -= b.z; a.w -= b.w; }
