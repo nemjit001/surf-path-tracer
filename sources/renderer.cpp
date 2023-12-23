@@ -20,7 +20,7 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
-#define COLOR_BLACK RgbColor(0.0f, 0.0f, 0.0f)
+#define COLOR_BLACK         RgbColor(0.0f, 0.0f, 0.0f)
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
@@ -296,23 +296,29 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
     Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
+    Float3 mediumScale(1.0f);
+    if (ray.inMedium)
+    {
+        mediumScale = expf(material->absorption * -ray.depth);
+    }
+
     F32 r = randomF32();
     if (r < material->reflectivity)
     {
         Float3 newDirection = reflect(ray.direction, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newRay(newOrigin, newDirection);
-        return material->albedo * trace(newRay, depth + 1);
+        return material->albedo * mediumScale * trace(newRay, depth + 1);
     }
     else if (r < material->reflectivity + material->refractivity)
     {
         Float3 newDirection = reflect(ray.direction, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newReflect(newOrigin, newDirection);
+        newReflect.inMedium = ray.inMedium;
 
-        F32 cosTheta = ray.direction.dot(normal);
-        F32 iorRatio = cosTheta > 0.0f ?  material->indexOfRefraction : 1.0f / material->indexOfRefraction;
-        F32 cosI = -cosTheta;
+        F32 iorRatio = ray.inMedium ? material->indexOfRefraction : 1.0f / material->indexOfRefraction;
+        F32 cosI = -ray.direction.dot(normal);
         F32 cosTheta2 = 1.0f - iorRatio * iorRatio * (cosI * cosI);
         F32 Fresnel = 1.0f;
         if (cosTheta2 > 0.0f)
@@ -325,11 +331,13 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
             newDirection = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * normal);
             newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
             Ray newTransmit(newOrigin, newDirection);
+            newTransmit.inMedium = !ray.inMedium;
+
             if (randomF32() > Fresnel)
-                return material->albedo * trace(newTransmit, depth + 1);
+                return material->albedo * mediumScale * trace(newTransmit, depth + 1);
         }
 
-        return material->albedo * trace(newReflect, depth + 1);
+        return material->albedo * mediumScale * trace(newReflect, depth + 1);
     }
     else
     {
@@ -340,7 +348,7 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
         Ray newRay(newOrigin, newDirection);
 
         F32 cosTheta = newDirection.dot(normal);
-        return material->emittance() + F32_2PI * cosTheta * brdf * trace(newRay, depth + 1);
+        return material->emittance() + F32_2PI * cosTheta * brdf * mediumScale * trace(newRay, depth + 1);
     }
 }
 

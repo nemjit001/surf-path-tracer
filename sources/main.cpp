@@ -153,6 +153,7 @@ int main()
 
 	Material dielectricMaterial = Material{};
 	dielectricMaterial.albedo = RgbColor(0.2f, 0.7f, 0.2f);
+	dielectricMaterial.absorption = RgbColor(0.2f, 0.0f, 0.2f);
 	dielectricMaterial.refractivity = 1.0f;
 	dielectricMaterial.indexOfRefraction = 1.423;
 
@@ -162,14 +163,14 @@ int main()
 
 	Material lightMaterial = Material{};
 	lightMaterial.emissionColor = RgbColor(1.0f, 1.0f, 0.7f);
-	lightMaterial.emissionStrength = 1.0f;
+	lightMaterial.emissionStrength = 3.0f;
 
 	Instance cubeL(
 		&cubeBVH,
 		&lightMaterial,
 		glm::translate(
 			Mat4(1.0f),
-			static_cast<glm::vec3>(Float3( 7.5f, 5.0f, 0.0f))
+			static_cast<glm::vec3>(Float3(-10.0f, 5.0f, 0.0f))
 		)
 	);
 
@@ -178,7 +179,7 @@ int main()
 		&lightMaterial,
 		glm::translate(
 			Mat4(1.0f),
-			static_cast<glm::vec3>(Float3(-7.5f, 5.0f, 0.0f))
+			static_cast<glm::vec3>(Float3(10.0f, 5.0f, 0.0f))
 		)
 	);
 
@@ -210,7 +211,7 @@ int main()
 			glm::rotate(
 				glm::translate(
 					Mat4(1.0f),
-					static_cast<glm::vec3>(Float3(5.0f, 2.0f, -1.0f))
+					static_cast<glm::vec3>(Float3(5.0f, 0.25f, -1.0f))
 				),
 				glm::radians(45.0f),
 				static_cast<glm::vec3>(Float3(1.0f, 0.0f, 1.0f))
