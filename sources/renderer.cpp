@@ -290,22 +290,36 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
 
     if (material->isLight())
     {
-        return material->emittance;
+        return material->emittance();
     }
 
     Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
     Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
-    RgbColor brdf = material->albedo * F32_INV_PI;
+    F32 r = randomF32();
+    if (r < material->reflectivity)
+    {
+        Float3 newDirection = reflect(ray.direction, normal);
+        Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+        Ray newRay(newOrigin, newDirection);
+        return material->albedo * trace(newRay, depth + 1);
+    }
+    else if (r < material->reflectivity + material->refractivity)
+    {
+        // handle dielectric
+        return COLOR_BLACK;
+    }
+    else
+    {
+        RgbColor brdf = material->albedo * F32_INV_PI;
 
-    Float3 newDirection = randomOnHemisphere(normal);
-    Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
-    Ray newRay(newOrigin, newDirection);
+        Float3 newDirection = randomOnHemisphere(normal);
+        Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+        Ray newRay(newOrigin, newDirection);
 
-    F32 cosTheta = newDirection.dot(normal);
-    RgbColor incomingColor = trace(newRay, depth + 1);
-
-    return material->emittance + F32_2PI * cosTheta * brdf * incomingColor;
+        F32 cosTheta = newDirection.dot(normal);
+        return material->emittance() + F32_2PI * cosTheta * brdf * trace(newRay, depth + 1);
+    }
 }
 
 void Renderer::copyBufferToImage(

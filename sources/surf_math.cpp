@@ -73,6 +73,11 @@ Float3 randomOnHemisphere(const Float3& normal)
 	return direction.normalize();
 }
 
+Float3 reflect(const Float3& direction, Float3& normal)
+{
+	return direction - 2.0f * normal.dot(direction) * normal;
+}
+
 bool depthInBounds(F32 depth, F32 maxDepth)
 {
 	return F32_EPSILON <= depth && depth < maxDepth;

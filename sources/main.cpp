@@ -146,7 +146,7 @@ int main()
 
 	Material floorMaterial = Material{};
 	floorMaterial.albedo = RgbColor(0.8f);
-	floorMaterial.reflectivity = 0.05f;
+	floorMaterial.reflectivity = 0.01f;
 
 	Material diffuseMaterial = Material{};
 	diffuseMaterial.albedo = RgbColor(1.0f, 0.0f, 0.0f);
@@ -161,7 +161,8 @@ int main()
 	specularMaterial.reflectivity = 0.8f;
 
 	Material lightMaterial = Material{};
-	lightMaterial.emittance = RgbColor(1.0f, 1.0f, 0.7f);
+	lightMaterial.emissionColor = RgbColor(1.0f, 1.0f, 0.7f);
+	lightMaterial.emissionStrength = 1.0f;
 
 	Instance cubeL(
 		&cubeBVH,

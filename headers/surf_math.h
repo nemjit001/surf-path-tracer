@@ -106,6 +106,8 @@ F32 randomRange(U32& seed, F32 range);
 
 Float3 randomOnHemisphere(const Float3& normal);
 
+Float3 reflect(const Float3& direction, Float3& normal);
+
 bool depthInBounds(F32 depth, F32 maxDepth);
 
 template <typename T>
