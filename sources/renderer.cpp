@@ -306,8 +306,30 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     }
     else if (r < material->reflectivity + material->refractivity)
     {
-        // handle dielectric
-        return COLOR_BLACK;
+        Float3 newDirection = reflect(ray.direction, normal);
+        Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+        Ray newReflect(newOrigin, newDirection);
+
+        F32 cosTheta = ray.direction.dot(normal);
+        F32 iorRatio = cosTheta > 0.0f ?  material->indexOfRefraction : 1.0f / material->indexOfRefraction;
+        F32 cosI = -cosTheta;
+        F32 cosTheta2 = 1.0f - iorRatio * iorRatio * (cosI * cosI);
+        F32 Fresnel = 1.0f;
+        if (cosTheta2 > 0.0f)
+        {
+            F32 ratio = (1.0f - iorRatio) / (1.0f + iorRatio);
+            F32 r0 = ratio * ratio;
+            F32 c = 1.0f - cosI;
+            F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+
+            newDirection = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * normal);
+            newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            Ray newTransmit(newOrigin, newDirection);
+            if (randomF32() > Fresnel)
+                return material->albedo * trace(newTransmit, depth + 1);
+        }
+
+        return material->albedo * trace(newReflect, depth + 1);
     }
     else
     {

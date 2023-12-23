@@ -206,9 +206,16 @@ int main()
 	Instance cube0(
 		&cubeBVH,
 		&dielectricMaterial,
-		glm::translate(
-			Mat4(1.0f),
-			static_cast<glm::vec3>(Float3(5.0f, 0.0f, -1.0f))
+		glm::scale(
+			glm::rotate(
+				glm::translate(
+					Mat4(1.0f),
+					static_cast<glm::vec3>(Float3(5.0f, 2.0f, -1.0f))
+				),
+				glm::radians(45.0f),
+				static_cast<glm::vec3>(Float3(1.0f, 0.0f, 1.0f))
+			),
+			static_cast<glm::vec3>(Float3(0.75f, 0.75f, 0.75f))
 		)
 	);
 
