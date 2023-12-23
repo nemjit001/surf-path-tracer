@@ -296,6 +296,9 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
     Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
     Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
+    if (normal.dot(ray.direction) > 0.0f)
+        normal *= -1.0f;    // Invert normal to handle interior hits properly
+
     Float3 mediumScale(1.0f);
     if (ray.inMedium)
     {

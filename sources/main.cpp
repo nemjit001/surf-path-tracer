@@ -155,7 +155,7 @@ int main()
 	dielectricMaterial.albedo = RgbColor(0.2f, 0.7f, 0.2f);
 	dielectricMaterial.absorption = RgbColor(0.2f, 0.0f, 0.2f);
 	dielectricMaterial.refractivity = 1.0f;
-	dielectricMaterial.indexOfRefraction = 1.423;
+	dielectricMaterial.indexOfRefraction = 1.423f;
 
 	Material specularMaterial = Material{};
 	specularMaterial.albedo = RgbColor(0.0f, 1.0f, 1.0f);
@@ -191,7 +191,7 @@ int main()
 				Mat4(1.0f),
 				static_cast<glm::vec3>(Float3(0.0f, -1.0f, 0.0f))
 			),
-			static_cast<glm::vec3>(Float3(10.0f, 10.0f, 10.0f))
+			static_cast<glm::vec3>(Float3(15.0f, 15.0f, 15.0f))
 		)
 	);
 
@@ -201,6 +201,15 @@ int main()
 		glm::translate(
 			Mat4(1.0f),
 			static_cast<glm::vec3>(Float3(0.0f, 0.0f, -1.0f))
+		)
+	);
+
+	Instance susanne1(
+		&susanneBVH,
+		&specularMaterial,
+		glm::translate(
+			Mat4(1.0f),
+			static_cast<glm::vec3>(Float3(-5.0f, 0.0f, -1.0f))
 		)
 	);
 
@@ -217,15 +226,6 @@ int main()
 				static_cast<glm::vec3>(Float3(1.0f, 0.0f, 1.0f))
 			),
 			static_cast<glm::vec3>(Float3(0.75f, 0.75f, 0.75f))
-		)
-	);
-
-	Instance susanne1(
-		&susanneBVH,
-		&specularMaterial,
-		glm::translate(
-			Mat4(1.0f),
-			static_cast<glm::vec3>(Float3(-5.0f, 0.0f, -1.0f))
 		)
 	);
 
