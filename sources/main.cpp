@@ -144,20 +144,24 @@ int main()
 	BvhBLAS cubeBVH(&cubeMesh);
 	BvhBLAS planeBVH(&planeMesh);
 
-	Material floorMaterial = Material{
-		RgbColor(0.0f),
-		RgbColor(0.8f),
-	};
+	Material floorMaterial = Material{};
+	floorMaterial.albedo = RgbColor(0.8f);
+	floorMaterial.reflectivity = 0.05f;
 
-	Material diffuseMaterial = Material{
-		RgbColor(0.0f),
-		RgbColor(1.0f, 0.0f, 0.0f),
-	};
+	Material diffuseMaterial = Material{};
+	diffuseMaterial.albedo = RgbColor(1.0f, 0.0f, 0.0f);
 
-	Material lightMaterial = Material{
-		RgbColor(1.0f, 1.0f, 0.7f),
-		RgbColor(0.0f),
-	};
+	Material dielectricMaterial = Material{};
+	dielectricMaterial.albedo = RgbColor(0.2f, 0.7f, 0.2f);
+	dielectricMaterial.refractivity = 1.0f;
+	dielectricMaterial.indexOfRefraction = 1.423;
+
+	Material specularMaterial = Material{};
+	specularMaterial.albedo = RgbColor(0.0f, 1.0f, 1.0f);
+	specularMaterial.reflectivity = 0.8f;
+
+	Material lightMaterial = Material{};
+	lightMaterial.emittance = RgbColor(1.0f, 1.0f, 0.7f);
 
 	Instance cubeL(
 		&cubeBVH,
@@ -185,11 +189,11 @@ int main()
 				Mat4(1.0f),
 				static_cast<glm::vec3>(Float3(0.0f, -1.0f, 0.0f))
 			),
-			static_cast<glm::vec3>(Float3(5.0f, 5.0f, 5.0f))
+			static_cast<glm::vec3>(Float3(10.0f, 10.0f, 10.0f))
 		)
 	);
 
-	Instance redHeaded(
+	Instance susanne0(
 		&susanneBVH,
 		&diffuseMaterial,
 		glm::translate(
@@ -198,7 +202,25 @@ int main()
 		)
 	);
 
-	Scene scene({ floor, cubeL, cubeR, redHeaded });
+	Instance cube0(
+		&cubeBVH,
+		&dielectricMaterial,
+		glm::translate(
+			Mat4(1.0f),
+			static_cast<glm::vec3>(Float3(5.0f, 0.0f, -1.0f))
+		)
+	);
+
+	Instance susanne1(
+		&susanneBVH,
+		&specularMaterial,
+		glm::translate(
+			Mat4(1.0f),
+			static_cast<glm::vec3>(Float3(-5.0f, 0.0f, -1.0f))
+		)
+	);
+
+	Scene scene({ floor, cubeL, cubeR, susanne0, susanne1, cube0 });
 
 	// -- END Scene setup
 
