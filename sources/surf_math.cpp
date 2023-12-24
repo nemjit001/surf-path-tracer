@@ -29,6 +29,8 @@ U32 RgbaToU32(const RgbaColor& color)
 
 U32 wangHash(U32 seed)
 {
+	assert(seed != 0);
+
 	seed = (seed ^ 61) ^ (seed >> 16);
 	seed *= 9;
 	seed = seed ^ (seed >> 4);
@@ -40,7 +42,7 @@ U32 wangHash(U32 seed)
 
 U32 initSeed(U32 seed)
 {
-	return wangHash((seed + 1) * 17);
+	return wangHash((seed + 1) * 0x11);
 }
 
 U32 randomU32()
