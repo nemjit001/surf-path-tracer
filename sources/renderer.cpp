@@ -20,6 +20,7 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
+// #define RECURSIVE_IMPLEMENTATION // Use a recursive path tracing implementation
 #define COLOR_BLACK         RgbColor(0.0f, 0.0f, 0.0f)
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
@@ -279,6 +280,7 @@ void Renderer::render(F32 deltaTime)
 
 RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 {
+#ifdef RECURSIVE_IMPLEMENTATION
     if (depth > m_config.maxBounces)
         return COLOR_BLACK;
 
@@ -299,15 +301,11 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
     // Handle backface hits -> normal needs to be flipped if colinear with hit direction
     if (ray.direction.dot(normal) > 0.0f)
-    {
         normal *= -1.0f;
-    }
 
     Float3 mediumScale(1.0f);
     if (ray.inMedium)
-    {
         mediumScale = expf(material->absorption * -ray.depth);
-    }
 
     F32 r = randomF32(seed);
     if (r < material->reflectivity)
@@ -315,6 +313,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         Float3 newDirection = reflect(ray.direction, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newRay(newOrigin, newDirection);
+        newRay.inMedium = ray.inMedium;
         return material->albedo * mediumScale * trace(seed, newRay, depth + 1);
     }
     else if (r < material->reflectivity + material->refractivity)
@@ -360,6 +359,100 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         F32 cosTheta = newDirection.dot(normal);
         return material->emittance() + F32_2PI * cosTheta * brdf * mediumScale * trace(seed, newRay, depth + 1);
     }
+#else
+    // Non recursive path tracing implementation
+    RgbColor energy(0.0f);
+    RgbColor transmission(1.0f);
+    for (;;)
+    {
+        if (!m_scene.intersect(ray))
+        {
+            energy += transmission * m_scene.sampleBackground(ray);
+            break;
+        }
+
+        const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
+        const Mesh* mesh = instance.bvh->mesh();
+        const Material* material = instance.material;
+
+        if (material->isLight())
+        {
+            energy += transmission * material->emittance();
+            break;
+        }
+
+        Float3 normal = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+        Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+
+        // Handle backface hits -> normal needs to be flipped if colinear with hit direction
+        if (ray.direction.dot(normal) > 0.0f)
+            normal *= -1.0f;
+
+        Float3 mediumScale(1.0f);
+        if (ray.inMedium)
+            mediumScale = expf(material->absorption * -ray.depth);
+
+        F32 r = randomF32(seed);
+        if (r < material->reflectivity)
+        {
+            Float3 newDirection = reflect(ray.direction, normal);
+            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            bool wasInMedium = ray.inMedium;
+            ray = Ray(newOrigin, newDirection);
+            ray.inMedium = wasInMedium;
+
+            transmission *= material->albedo * mediumScale;
+        }
+        else if (r < (material->reflectivity + material->refractivity))
+        {
+            F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
+            F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
+            F32 iorRatio = n1 / n2;
+
+            F32 cosI = -ray.direction.dot(normal);
+            F32 cosTheta2 = 1.0f - iorRatio * iorRatio * (1.0f - cosI * cosI);
+            F32 Fresnel = 1.0f;
+            if (cosTheta2 > 0.0f)
+            {
+                F32 a = n1 - n2;
+                F32 b = n1 + n2;
+                F32 r0 = (a * a) / (b * b);
+                F32 c = 1.0f - cosI;
+                F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+
+                Float3 newDirection = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * normal);
+                Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+                bool wasInMedium = ray.inMedium;
+                ray = Ray(newOrigin, newDirection);
+                ray.inMedium = !wasInMedium;
+
+                if (randomF32(seed) > Fresnel)
+                    transmission *= material->albedo * mediumScale;
+            }
+            else
+            {
+                Float3 newDirection = reflect(ray.direction, normal);
+                Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+                bool wasInMedium = ray.inMedium;
+                ray = Ray(newOrigin, newDirection);
+                ray.inMedium = wasInMedium;
+                transmission *= material->albedo * mediumScale;
+            }
+        }
+        else
+        {
+            RgbColor brdf = material->albedo * F32_INV_PI;
+            Float3 newDirection = randomOnHemisphere(seed, normal);
+            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            ray = Ray(newOrigin, newDirection);
+
+            F32 cosTheta = newDirection.dot(normal);
+            transmission *= material->emittance() + F32_2PI * cosTheta * brdf * mediumScale;
+        }
+    }
+
+    return energy;
+#endif
 }
 
 void Renderer::copyBufferToImage(
