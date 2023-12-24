@@ -20,7 +20,8 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
-// #define RECURSIVE_IMPLEMENTATION // Use a recursive path tracing implementation
+// #define RECURSIVE_IMPLEMENTATION    // Use a recursive path tracing implementation
+#define LIMIT_NON_RECURSIVE_DEPTH   // Limit the bounce depth for the non recursive implementation -> removing max bounce depth will give a more accurate image but may result in infinite bounces
 #define COLOR_BLACK         RgbColor(0.0f, 0.0f, 0.0f)
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
@@ -365,6 +366,11 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
     RgbColor transmission(1.0f);
     for (;;)
     {
+#ifdef LIMIT_NON_RECURSIVE_DEPTH
+        if (depth > m_config.maxBounces)
+            break;
+#endif
+
         if (!m_scene.intersect(ray))
         {
             energy += transmission * m_scene.sampleBackground(ray);
@@ -449,6 +455,10 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             F32 cosTheta = newDirection.dot(normal);
             transmission *= material->emittance() + F32_2PI * cosTheta * brdf * mediumScale;
         }
+
+#ifdef LIMIT_NON_RECURSIVE_DEPTH
+        depth++;
+#endif
     }
 
     return energy;
