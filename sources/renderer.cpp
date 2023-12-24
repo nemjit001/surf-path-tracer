@@ -26,14 +26,14 @@ AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
     totalSamples(0),
     bufferSize(width * height),
-    buffer(new RgbaColor[bufferSize]{})
+    buffer(static_cast<RgbaColor*>(MALLOC64(bufferSize * sizeof(RgbaColor))))
 {
-    //
+    memset(buffer, 0, bufferSize * sizeof(RgbaColor));
 }
 
 AccumulatorState::~AccumulatorState()
 {
-    delete[] buffer;
+    FREE64(buffer);
 }
 
 Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
@@ -65,7 +65,7 @@ Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuff
     m_frameImage(
         m_context.device,
         m_context.allocator,
-        VkFormat::VK_FORMAT_R8G8B8A8_UNORM,                     // Standard RGBA format
+        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
         resultBuffer.width, resultBuffer.height,
         VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
         | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
@@ -209,15 +209,16 @@ void Renderer::render(F32 deltaTime)
         for (I32 x = 0; x < static_cast<I32>(m_resultBuffer.width); x++)
         {
             SizeType pixelIndex = x + y * m_resultBuffer.width;
+            U32 pixelSeed = initSeed(static_cast<U32>(pixelIndex + m_accumulator.totalSamples * 1799));
 
             for (SizeType sample = 0; sample < m_config.samplesPerFrame; sample++)
             {
                 Ray primaryRay = m_camera.getPrimaryRay(
-                    static_cast<F32>(x) + randomRange(-0.5f, 0.5f),
-                    static_cast<F32>(y) + randomRange(-0.5f, 0.5f)
+                    static_cast<F32>(x) + randomRange(pixelSeed, -0.5f, 0.5f),
+                    static_cast<F32>(y) + randomRange(pixelSeed, -0.5f, 0.5f)
                 );
 
-                RgbaColor color = RgbaColor(trace(primaryRay), 1.0f);
+                RgbaColor color = RgbaColor(trace(pixelSeed, primaryRay), 1.0f);
                 m_accumulator.buffer[pixelIndex] += color;
             }
 
@@ -276,13 +277,13 @@ void Renderer::render(F32 deltaTime)
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }
 
-RgbColor Renderer::trace(Ray& ray, U32 depth)
+RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 {
     if (depth > m_config.maxBounces)
         return COLOR_BLACK;
 
     if (!m_scene.intersect(ray))
-        return COLOR_BLACK; // TODO: sample HDRI or sky color from scene
+        return m_scene.sampleBackground(ray);
 
     const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
     const Mesh* mesh = instance.bvh->mesh();
@@ -293,11 +294,14 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
         return material->emittance();
     }
 
-    Float3 normal = mesh->normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+    Float3 normal = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
     Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
 
-    if (normal.dot(ray.direction) > 0.0f)
-        normal *= -1.0f;    // Invert normal to handle interior hits properly
+    // Handle backface hits -> normal needs to be flipped if colinear with hit direction
+    if (ray.direction.dot(normal) > 0.0f)
+    {
+        normal *= -1.0f;
+    }
 
     Float3 mediumScale(1.0f);
     if (ray.inMedium)
@@ -305,24 +309,28 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
         mediumScale = expf(material->absorption * -ray.depth);
     }
 
-    F32 r = randomF32();
+    F32 r = randomF32(seed);
     if (r < material->reflectivity)
     {
         Float3 newDirection = reflect(ray.direction, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newRay(newOrigin, newDirection);
-        return material->albedo * mediumScale * trace(newRay, depth + 1);
+        return material->albedo * mediumScale * trace(seed, newRay, depth + 1);
     }
     else if (r < material->reflectivity + material->refractivity)
     {
-        F32 iorRatio = ray.inMedium ? material->indexOfRefraction : 1.0f / material->indexOfRefraction;
+        F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
+        F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
+        F32 iorRatio = n1 / n2;
+
         F32 cosI = -ray.direction.dot(normal);
-        F32 cosTheta2 = 1.0f - iorRatio * iorRatio * (cosI * cosI);
+        F32 cosTheta2 = 1.0f - iorRatio * iorRatio * (1.0f - cosI * cosI);
         F32 Fresnel = 1.0f;
         if (cosTheta2 > 0.0f)
         {
-            F32 ratio = (1.0f - iorRatio) / (1.0f + iorRatio);
-            F32 r0 = ratio * ratio;
+            F32 a = n1 - n2;
+            F32 b = n1 + n2;
+            F32 r0 = (a * a) / (b * b);
             F32 c = 1.0f - cosI;
             F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
 
@@ -331,26 +339,26 @@ RgbColor Renderer::trace(Ray& ray, U32 depth)
             Ray newTransmit(newOrigin, newDirection);
             newTransmit.inMedium = !ray.inMedium;
 
-            if (randomF32() > Fresnel)
-                return material->albedo * mediumScale * trace(newTransmit, depth + 1);
+            if (randomF32(seed) > Fresnel)
+                return material->albedo * mediumScale * trace(seed, newTransmit, depth + 1);
         }
 
         Float3 newDirection = reflect(ray.direction, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newReflect(newOrigin, newDirection);
         newReflect.inMedium = ray.inMedium;
-        return material->albedo * mediumScale * trace(newReflect, depth + 1);
+        return material->albedo * mediumScale * trace(seed, newReflect, depth + 1);
     }
     else
     {
         RgbColor brdf = material->albedo * F32_INV_PI;
 
-        Float3 newDirection = randomOnHemisphere(normal);
+        Float3 newDirection = randomOnHemisphere(seed, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newRay(newOrigin, newDirection);
 
         F32 cosTheta = newDirection.dot(normal);
-        return material->emittance() + F32_2PI * cosTheta * brdf * mediumScale * trace(newRay, depth + 1);
+        return material->emittance() + F32_2PI * cosTheta * brdf * mediumScale * trace(seed, newRay, depth + 1);
     }
 }
 

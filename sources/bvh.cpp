@@ -480,6 +480,15 @@ bool Instance::intersect(Ray& ray) const
 	return intersected;
 }
 
+Float3 Instance::normal(U32 primitiveIndex, const Float2& barycentric) const
+{
+	Float3 normal = bvh->mesh()->normal(primitiveIndex, barycentric);
+	glm::vec4 tNormal = m_transform * static_cast<glm::vec4>(Float4(normal, 0.0f));
+	tNormal = glm::normalize(tNormal);	// Renormalize to avoid rounding errors
+
+	return Float3(tNormal.x, tNormal.y, tNormal.z);
+}
+
 void Instance::setTransform(const Mat4& transform)
 {
 	const AABB& localBounds = bvh->bounds();
@@ -822,7 +831,7 @@ U32 BvhTLAS::partitionNode(const BvhNode& node, F32 splitPosition, U32 axis) con
 
 void BvhTLAS::updateNodeBounds(SizeType nodeIndex)
 {
-	assert(nodeIndex < 2 * m_triCount);
+	assert(nodeIndex < 2 * m_instances.size());
 	BvhNode& node = m_nodePool[nodeIndex];
 
 	for (SizeType i = 0; i < node.count; i++)
@@ -835,7 +844,7 @@ void BvhTLAS::updateNodeBounds(SizeType nodeIndex)
 
 void BvhTLAS::subdivide(SizeType nodeIndex)
 {
-	assert(nodeIndex < 2 * m_triCount);
+	assert(nodeIndex < 2 * m_instances.size());
 	BvhNode& node = m_nodePool[nodeIndex];
 
 	F32 cost = F32_INF;

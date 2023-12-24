@@ -129,7 +129,7 @@ int main()
 	);
 
 	Camera worldCam(
-		Float3(0.0f, 0.0f, 5.0f),
+		Float3(0.0f, 0.0f, -7.0f),
 		Float3(0.0f, 0.0f, 0.0f),
 		resultBuffer.width,
 		resultBuffer.height
@@ -139,9 +139,12 @@ int main()
 
 	Mesh susanneMesh("assets/susanne.obj");
 	Mesh cubeMesh("assets/cube.obj");
+	Mesh lensMesh("assets/lens.obj");
 	Mesh planeMesh("assets/plane.obj");
+
 	BvhBLAS susanneBVH(&susanneMesh);
 	BvhBLAS cubeBVH(&cubeMesh);
+	BvhBLAS lensBVH(&lensMesh);
 	BvhBLAS planeBVH(&planeMesh);
 
 	Material floorMaterial = Material{};
@@ -152,18 +155,18 @@ int main()
 	diffuseMaterial.albedo = RgbColor(1.0f, 0.0f, 0.0f);
 
 	Material dielectricMaterial = Material{};
-	dielectricMaterial.albedo = RgbColor(0.2f, 0.7f, 0.2f);
-	dielectricMaterial.absorption = RgbColor(0.2f, 0.0f, 0.2f);
+	dielectricMaterial.albedo = RgbColor(0.7f, 0.7f, 0.2f);
+	dielectricMaterial.absorption = RgbColor(0.3f, 0.04f, 0.3f);
 	dielectricMaterial.refractivity = 1.0f;
-	dielectricMaterial.indexOfRefraction = 1.423f;
+	dielectricMaterial.indexOfRefraction = 1.42f;
 
 	Material specularMaterial = Material{};
-	specularMaterial.albedo = RgbColor(0.0f, 1.0f, 1.0f);
+	specularMaterial.albedo = RgbColor(0.2f, 0.9f, 1.0f);
 	specularMaterial.reflectivity = 0.8f;
 
 	Material lightMaterial = Material{};
 	lightMaterial.emissionColor = RgbColor(1.0f, 1.0f, 0.7f);
-	lightMaterial.emissionStrength = 3.0f;
+	lightMaterial.emissionStrength = 5.0f;
 
 	Instance cubeL(
 		&cubeBVH,
@@ -191,7 +194,7 @@ int main()
 				Mat4(1.0f),
 				static_cast<glm::vec3>(Float3(0.0f, -1.0f, 0.0f))
 			),
-			static_cast<glm::vec3>(Float3(15.0f, 15.0f, 15.0f))
+			static_cast<glm::vec3>(Float3(10.0f, 10.0f, 10.0f))
 		)
 	);
 
@@ -209,27 +212,25 @@ int main()
 		&specularMaterial,
 		glm::translate(
 			Mat4(1.0f),
-			static_cast<glm::vec3>(Float3(-5.0f, 0.0f, -1.0f))
+			static_cast<glm::vec3>(Float3(3.0f, 0.0f, -1.0f))
 		)
 	);
 
-	Instance cube0(
-		&cubeBVH,
+	Instance lens0(
+		&lensBVH,
 		&dielectricMaterial,
-		glm::scale(
-			glm::rotate(
-				glm::translate(
-					Mat4(1.0f),
-					static_cast<glm::vec3>(Float3(5.0f, 0.25f, -1.0f))
-				),
-				glm::radians(45.0f),
-				static_cast<glm::vec3>(Float3(1.0f, 0.0f, 1.0f))
-			),
-			static_cast<glm::vec3>(Float3(0.75f, 0.75f, 0.75f))
+		glm::translate(
+			Mat4(1.0f),
+			static_cast<glm::vec3>(Float3(-3.0f, 0.0f, -1.0f))
 		)
 	);
 
-	Scene scene({ floor, cubeL, cubeR, susanne0, susanne1, cube0 });
+	SceneBackground background = SceneBackground{};
+	background.type = BackgroundType::ColorGradient;
+	background.colorA = RgbColor(1.0f, 1.0f, 1.0f);
+	background.colorB = RgbColor(0.2f, 0.7f, 0.9f);
+
+	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
 
 	// -- END Scene setup
 

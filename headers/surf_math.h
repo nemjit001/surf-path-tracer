@@ -90,26 +90,6 @@ using RgbaColor = Float4;
 
 using Mat4 = glm::mat4;	// Matrix stuff is hard, so steal it from GLM
 
-U32 RgbaToU32(const RgbaColor& color);
-
-U32 randomU32();
-
-U32 randomU32(U32& seed);
-
-F32 randomF32();
-
-F32 randomF32(U32& seed);
-
-F32 randomRange(F32 min, F32 max);
-
-F32 randomRange(U32& seed, F32 range);
-
-Float3 randomOnHemisphere(const Float3& normal);
-
-Float3 reflect(const Float3& direction, Float3& normal);
-
-bool depthInBounds(F32 depth, F32 maxDepth);
-
 template <typename T>
 inline void swap(T& a, T& b) { T temp; temp = a; a = b; b = temp; }
 
@@ -214,3 +194,25 @@ inline void operator/=(Float4& a, const Float4& b) { a.x /= b.x; a.y /= b.y; a.z
 inline F32 Float4::magnitude() const { return sqrtf(this->dot(*this)); }
 inline F32 Float4::dot(const Float4& other) const { return x * other.x + y * other.y + z * other.z + w * other.w; }
 inline Float4 Float4::normalize() const { F32 invLen = rsqrtf(this->dot(*this)); return *this * invLen; }
+
+U32 RgbaToU32(const RgbaColor& color);
+
+U32 initSeed(U32 seed);
+
+U32 randomU32();
+
+U32 randomU32(U32& seed);
+
+F32 randomF32();
+
+F32 randomF32(U32& seed);
+
+F32 randomRange(F32 min, F32 max);
+
+F32 randomRange(U32& seed, F32 min, F32 max);
+
+Float3 randomOnHemisphere(U32& seed, const Float3& normal);
+
+inline Float3 reflect(const Float3& direction, Float3& normal) { return direction - 2.0f * normal.dot(direction) * normal; }
+
+inline bool depthInBounds(F32 depth, F32 maxDepth) { return F32_EPSILON <= depth && depth < maxDepth; }

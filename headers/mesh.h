@@ -32,11 +32,11 @@ class Mesh
 public:
 	Mesh(const std::string& path);
 
-	Float3 normal(SizeType primitiveIndex) const;
+	inline Float3 normal(SizeType primitiveIndex) const;
 
-	Float3 normal(SizeType primitiveIndex, const Float2& barycentric) const;
+	inline Float3 normal(SizeType primitiveIndex, const Float2& barycentric) const;
 
-	Float2 textureCoordinate(SizeType primitiveIndex, const Float2& barycentric) const;
+	inline Float2 textureCoordinate(SizeType primitiveIndex, const Float2& barycentric) const;
 
 public:
 	std::vector<Triangle> triangles;
@@ -44,3 +44,23 @@ public:
 private:
 	std::vector<TriExtension> m_triExtensions;
 };
+
+Float3 Mesh::normal(SizeType primitiveIndex) const
+{
+	assert(primitiveIndex < triangles.size());
+	return triangles[primitiveIndex].normal();
+}
+
+Float3 Mesh::normal(SizeType primitiveIndex, const Float2& barycentric) const
+{
+	assert(primitiveIndex < triangles.size());
+	const TriExtension& ext = m_triExtensions[primitiveIndex];
+	return barycentric.u * ext.n0 + barycentric.v * ext.n2 + (1.0f - barycentric.u - barycentric.v) * ext.n1;
+}
+
+Float2 Mesh::textureCoordinate(SizeType primitiveIndex, const Float2& barycentric) const
+{
+	assert(primitiveIndex < triangles.size());
+	const TriExtension& ext = m_triExtensions[primitiveIndex];
+	return barycentric.u * ext.uv0 + barycentric.v * ext.uv2 + (1.0f - barycentric.u - barycentric.v) * ext.uv1;
+}

@@ -93,6 +93,8 @@ public:
 
 	bool intersect(Ray& ray) const;
 
+	Float3 normal(U32 primitiveIndex, const Float2& barycentric) const;
+
 	inline const Mat4& transform() const { return m_transform; }
 
 	void setTransform(const Mat4& transform);

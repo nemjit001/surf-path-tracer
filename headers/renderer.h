@@ -68,7 +68,7 @@ public:
     inline const FrameInstrumentationData& frameInfo();
 
 private:
-    RgbColor trace(Ray& ray, U32 depth = 0);
+    RgbColor trace(U32& seed, Ray& ray, U32 depth = 0);
 
     void copyBufferToImage(
         const Buffer& staging,
