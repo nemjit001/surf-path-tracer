@@ -30,6 +30,7 @@ AccumulatorState::AccumulatorState(U32 width, U32 height)
     bufferSize(width * height),
     buffer(static_cast<RgbaColor*>(MALLOC64(bufferSize * sizeof(RgbaColor))))
 {
+    assert(buffer != nullptr);
     memset(buffer, 0, bufferSize * sizeof(RgbaColor));
 }
 
