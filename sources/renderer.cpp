@@ -138,8 +138,8 @@ Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuff
     }
 
     // Instantiate shaders & pipeline
-    Shader presentVertShader(m_context.device, ShaderType::Vertex, "shaders/fs_quad_vert.glsl.spv");
-    Shader presentFragShader(m_context.device, ShaderType::Fragment, "shaders/fs_quad_frag.glsl.spv");
+    Shader presentVertShader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
+    Shader presentFragShader(m_context.device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
 
     m_presentPipeline.init(
         m_context.device,

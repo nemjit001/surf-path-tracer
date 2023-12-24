@@ -29,7 +29,7 @@ option(VK_BOOTSTRAP_WERROR OFF)
 option(VK_BOOTSTRAP_TEST OFF)
 add_subdirectory(dependencies/vk-bootstrap/)
 
-file(GLOB PROJECT_SHADERS "shaders/*.glsl" "shaders/*.vert" "shaders/*.frag" "shaders/*.compute")
+file(GLOB PROJECT_SHADERS "shaders/*.vert" "shaders/*.frag" "shaders/*.comp")
 file(GLOB PROJECT_HEADERS "headers/*.h" "headers/**/*.h")
 file(GLOB PROJECT_SOURCES "sources/*.cpp" "sources/**/*.cpp")
 
