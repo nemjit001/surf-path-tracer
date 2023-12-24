@@ -18,7 +18,7 @@ struct ViewPlane
 class Camera
 {
 public:
-	Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight);
+	Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight, F32 focalLength = 1.5f);
 
 	inline Float3 right() const;
 
@@ -32,6 +32,7 @@ public:
 	Float3 up;
 	F32 screenWidth;
 	F32 screenHeight;
+	F32 focalLength;
 	ViewPlane viewPlane;
 };
 

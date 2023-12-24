@@ -209,7 +209,7 @@ void Renderer::render(F32 deltaTime)
         for (I32 x = 0; x < static_cast<I32>(m_resultBuffer.width); x++)
         {
             SizeType pixelIndex = x + y * m_resultBuffer.width;
-            U32 pixelSeed = initSeed(static_cast<U32>(pixelIndex + m_accumulator.totalSamples * 1799));
+            U32 pixelSeed = initSeed(static_cast<U32>(pixelIndex + m_accumulator.totalSamples * 1799)); // Init with random very large value -> too small and randomization 'smears' screen
 
             for (SizeType sample = 0; sample < m_config.samplesPerFrame; sample++)
             {
