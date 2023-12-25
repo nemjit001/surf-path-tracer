@@ -104,6 +104,7 @@ void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& 
 		return;
 
 	camera.forward = (target - camera.position).normalize();
+	right = WORLD_UP.cross(camera.forward).normalize();
 	camera.up = forward.cross(right).normalize();
 	camera.generateViewPlane();
 }
