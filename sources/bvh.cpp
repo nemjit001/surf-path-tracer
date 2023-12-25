@@ -267,8 +267,23 @@ void BvhBLAS::build()
 
 void BvhBLAS::refit()
 {
-	// refit bvh
-	FATAL_ERROR("Refitting not yet implemented!\n");
+	for (I64 i = m_nodesUsed - 1; i >= 0; i--)
+	{
+		if (i == 1) continue;
+
+		if (m_nodePool[i].isLeaf())
+		{
+			updateNodeBounds(i);
+			continue;
+		}
+
+		BvhNode& node = m_nodePool[i];
+		const BvhNode& left = m_nodePool[node.left()];
+		const BvhNode& right = m_nodePool[node.right()];
+
+		node.boundingBox.bbMin = min(left.boundingBox.bbMin, right.boundingBox.bbMin);
+		node.boundingBox.bbMax = max(left.boundingBox.bbMax, right.boundingBox.bbMax);
+	}
 }
 
 F32 BvhBLAS::calculateNodeCost(const BvhNode& node) const
@@ -491,6 +506,14 @@ Float3 Instance::normal(U32 primitiveIndex, const Float2& barycentric) const
 
 void Instance::setTransform(const Mat4& transform)
 {
+	m_invTransform = glm::inverse(transform);
+	m_transform = transform;
+
+	updateBounds();
+}
+
+void Instance::updateBounds()
+{
 	const AABB& localBounds = bvh->bounds();
 	bounds = AABB();
 
@@ -505,12 +528,9 @@ void Instance::setTransform(const Mat4& transform)
 		Float3(localBounds.bbMin.x, localBounds.bbMin.y, localBounds.bbMin.z),
 	};
 
-	m_invTransform = glm::inverse(transform);
-	m_transform = transform;
-
 	for (auto const& pos : positions)
 	{
-		glm::vec4 transformedPos = transform * static_cast<glm::vec4>(Float4(pos, 1.0f));
+		glm::vec4 transformedPos = m_transform * static_cast<glm::vec4>(Float4(pos, 1.0f));
 		bounds.grow(Float3(transformedPos.x, transformedPos.y, transformedPos.z) / transformedPos.w);
 	}
 }
@@ -714,7 +734,30 @@ void BvhTLAS::build()
 
 void BvhTLAS::refit()
 {
-	FATAL_ERROR("Refitting NYI for TLAS\n");
+	for (I64 i = m_nodesUsed - 1; i >= 0; i--)
+	{
+		if (i == 1) continue;
+		
+		BvhNode& node = m_nodePool[i];
+		if (node.isLeaf())
+		{
+			// Update node instance bounds because worldspace bounds of instance may have changed after a blas refit
+			for (SizeType idx = 0; idx < node.count; idx++)
+			{
+				Instance& instance = m_instances[m_indices[node.first() + idx]];
+				instance.updateBounds();
+			}
+
+			updateNodeBounds(i);
+			continue;
+		}
+
+		const BvhNode& left = m_nodePool[node.left()];
+		const BvhNode& right = m_nodePool[node.right()];
+
+		node.boundingBox.bbMin = min(left.boundingBox.bbMin, right.boundingBox.bbMin);
+		node.boundingBox.bbMax = max(left.boundingBox.bbMax, right.boundingBox.bbMax);
+	}
 }
 
 F32 BvhTLAS::calculateNodeCost(const BvhNode& node) const

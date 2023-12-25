@@ -24,13 +24,25 @@ class Scene
 public:
 	Scene(SceneBackground background, std::vector<Instance> instances);
 
-	bool intersect(Ray& ray) const;
+	inline bool intersect(Ray& ray) const;
 
-	const Instance& hitInstance(SizeType instanceIndex) const;
+	inline const Instance& hitInstance(SizeType instanceIndex);
 
 	RgbColor sampleBackground(const Ray& ray) const;
+
+	void update(F32 deltaTime);
 
 private:
 	SceneBackground m_background;
 	BvhTLAS m_sceneTlas;
 };
+
+bool Scene::intersect(Ray& ray) const
+{
+	return m_sceneTlas.intersect(ray);
+}
+
+const Instance& Scene::hitInstance(SizeType instanceIndex)
+{
+	return m_sceneTlas.instance(instanceIndex);
+}

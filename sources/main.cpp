@@ -247,15 +247,18 @@ int main()
 
 	printf("Initialized Surf\n");
 
-	F32 deltaTime = frameTimer.deltaTime();
+	F32 deltaTime = 0.0f;
 	while (!glfwWindowShouldClose(window))
 	{
 		static F32 SMOOTH_FRAC = 1.0f / NUM_SMOOTH_FRAMES;
 		static F32 AVERAGE_FRAMETIME = 10.0f;
 		static F32 ALPHA = 1.0f;
 
+		// Update scene state
+		scene.update(deltaTime);
+
 		// Render frame
-		RendererConfig& config = renderer.config();
+		RendererConfig& config = renderer.config();	// Used only for debug info now -> can be updated using UI
 		renderer.render(deltaTime);
 
 		// Handle input
@@ -267,6 +270,7 @@ int main()
 		if (cameraUpdated)
 			renderer.clearAccumulator();
 
+		// Tick frame timer and update average trackers
 		frameTimer.tick();
 		deltaTime = frameTimer.deltaTime();
 

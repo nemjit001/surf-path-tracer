@@ -99,6 +99,8 @@ public:
 
 	void setTransform(const Mat4& transform);
 
+	void updateBounds();
+
 public:
 	BvhBLAS* bvh;
 	Material* material;
@@ -127,7 +129,7 @@ public:
 
 	void refit();
 
-	inline const Instance& instance(SizeType index) const;
+	inline Instance& instance(SizeType index);
 
 	inline const std::vector<Instance>& instances() const;
 
@@ -159,7 +161,7 @@ const AABB& BvhBLAS::bounds() const
 	return m_nodePool[BVH_ROOT_INDEX].boundingBox;
 }
 
-const Instance& BvhTLAS::instance(SizeType index) const
+Instance& BvhTLAS::instance(SizeType index)
 {
 	assert(index < m_instances.size());
 	return m_instances[index];
