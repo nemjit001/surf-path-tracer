@@ -1,6 +1,7 @@
 #include "surf_math.h"
 
 #include <cmath>
+#include <immintrin.h>
 
 #include "types.h"
 

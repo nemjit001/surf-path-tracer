@@ -34,7 +34,7 @@ RgbColor Scene::sampleBackground(const Ray& ray) const
 	case BackgroundType::ColorGradient:
 		{
 			F32 alpha = 0.5f * (1.0f + ray.direction.y);
-			return alpha * m_background.colorB + (1.0f - alpha) * m_background.colorA;
+			return alpha * m_background.gradient.colorB + (1.0f - alpha) * m_background.gradient.colorA;
 		}
 	default:
 		break;

@@ -15,10 +15,8 @@ enum class BackgroundType
 struct SceneBackground
 {
 	BackgroundType type;
-	union {
-		RgbColor color;
-		struct { RgbColor colorA; RgbColor colorB; };
-	};
+	RgbColor color;
+	struct { RgbColor colorA; RgbColor colorB; } gradient;
 };
 
 class Scene

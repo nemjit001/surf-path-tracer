@@ -37,6 +37,9 @@ source_group("Shaders" ${PROJECT_SHADERS})
 source_group("Headers" ${PROJECT_HEADERS})
 source_group("Sources" ${PROJECT_SOURCES})
 
+# Setup SSE, SSE2, SSE3, AVX usage
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -msse2 -msse3 -msse4.1")
+
 add_executable(${TARGET_NAME}
 	${PROJECT_SHADERS}
 	${PROJECT_HEADERS}

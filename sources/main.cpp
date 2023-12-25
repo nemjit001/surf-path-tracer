@@ -227,8 +227,8 @@ int main()
 
 	SceneBackground background = SceneBackground{};
 	background.type = BackgroundType::ColorGradient;
-	background.colorA = RgbColor(1.0f, 1.0f, 1.0f);
-	background.colorB = RgbColor(0.2f, 0.7f, 0.9f);
+	background.gradient.colorA = RgbColor(1.0f, 1.0f, 1.0f);
+	background.gradient.colorB = RgbColor(0.2f, 0.7f, 0.9f);
 
 	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
 
