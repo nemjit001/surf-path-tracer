@@ -35,24 +35,5 @@ RgbColor Scene::sampleBackground(const Ray& ray) const
 
 void Scene::update(F32 deltaTime)
 {
-	static SizeType BUILD_INDEX = 0;
-
-	// TODO: animate entries in scene
-
-	auto const& instances = m_sceneTlas.instances();
-	for (SizeType i = 0; i < instances.size(); i++)
-	{
-		Instance& instance = m_sceneTlas.instance(i);
-
-		if (i == BUILD_INDEX)
-		{
-			instance.bvh->build();
-			BUILD_INDEX++;
-			continue;
-		}
-
-		instance.bvh->refit();
-	}
-
 	m_sceneTlas.refit();
 }
