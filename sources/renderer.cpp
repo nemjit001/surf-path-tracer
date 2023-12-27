@@ -20,9 +20,8 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
-// #define RECURSIVE_IMPLEMENTATION    // Use a recursive path tracing implementation
-#define LIMIT_NON_RECURSIVE_DEPTH   // Limit the bounce depth for the non recursive implementation -> removing max bounce depth will give a more accurate image but may result in infinite bounces
-#define COLOR_BLACK         RgbColor(0.0f, 0.0f, 0.0f)
+#define RECURSIVE_IMPLEMENTATION    0   // Use a recursive path tracing implementation
+#define COLOR_BLACK                 RgbColor(0.0f, 0.0f, 0.0f)
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
@@ -282,7 +281,7 @@ void Renderer::render(F32 deltaTime)
 
 RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 {
-#ifdef RECURSIVE_IMPLEMENTATION
+#if RECURSIVE_IMPLEMENTATION == 1
     if (depth > m_config.maxBounces)
         return COLOR_BLACK;
 
@@ -367,11 +366,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
     RgbColor transmission(1.0f);
     for (;;)
     {
-#ifdef LIMIT_NON_RECURSIVE_DEPTH
-        if (depth > m_config.maxBounces)
-            break;
-#endif
-
         if (!m_scene.intersect(ray))
         {
             energy += transmission * m_scene.sampleBackground(ray);
@@ -388,8 +382,14 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             break;
         }
 
+        // Calculate termination chance & new scalefor russian roulette
+        const F32 p = clamp(max(transmission.r, max(transmission.g, transmission.b)), 0.0f, 1.0f);
+        if (p < randomF32(seed))
+            break;
+
         Float3 normal = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
         Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+        const F32 rrScale = 1.0f / p;
 
         // Handle backface hits -> normal needs to be flipped if colinear with hit direction
         if (ray.direction.dot(normal) > 0.0f)
@@ -408,7 +408,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             ray = Ray(newOrigin, newDirection);
             ray.inMedium = wasInMedium;
 
-            transmission *= material->albedo * mediumScale;
+            transmission *= material->albedo * rrScale * mediumScale;
         }
         else if (r < (material->reflectivity + material->refractivity))
         {
@@ -434,7 +434,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 ray.inMedium = !wasInMedium;
 
                 if (randomF32(seed) > Fresnel)
-                    transmission *= material->albedo * mediumScale;
+                    transmission *= material->albedo * rrScale * mediumScale;
             }
             else
             {
@@ -443,7 +443,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 bool wasInMedium = ray.inMedium;
                 ray = Ray(newOrigin, newDirection);
                 ray.inMedium = wasInMedium;
-                transmission *= material->albedo * mediumScale;
+                transmission *= material->albedo * rrScale * mediumScale;
             }
         }
         else
@@ -454,12 +454,8 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             ray = Ray(newOrigin, newDirection);
 
             F32 cosTheta = newDirection.dot(normal);
-            transmission *= material->emittance() + F32_2PI * cosTheta * brdf * mediumScale;
+            transmission *= material->emittance() + F32_2PI * rrScale * cosTheta * brdf * mediumScale;
         }
-
-#ifdef LIMIT_NON_RECURSIVE_DEPTH
-        depth++;
-#endif
     }
 
     return energy;

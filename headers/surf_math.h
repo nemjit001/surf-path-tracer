@@ -95,6 +95,11 @@ inline void swap(T& a, T& b) { T temp; temp = a; a = b; b = temp; }
 
 inline F32 rsqrtf(const F32 x) { return 1.0f / sqrtf(x); }
 
+inline F32 clamp(F32 a, F32 min, F32 max) { return a < min ? min : (a > max ? max : a); }
+inline Float2 clamp(const Float2& a, F32 min, F32 max) { return Float2(clamp(a.x, min, max), clamp(a.y, min, max)); }
+inline Float3 clamp(const Float3& a, F32 min, F32 max) { return Float3(clamp(a.x, min, max), clamp(a.y, min, max), clamp(a.z, min, max)); }
+inline Float4 clamp(const Float4& a, F32 min, F32 max) { return Float4(clamp(a.x, min, max), clamp(a.y, min, max), clamp(a.z, min, max), clamp(a.w, min, max)); }
+
 inline Float2 expf(const Float2& a) { return Float2(expf(a.x), expf(a.y)); }
 inline Float3 expf(const Float3& a) { return Float3(expf(a.x), expf(a.y), expf(a.z)); }
 inline Float4 expf(const Float4& a) { return Float4(expf(a.x), expf(a.y), expf(a.z), expf(a.w)); }
