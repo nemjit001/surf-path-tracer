@@ -20,7 +20,7 @@
 #include "vk_layer/sampler.h"
 #include "vk_layer/vk_check.h"
 
-#define RECURSIVE_IMPLEMENTATION    0   // Use a recursive path tracing implementation
+#define RECURSIVE_IMPLEMENTATION    0   // Use a simple recursive path tracing implementation with no variance reduction & clamped depth
 #define COLOR_BLACK                 RgbColor(0.0f, 0.0f, 0.0f)
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
