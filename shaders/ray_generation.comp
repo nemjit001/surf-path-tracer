@@ -3,6 +3,8 @@
 
 #include "wavefront_common.glsl"
 
+shared uint rayIdx;
+
 layout(set = 0, binding = 0) uniform CameraData
 {
 	vec3 position;
@@ -13,9 +15,9 @@ layout(set = 0, binding = 0) uniform CameraData
 } camera;
 
 // SOA structure for faster data access
-layout(set = 1, binding = 0) buffer RayOriginOut 	{ vec3 origin[]; };
-layout(set = 1, binding = 1) buffer RayDirectionOut { vec3 direction[]; };
-layout(set = 1, binding = 2) buffer RayDepthOut		{ float depth[]; };
+layout(set = 1, binding = 0) buffer RayOriginOut 	{ vec3 originBuffer[]; };
+layout(set = 1, binding = 1) buffer RayDirectionOut { vec3 directionBuffer[]; };
+layout(set = 1, binding = 2) buffer RayDepthOut		{ float depthBuffer[]; };
 
 layout(local_size_x = 64, local_size_y = 64) in;
 
@@ -29,7 +31,10 @@ void main()
 	vec3 origin = camera.position;
 	vec3 planePos = camera.topLeft + u * camera.uVector + v * camera.vVector;
 	vec3 direction = normalize(planePos - origin);
-	float depth = F32_FAR_AWAY;
 
-	// TODO: write ray data to out buffers
+	// Store data & update idx atomically
+	originBuffer[rayIdx] = origin;
+	directionBuffer[rayIdx] = direction;
+	depthBuffer[rayIdx] = F32_FAR_AWAY;
+	atomicAdd(rayIdx, 1);
 }
