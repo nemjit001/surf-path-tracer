@@ -3,7 +3,33 @@
 
 #include "wavefront_common.glsl"
 
+layout(set = 0, binding = 0) uniform CameraData
+{
+	vec3 position;
+	vec3 topLeft;
+	vec3 uVector;
+	vec3 vVector;
+	vec2 resolution;
+} camera;
+
+// SOA structure for faster data access
+layout(set = 1, binding = 0) buffer RayOriginOut 	{ vec3 origin[]; };
+layout(set = 1, binding = 1) buffer RayDirectionOut { vec3 direction[]; };
+layout(set = 1, binding = 2) buffer RayDepthOut		{ float depth[]; };
+
+layout(local_size_x = 64, local_size_y = 64) in;
+
 void main()
 {
-	// TODO: generate primary rays + write out to primary ray buffer
+	float xPixel = gl_LocalInvocationID.x + gl_WorkGroupSize.x * gl_WorkGroupID.x;
+	float yPixel = gl_LocalInvocationID.y + gl_WorkGroupSize.y * gl_WorkGroupID.y;
+	float u = xPixel / camera.resolution.x;
+	float v = yPixel / camera.resolution.y;
+
+	vec3 origin = camera.position;
+	vec3 planePos = camera.topLeft + u * camera.uVector + v * camera.vVector;
+	vec3 direction = normalize(planePos - origin);
+	float depth = F32_FAR_AWAY;
+
+	// TODO: write ray data to out buffers
 }

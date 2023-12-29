@@ -1,12 +1,4 @@
-struct Ray
-{
-	vec3 origin;
-	vec3 direction;
-	float depth;
-	uint primitiveIndex;
-	uint instanceIndex;
-	vec2 barycentric;
-};
+#define F32_FAR_AWAY 1e30;
 
 uint WangHash(inout uint seed)
 {
