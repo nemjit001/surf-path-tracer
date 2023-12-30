@@ -67,9 +67,7 @@ private:
 class GraphicsPipeline
 {
 public:
-    GraphicsPipeline();
-
-    void init(
+    GraphicsPipeline(
         VkDevice device,
         Viewport viewport,
         const DescriptorPool& descriptorPool,
@@ -78,7 +76,13 @@ public:
         const std::vector<Shader*>& shaders
     );
 
-    void destroy();
+    ~GraphicsPipeline();
+
+    GraphicsPipeline(GraphicsPipeline&) = delete;
+    GraphicsPipeline& operator=(GraphicsPipeline&) = delete;
+
+    GraphicsPipeline(GraphicsPipeline&& other) noexcept;
+    GraphicsPipeline& operator=(GraphicsPipeline&& other) noexcept;
 
     void updateDescriptorSets(const std::vector<WriteDescriptorSet>& sets);
 
@@ -87,6 +91,9 @@ public:
     VkPipeline handle() const;
 
     const std::vector<VkDescriptorSet>& descriptorSets();
+
+private:
+    void release();
 
 private:
     VkDevice m_device;

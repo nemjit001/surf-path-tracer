@@ -99,15 +99,7 @@ void PipelineLayout::release()
     }
 }
 
-GraphicsPipeline::GraphicsPipeline()
-    :
-    m_device(VK_NULL_HANDLE),
-    m_pipeline(VK_NULL_HANDLE)
-{
-
-}
-
-void GraphicsPipeline::init(
+GraphicsPipeline::GraphicsPipeline(
     VkDevice device,
     Viewport viewport,
     const DescriptorPool& descriptorPool,
@@ -115,9 +107,11 @@ void GraphicsPipeline::init(
     const PipelineLayout& layout,
     const std::vector<Shader*>& shaders
 )
+    :
+    m_device(device),
+    m_pipeline(VK_NULL_HANDLE),
+    m_descriptorSets()
 {
-    m_device = device;
-
     std::vector<VkPipelineShaderStageCreateInfo> stages = {};
     for (auto const& shader : shaders)
     {
@@ -251,9 +245,34 @@ void GraphicsPipeline::init(
     VK_CHECK(vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, m_descriptorSets.data()));
 }
 
-void GraphicsPipeline::destroy()
+GraphicsPipeline::~GraphicsPipeline()
 {
-    vkDestroyPipeline(m_device, m_pipeline, nullptr);
+    release();
+}
+
+GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) noexcept
+    :
+    m_device(other.m_device),
+    m_pipeline(other.m_pipeline),
+    m_descriptorSets(other.m_descriptorSets)
+{
+    other.m_pipeline = VK_NULL_HANDLE;
+    other.m_descriptorSets.clear();
+}
+
+GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) noexcept
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+
+    this->release();
+    this->m_device = other.m_device;
+    this->m_pipeline = other.m_pipeline;
+    this->m_descriptorSets = other.m_descriptorSets;
+
+    return *this;
 }
 
 void GraphicsPipeline::updateDescriptorSets(const std::vector<WriteDescriptorSet>& sets)
@@ -322,4 +341,9 @@ VkPipeline GraphicsPipeline::handle() const
 const std::vector<VkDescriptorSet>& GraphicsPipeline::descriptorSets()
 {
     return m_descriptorSets;
+}
+
+void GraphicsPipeline::release()
+{
+    vkDestroyPipeline(m_device, m_pipeline, nullptr);
 }

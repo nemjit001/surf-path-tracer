@@ -44,46 +44,9 @@ Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuff
     m_descriptorPool(m_context.device),
     m_framebufferSize(m_context.getFramebufferSize()),
     m_config(config),
-    m_resultBuffer(resultBuffer),
-    m_accumulator(resultBuffer.width, resultBuffer.height),
     m_camera(camera),
     m_scene(scene),
-    m_frameInstrumentationData{},
-    m_copyFinishedFence(VK_NULL_HANDLE),
-    m_copyPool(VK_NULL_HANDLE),
-    m_oneshotCopyBuffer(VK_NULL_HANDLE),
-    m_currentFrame(0),
-    m_frames{},
-    m_presentPass(m_context.device, m_context.swapchain.image_format),
-    m_framebuffers(),
-    m_frameStagingBuffer(
-        m_context.allocator,
-        resultBuffer.width * resultBuffer.height * sizeof(U32),
-        VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT,            // Used as staging bufer for GPU uploads
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT       // Needs to be visible from the CPU
-        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,   // And always coherent with CPU memory during uploads
-        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT // Should allow memcpy writes & mapping
-    ),
-    m_frameImage(
-        m_context.device,
-        m_context.allocator,
-        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
-        resultBuffer.width, resultBuffer.height,
-        VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
-        | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
-    ),
-    m_frameImageSampler(m_context.device),
-    m_presentPipelineLayout(
-        m_context.device,
-        {DescriptorSetLayout{{
-            DescriptorSetBinding{
-                0,                                          // Binding
-                VK_SHADER_STAGE_FRAGMENT_BIT,               // Shader stage
-                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER   // Descriptor Type
-            }
-        }}}
-    ),
-    m_presentPipeline()
+    m_resultBuffer(resultBuffer)
 {
     // Set up oneshot command pool, fence & copy buffer
     VkFenceCreateInfo copyFinishedCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
@@ -136,23 +99,6 @@ Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuff
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 
-    // Instantiate shaders & pipeline
-    Shader presentVertShader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
-    Shader presentFragShader(m_context.device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
-
-    m_presentPipeline.init(
-        m_context.device,
-        Viewport {
-            0, 0,   // Offset of viewport in (X, Y)
-            m_framebufferSize.width, m_framebufferSize.height,
-            0.0f, 1.0f
-        },
-        m_descriptorPool,
-        m_presentPass,
-        m_presentPipelineLayout,
-        { &presentVertShader, &presentFragShader }
-    );
-
     m_presentPipeline.updateDescriptorSets({
         WriteDescriptorSet{
             0, 0,
@@ -169,8 +115,6 @@ Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuff
 Renderer::~Renderer()
 {
     vkDeviceWaitIdle(m_context.device);
-
-    m_presentPipeline.destroy();
 
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
@@ -605,12 +549,8 @@ void Renderer::recordFrame(
 WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, Camera& camera, Scene& scene)
     :
     m_context(std::move(renderContext)),
-    m_framebufferSize(m_context.getFramebufferSize()),
     m_camera(camera),
-    m_scene(scene),
-    m_currentFrame(0),
-    m_frames{},
-    m_framebuffers()
+    m_scene(scene)
 {
     // Set up per frame structures
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
@@ -642,7 +582,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, Camera& camera
     m_framebuffers.reserve(m_context.swapchain.image_count);
     for (const auto& imageView : m_context.swapImageViews)
     {
-        // Needs a render pass
+        // Needs a render pass before create
     }
 }
 

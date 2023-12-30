@@ -34,9 +34,9 @@ struct FrameInstrumentationData
 
 struct AccumulatorState
 {
-    SizeType totalSamples;
-    SizeType bufferSize;
-    RgbaColor* buffer;
+    SizeType totalSamples   = 0;
+    SizeType bufferSize     = 0;
+    RgbaColor* buffer       = nullptr;
 
     AccumulatorState(U32 width, U32 height);
 
@@ -86,35 +86,63 @@ private:
     DescriptorPool m_descriptorPool;
     FramebufferSize m_framebufferSize;
     RendererConfig m_config;
-    PixelBuffer m_resultBuffer;
-    AccumulatorState m_accumulator;
     Camera& m_camera;
     Scene& m_scene;
+    PixelBuffer m_resultBuffer;
 
-    // Frame instrumentation data
-    FrameInstrumentationData m_frameInstrumentationData;
+    // Frame accumulator & instrumentation data
+    AccumulatorState m_accumulator = AccumulatorState(m_resultBuffer.width, m_resultBuffer.height);
+    FrameInstrumentationData m_frameInstrumentationData = FrameInstrumentationData{};
 
     // Setup for copy operations
-    VkFence m_copyFinishedFence;
-    VkCommandPool m_copyPool;
-    VkCommandBuffer m_oneshotCopyBuffer;
+    VkFence m_copyFinishedFence = VK_NULL_HANDLE;
+    VkCommandPool m_copyPool = VK_NULL_HANDLE;
+    VkCommandBuffer m_oneshotCopyBuffer = VK_NULL_HANDLE;
 
     // Renderer Frame management
-    SizeType m_currentFrame;
-    FrameData m_frames[FRAMES_IN_FLIGHT];
+    SizeType m_currentFrame = 0;
+    FrameData m_frames[FRAMES_IN_FLIGHT] = {};
 
     // Default render pass w/ framebuffers
-    RenderPass m_presentPass;
-    std::vector<Framebuffer> m_framebuffers;
+    RenderPass m_presentPass = RenderPass(m_context.device, m_context.swapchain.image_format);
+    std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
 
     // Rendered frame staging buffer & target image
-    Buffer m_frameStagingBuffer;
-    Image m_frameImage;
+    Buffer m_frameStagingBuffer = Buffer(
+        m_context.allocator,
+        m_resultBuffer.width * m_resultBuffer.height * sizeof(U32),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT,            // Used as staging bufer for GPU uploads
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT       // Needs to be visible from the CPU
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,   // And always coherent with CPU memory during uploads
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT // Should allow memcpy writes & mapping
+    );
+
+    Image m_frameImage = Image(
+        m_context.device,
+        m_context.allocator,
+        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
+        m_resultBuffer.width, m_resultBuffer.height,
+        VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
+        | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
+    );
 
     // Custom sampler, shader pipeline & layout for use during render pass
-    Sampler m_frameImageSampler;
-    PipelineLayout m_presentPipelineLayout;
-    GraphicsPipeline m_presentPipeline;
+    Sampler m_frameImageSampler = Sampler(m_context.device);
+
+    PipelineLayout m_presentPipelineLayout = PipelineLayout(m_context.device, std::vector{
+        DescriptorSetLayout{
+            std::vector{ DescriptorSetBinding{ 0, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER } }
+        }
+    });
+
+    Shader m_presentVertShader = Shader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
+    Shader m_presentFragShader = Shader(m_context.device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
+
+    GraphicsPipeline m_presentPipeline = GraphicsPipeline(
+        m_context.device, Viewport{ 0, 0, m_framebufferSize.width, m_framebufferSize.height, 0.0f, 1.0f },
+        m_descriptorPool, m_presentPass, m_presentPipelineLayout,
+        std::vector{ &m_presentVertShader, &m_presentFragShader }
+    );
 };
 
 class WaveFrontRenderer
@@ -126,14 +154,14 @@ public:
 
 private:
     RenderContext m_context;
-    FramebufferSize m_framebufferSize;
     Camera& m_camera;
     Scene& m_scene;
 
     // Frame management
-    SizeType m_currentFrame;
-    FrameData m_frames[FRAMES_IN_FLIGHT];
-    std::vector<Framebuffer> m_framebuffers;
+    SizeType m_currentFrame = 0;
+    FramebufferSize m_framebufferSize = m_context.getFramebufferSize();
+    FrameData m_frames[FRAMES_IN_FLIGHT] = {};
+    std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
 };
 
 RendererConfig& Renderer::config()
