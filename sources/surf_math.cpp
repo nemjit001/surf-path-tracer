@@ -13,7 +13,6 @@ static U32 RAND_SEED = 0x12345678;
 U32 RgbaToU32(const RgbaColor& color)
 {
 #if 0
-	// TODO: implement color SIMD implementation
 	U32 r = static_cast<U32>(color.r * 255.00f);
 	U32 g = static_cast<U32>(color.g * 255.00f);
 	U32 b = static_cast<U32>(color.b * 255.00f);
