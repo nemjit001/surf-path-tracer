@@ -1,6 +1,6 @@
 #define F32_FAR_AWAY 1e30;
 
-uint WangHash(inout uint seed)
+uint WangHash(uint seed)
 {
 	seed = (seed ^ 61) ^ (seed >> 16);
 	seed *= 9;
