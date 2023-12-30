@@ -19,7 +19,7 @@ layout(set = 1, binding = 0) buffer RayOriginOut 	{ vec3 originBuffer[]; };
 layout(set = 1, binding = 1) buffer RayDirectionOut { vec3 directionBuffer[]; };
 layout(set = 1, binding = 2) buffer RayDepthOut		{ float depthBuffer[]; };
 
-layout(local_size_x = 64, local_size_y = 64) in;
+layout(local_size_x = 1, local_size_y = 1) in;
 
 void main()
 {

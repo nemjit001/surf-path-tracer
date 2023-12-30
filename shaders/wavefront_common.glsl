@@ -42,7 +42,7 @@ vec3 diffuseReflect(inout uint seed, vec3 normal)
 		);
 	} while(dot(direction, direction) > 1.0);
 
-	if (dot(direction, normal) < 0.0f)
+	if (dot(direction, normal) < 0.0)
 	{
 		direction *= -1.0;
 	}
