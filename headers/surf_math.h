@@ -218,6 +218,8 @@ F32 randomRange(U32& seed, F32 min, F32 max);
 
 Float3 randomOnHemisphere(U32& seed, const Float3& normal);
 
+Float3 randomOnHemisphereCosineWeighted(U32& seed, const Float3& normal);
+
 inline Float3 reflect(const Float3& direction, Float3& normal) { return direction - 2.0f * normal.dot(direction) * normal; }
 
 inline bool depthInBounds(F32 depth, F32 maxDepth) { return F32_EPSILON <= depth && depth < maxDepth; }

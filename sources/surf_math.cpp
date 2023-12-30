@@ -3,6 +3,7 @@
 #include <cmath>
 #include <immintrin.h>
 
+#include "camera.h"
 #include "types.h"
 
 #define U32_TO_FLOAT_SCALE	2.3283064365387e-10f
@@ -101,4 +102,24 @@ Float3 randomOnHemisphere(U32& seed, const Float3& normal)
 		direction *= -1.0f;
 
 	return direction.normalize();
+}
+
+Float3 randomOnHemisphereCosineWeighted(U32& seed, const Float3& normal)
+{
+	F32 r0 = randomF32(seed);
+	F32 r1 = randomF32(seed);
+	F32 r = sqrtf(r0);
+	F32 theta = F32_2PI * r1;
+	Float3 direction(r * cosf(theta), r * sinf(theta), sqrtf(1.0f - r0));
+
+	static const F32 X_MAX = 1.0f - F32_EPSILON;
+	Float3 tmp = (fabs(normal.x) > X_MAX) ? WORLD_UP : WORLD_RIGHT;
+	Float3 B = normal.cross(tmp).normalize();
+	Float3 T = B.cross(normal);
+	Float3 outDirection = direction.x * T + direction.y * B + direction.z * normal;
+
+	if (outDirection.dot(normal) == 0.0f)
+		return randomOnHemisphereCosineWeighted(seed, normal);	// retry (sometimes R.N is 0 for some reason)
+
+	return outDirection;
 }

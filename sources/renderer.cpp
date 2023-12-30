@@ -448,13 +448,15 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         }
         else
         {
-            RgbColor brdf = material->albedo * F32_INV_PI;
-            Float3 newDirection = randomOnHemisphere(seed, normal);
+            Float3 newDirection = randomOnHemisphereCosineWeighted(seed, normal);
             Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
             ray = Ray(newOrigin, newDirection);
 
             F32 cosTheta = newDirection.dot(normal);
-            transmission *= material->emittance() + F32_2PI * rrScale * cosTheta * brdf * mediumScale;
+            RgbColor brdf = material->albedo * F32_INV_PI;
+            F32 inversePdf = 1.0f / (cosTheta / F32_PI);
+
+            transmission *= material->emittance() + rrScale * inversePdf * cosTheta * brdf * mediumScale;
         }
     }
 
