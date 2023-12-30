@@ -152,6 +152,8 @@ public:
 
     ~WaveFrontRenderer();
 
+    void render(F32 deltaTime);
+
 private:
     RenderContext m_context;
     Camera& m_camera;

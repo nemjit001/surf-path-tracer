@@ -599,3 +599,8 @@ WaveFrontRenderer::~WaveFrontRenderer()
         vkDestroySemaphore(m_context.device, m_frames[i].renderingFinished, nullptr);
     }
 }
+
+void WaveFrontRenderer::render(F32 deltaTime)
+{
+    // TODO: implement
+}
