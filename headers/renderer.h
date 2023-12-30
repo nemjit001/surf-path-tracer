@@ -117,6 +117,25 @@ private:
     GraphicsPipeline m_presentPipeline;
 };
 
+class WaveFrontRenderer
+{
+public:
+    WaveFrontRenderer(RenderContext renderContext, Camera& camera, Scene& scene);
+
+    ~WaveFrontRenderer();
+
+private:
+    RenderContext m_context;
+    FramebufferSize m_framebufferSize;
+    Camera& m_camera;
+    Scene& m_scene;
+
+    // Frame management
+    SizeType m_currentFrame;
+    FrameData m_frames[FRAMES_IN_FLIGHT];
+    std::vector<Framebuffer> m_framebuffers;
+};
+
 RendererConfig& Renderer::config()
 {
     return m_config;

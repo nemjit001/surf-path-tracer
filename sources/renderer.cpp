@@ -601,3 +601,61 @@ void Renderer::recordFrame(
     vkCmdEndRenderPass(commandBuffer);
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
+
+WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, Camera& camera, Scene& scene)
+    :
+    m_context(std::move(renderContext)),
+    m_framebufferSize(m_context.getFramebufferSize()),
+    m_camera(camera),
+    m_scene(scene),
+    m_currentFrame(0),
+    m_frames{},
+    m_framebuffers()
+{
+    // Set up per frame structures
+    for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
+        VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+        poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolCreateInfo.queueFamilyIndex = m_context.queues.graphicsQueue.familyIndex;
+
+        VK_CHECK(vkCreateCommandPool(m_context.device, &poolCreateInfo, nullptr, &m_frames[i].pool));
+
+        VkCommandBufferAllocateInfo bufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        bufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        bufferAllocateInfo.commandPool = m_frames[i].pool;
+        bufferAllocateInfo.commandBufferCount = 1;
+
+        VK_CHECK(vkAllocateCommandBuffers(m_context.device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
+
+        VkFenceCreateInfo frameReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+        frameReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        VK_CHECK(vkCreateFence(m_context.device, &frameReadyCreateInfo, nullptr, &m_frames[i].frameReady));
+
+        VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+        VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
+        VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
+    }
+
+    // Create framebuffers for swapchain images
+    m_framebuffers.reserve(m_context.swapchain.image_count);
+    for (const auto& imageView : m_context.swapImageViews)
+    {
+        // Needs a render pass
+    }
+}
+
+WaveFrontRenderer::~WaveFrontRenderer()
+{
+    vkDeviceWaitIdle(m_context.device);
+
+    for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
+        VK_CHECK(vkWaitForFences(m_context.device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
+        vkDestroyCommandPool(m_context.device, m_frames[i].pool, nullptr);
+        vkDestroyFence(m_context.device, m_frames[i].frameReady, nullptr);
+        vkDestroySemaphore(m_context.device, m_frames[i].swapImageAvailable, nullptr);
+        vkDestroySemaphore(m_context.device, m_frames[i].renderingFinished, nullptr);
+    }
+}
