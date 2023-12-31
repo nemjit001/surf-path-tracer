@@ -1,0 +1,23 @@
+#version 450
+#pragma shader_stage(compute)
+
+#include "wavefront_common.glsl"
+
+layout(set = 1, binding = 0) buffer RayBuffer
+{
+	uint counter;
+	Ray rays[];
+} rayStack;
+
+layout(set = 1, binding = 1) buffer HitRayBuffer
+{
+	uint counter;
+	Ray rays[];
+} hitRayStack;
+
+layout(local_size_x = 1, local_size_y = 1) in;
+
+void main()
+{
+	// TODO: process ray hits -> shade pixel idx accordingly -> store new rays in ray buffer to be processed by extend again
+}

@@ -3,8 +3,6 @@
 
 #include "wavefront_common.glsl"
 
-shared uint rayIdx;
-
 layout(set = 0, binding = 0) uniform CameraData
 {
 	vec3 position;
@@ -14,17 +12,20 @@ layout(set = 0, binding = 0) uniform CameraData
 	vec2 resolution;
 } camera;
 
-// SOA structure for faster data access
-layout(set = 1, binding = 0) buffer RayOriginOut 	{ vec3 originBuffer[]; };
-layout(set = 1, binding = 1) buffer RayDirectionOut { vec3 directionBuffer[]; };
-layout(set = 1, binding = 2) buffer RayDepthOut		{ float depthBuffer[]; };
+layout(set = 1, binding = 0) buffer RayBuffer
+{
+	uint counter;
+	Ray rays[];
+} rayOut;
 
 layout(local_size_x = 1, local_size_y = 1) in;
 
 void main()
 {
-	float xPixel = gl_LocalInvocationID.x + gl_WorkGroupSize.x * gl_WorkGroupID.x;
-	float yPixel = gl_LocalInvocationID.y + gl_WorkGroupSize.y * gl_WorkGroupID.y;
+	uint xPixel = gl_WorkGroupID.x;
+	uint yPixel = gl_WorkGroupID.y;
+	uint pixelIdx = xPixel + gl_WorkGroupSize.x * yPixel;
+
 	float u = xPixel / camera.resolution.x;
 	float v = yPixel / camera.resolution.y;
 
@@ -32,9 +33,16 @@ void main()
 	vec3 planePos = camera.topLeft + u * camera.uVector + v * camera.vVector;
 	vec3 direction = normalize(planePos - origin);
 
-	// Store data & update idx atomically
-	originBuffer[rayIdx] = origin;
-	directionBuffer[rayIdx] = direction;
-	depthBuffer[rayIdx] = F32_FAR_AWAY;
-	atomicAdd(rayIdx, 1);
+	Ray newRay = Ray(
+		origin,
+		direction,
+		F32_FAR_AWAY,
+		pixelIdx,
+		UNSET_IDX,
+		UNSET_IDX,
+		vec2(0, 0)
+	);
+
+	rayOut.rays[rayOut.counter] = newRay;
+	atomicAdd(rayOut.counter, 1);
 }

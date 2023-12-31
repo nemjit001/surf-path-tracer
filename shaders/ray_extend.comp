@@ -1,0 +1,29 @@
+#version 450
+#pragma shader_stage(compute)
+
+#include "wavefront_common.glsl"
+
+layout(set = 1, binding = 0) buffer RayBuffer
+{
+	uint counter;
+	Ray rays[];
+} rayStack;
+
+layout(set = 1, binding = 1) buffer HitRayBuffer
+{
+	uint counter;
+	Ray rays[];
+} hitRayStack;
+
+layout(set = 1, binding = 2) buffer MissRayBuffer
+{
+	uint counter;
+	Ray rays[];
+} missRayStack;
+
+layout(local_size_x = 1, local_size_y = 1) in;
+
+void main()
+{
+	// TODO: extend rays -> intersect TLAS and BLAS BVHs -> store in hit or miss
+}

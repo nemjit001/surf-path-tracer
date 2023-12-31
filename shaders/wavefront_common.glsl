@@ -1,4 +1,17 @@
-#define F32_FAR_AWAY 1e30;
+#define F32_FAR_AWAY	1e30
+
+#define UNSET_IDX		~0
+
+struct Ray
+{
+	vec3 origin;
+	vec3 direction;
+	float depth;
+	uint pixelIdx;		// Pixel index for ray into out buffer
+	uint instanceIdx;	// Index into TLAS instance list
+	uint primitiveIdx;	// Index into BLAS primitive list
+	vec2 hitCoords;		// Barycentric hit coordinates
+};
 
 uint WangHash(uint seed)
 {
