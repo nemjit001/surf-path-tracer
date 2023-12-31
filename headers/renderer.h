@@ -52,20 +52,33 @@ struct FrameData
     VkSemaphore renderingFinished;
 };
 
+class IRenderer
+{
+public:
+    virtual void clearAccumulator() = 0;
+
+    virtual void render(F32 deltaTime) = 0;
+
+    virtual RendererConfig& config() = 0;
+
+    virtual const FrameInstrumentationData& frameInfo() = 0;
+};
+
 class Renderer
+    : public IRenderer
 {
 public:
     Renderer(RenderContext renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
 
     ~Renderer();
 
-    void clearAccumulator();
+    virtual void clearAccumulator() override;
 
-    void render(F32 deltaTime);
+    virtual void render(F32 deltaTime) override;
 
-    inline RendererConfig& config();
+    virtual inline RendererConfig& config() override { return m_config; }
 
-    inline const FrameInstrumentationData& frameInfo();
+    virtual inline const FrameInstrumentationData& frameInfo() override { return m_frameInstrumentationData; }
 
 private:
     RgbColor trace(U32& seed, Ray& ray, U32 depth = 0);
@@ -146,32 +159,96 @@ private:
 };
 
 class WaveFrontRenderer
+    : public IRenderer
 {
 public:
-    WaveFrontRenderer(RenderContext renderContext, Camera& camera, Scene& scene);
+    WaveFrontRenderer(RenderContext renderContext, RendererConfig config, Camera& camera, Scene& scene);
 
     ~WaveFrontRenderer();
 
-    void render(F32 deltaTime);
+    virtual void clearAccumulator() override;
+
+    virtual void render(F32 deltaTime) override;
+
+    virtual inline RendererConfig& config() override { return m_config; }
+
+    virtual inline const FrameInstrumentationData& frameInfo() override { return m_frameInstrumentationData; }
 
 private:
     RenderContext m_context;
+    RendererConfig m_config;
     Camera& m_camera;
     Scene& m_scene;
+
+    // Frame data
+    FrameInstrumentationData m_frameInstrumentationData = FrameInstrumentationData{};
 
     // Frame management
     SizeType m_currentFrame = 0;
     FramebufferSize m_framebufferSize = m_context.getFramebufferSize();
     FrameData m_frames[FRAMES_IN_FLIGHT] = {};
+
+    // Default render pass w/ framebuffers
+    RenderPass m_presentPass = RenderPass(m_context.device, m_context.swapchain.image_format);
     std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
+
+    // Default descriptor pool
+    DescriptorPool m_descriptorPool = DescriptorPool(m_context.device);
+
+    // Wavefront kernels
+    Shader m_rayGeneration  = Shader(m_context.device, ShaderType::Compute, "shaders/ray_generation.comp.spv");
+    Shader m_rayExtend      = Shader(m_context.device, ShaderType::Compute, "shaders/ray_extend.comp.spv");
+    Shader m_rayShade       = Shader(m_context.device, ShaderType::Compute, "shaders/ray_shade.comp.spv");
+    Shader m_rayMiss        = Shader(m_context.device, ShaderType::Compute, "shaders/ray_miss.comp.spv");
+
+    // Wavefront layout & pipelines
+    PipelineLayout m_wavefrontLayout = PipelineLayout(m_context.device, std::vector{
+        DescriptorSetLayout{    // Per frame data uniforms (camera)
+            std::vector{
+                DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
+            }
+        },
+        DescriptorSetLayout{    // Compute SSBOs (rays, hits, misses)
+            std::vector{
+                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                 DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+            }
+        },
+    });
+
+    ComputePipeline m_rayGenPipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
+    ComputePipeline m_rayExtPipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
+    ComputePipeline m_rayShadePipeline  = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayShade);
+    ComputePipeline m_rayMissPipeline   = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayMiss);
+
+    // Present shaders
+    Shader m_presentVert    = Shader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
+    Shader m_presentFrag    = Shader(m_context.device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
+
+    // Present layout & pipeline
+    PipelineLayout m_presentLayout = PipelineLayout(m_context.device, std::vector{
+        DescriptorSetLayout{
+            std::vector{
+                DescriptorSetBinding{ 0, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER }
+            }
+        }
+    });
+
+    GraphicsPipeline m_presentPipeline  = GraphicsPipeline(
+        m_context.device, Viewport{ 0, 0, m_framebufferSize.width, m_framebufferSize.height, 0.0f, 1.0f },
+        m_descriptorPool, m_presentPass, m_presentLayout,
+        { &m_presentVert, &m_presentFrag }
+    );
+
+    // Present descriptors
+    Sampler m_frameImageSampler = Sampler(m_context.device);
+    Image m_frameImage = Image(
+        m_context.device,
+        m_context.allocator,
+        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
+        m_framebufferSize.width, m_framebufferSize.height,      // Take framebuffer size as resolution
+        VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
+        | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
+    );
 };
-
-RendererConfig& Renderer::config()
-{
-    return m_config;
-}
-
-const FrameInstrumentationData& Renderer::frameInfo()
-{
-    return m_frameInstrumentationData;
-}

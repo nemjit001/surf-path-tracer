@@ -99,6 +99,98 @@ void PipelineLayout::release()
     }
 }
 
+IPipeline::IPipeline(VkDevice device)
+    :
+    m_device(device),
+    m_pipeline(VK_NULL_HANDLE),
+    m_descriptorSets()
+{
+    assert(m_device != VK_NULL_HANDLE);
+}
+
+IPipeline::IPipeline(IPipeline && other) noexcept
+    :
+    m_device(other.m_device),
+    m_pipeline(other.m_pipeline),
+    m_descriptorSets(other.m_descriptorSets)
+{
+    other.m_pipeline = VK_NULL_HANDLE;
+    other.m_descriptorSets.clear();
+}
+
+IPipeline& IPipeline::operator=(IPipeline&& other) noexcept
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+
+    this->release();
+    this->m_device = other.m_device;
+    this->m_pipeline = other.m_pipeline;
+    this->m_descriptorSets = other.m_descriptorSets;
+
+    return *this;
+}
+
+void IPipeline::updateDescriptorSets(const std::vector<WriteDescriptorSet>& sets)
+{
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets;
+    writeDescriptorSets.reserve(sets.size());
+
+    for (auto const& set : sets)
+    {
+        assert(set.set < m_descriptorSets.size());
+
+        VkWriteDescriptorSet writeSet = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        writeSet.dstSet = m_descriptorSets[set.set];
+        writeSet.dstBinding = set.binding;
+        writeSet.dstArrayElement = 0;
+        writeSet.descriptorCount = 1;
+        writeSet.descriptorType = set.descriptorType;
+
+        switch (set.descriptorType)
+        {
+        case VK_DESCRIPTOR_TYPE_SAMPLER:
+        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+        case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+        case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+            writeSet.pImageInfo = &set.imageInfo;
+            break;
+        case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+        case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+            // TODO: handle pTexelInfo
+            break;
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+            // TODO: handle pBufferInfo
+            break;
+        case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+        default:
+            fprintf(stderr, "Cannot handle input attachment descriptor set\n");
+            abort();
+            break;
+        }
+
+        writeDescriptorSets.push_back(writeSet);
+    }
+
+    vkUpdateDescriptorSets(
+        m_device,
+        static_cast<U32>(writeDescriptorSets.size()),
+        writeDescriptorSets.data(),
+        0,
+        nullptr
+    );
+}
+
+void IPipeline::release()
+{
+    vkDestroyPipeline(m_device, m_pipeline, nullptr);
+}
+
 GraphicsPipeline::GraphicsPipeline(
     VkDevice device,
     Viewport viewport,
@@ -108,9 +200,7 @@ GraphicsPipeline::GraphicsPipeline(
     const std::vector<Shader*>& shaders
 )
     :
-    m_device(device),
-    m_pipeline(VK_NULL_HANDLE),
-    m_descriptorSets()
+    IPipeline(device)
 {
     std::vector<VkPipelineShaderStageCreateInfo> stages = {};
     for (auto const& shader : shaders)
@@ -245,105 +335,38 @@ GraphicsPipeline::GraphicsPipeline(
     VK_CHECK(vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, m_descriptorSets.data()));
 }
 
-GraphicsPipeline::~GraphicsPipeline()
-{
-    release();
-}
-
-GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) noexcept
+ComputePipeline::ComputePipeline(
+    VkDevice device,
+    const DescriptorPool& descriptorPool,
+    const PipelineLayout& layout,
+    const Shader* shader
+)
     :
-    m_device(other.m_device),
-    m_pipeline(other.m_pipeline),
-    m_descriptorSets(other.m_descriptorSets)
+    IPipeline(device)
 {
-    other.m_pipeline = VK_NULL_HANDLE;
-    other.m_descriptorSets.clear();
-}
+    VkPipelineShaderStageCreateInfo shaderStage = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    shaderStage.flags = 0;
+    shaderStage.stage = shader->stage();
+    shaderStage.module = shader->handle();
+    shaderStage.pName = "main";
+    shaderStage.pSpecializationInfo = nullptr;
 
-GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) noexcept
-{
-    if (this == &other)
-    {
-        return *this;
-    }
+    VkComputePipelineCreateInfo createInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    createInfo.flags = 0;
+    createInfo.stage = shaderStage;
+    createInfo.layout = layout.handle();
+    createInfo.basePipelineHandle = VK_NULL_HANDLE;
+    createInfo.basePipelineIndex = 0;
 
-    this->release();
-    this->m_device = other.m_device;
-    this->m_pipeline = other.m_pipeline;
-    this->m_descriptorSets = other.m_descriptorSets;
+    VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &m_pipeline));
 
-    return *this;
-}
+    const std::vector<VkDescriptorSetLayout>& setLayouts = layout.descriptorSetLayouts();
+    m_descriptorSets.resize(setLayouts.size(), VK_NULL_HANDLE);
 
-void GraphicsPipeline::updateDescriptorSets(const std::vector<WriteDescriptorSet>& sets)
-{
-    std::vector<VkWriteDescriptorSet> writeDescriptorSets;
-    writeDescriptorSets.reserve(sets.size());
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    descriptorSetAllocateInfo.descriptorPool = descriptorPool.handle();
+    descriptorSetAllocateInfo.descriptorSetCount = static_cast<U32>(setLayouts.size());
+    descriptorSetAllocateInfo.pSetLayouts = setLayouts.data();
 
-    for (auto const& set : sets)
-    {
-        assert(set.set < m_descriptorSets.size());
-
-        VkWriteDescriptorSet writeSet = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-        writeSet.dstSet = m_descriptorSets[set.set];
-        writeSet.dstBinding = set.binding;
-        writeSet.dstArrayElement = 0;
-        writeSet.descriptorCount = 1;
-        writeSet.descriptorType = set.descriptorType;
-        
-        switch (set.descriptorType)
-        {
-            case VK_DESCRIPTOR_TYPE_SAMPLER:
-            case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-            case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-            case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-                writeSet.pImageInfo = &set.imageInfo;
-                break;
-            case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-            case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-                // TODO: handle pTexelInfo
-                break;
-            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-                // TODO: handle pBufferInfo
-                break;
-            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-            default:
-                fprintf(stderr, "Cannot handle input attachment descriptor set\n");
-                abort();
-                break;
-        }
-
-        writeDescriptorSets.push_back(writeSet);
-    }
-
-    vkUpdateDescriptorSets(
-        m_device,
-        static_cast<U32>(writeDescriptorSets.size()),
-        writeDescriptorSets.data(),
-        0,
-        nullptr
-    );
-}
-
-VkPipelineBindPoint GraphicsPipeline::bindPoint() const
-{
-    return VK_PIPELINE_BIND_POINT_GRAPHICS;
-}
-
-VkPipeline GraphicsPipeline::handle() const
-{
-    return m_pipeline;
-}
-
-const std::vector<VkDescriptorSet>& GraphicsPipeline::descriptorSets()
-{
-    return m_descriptorSets;
-}
-
-void GraphicsPipeline::release()
-{
-    vkDestroyPipeline(m_device, m_pipeline, nullptr);
+    VK_CHECK(vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, m_descriptorSets.data()));
 }

@@ -397,8 +397,9 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             ray = Ray(newOrigin, newDirection);
 
             F32 cosTheta = newDirection.dot(normal);
+            F32 invCosTheta = 1.0f / cosTheta;
             RgbColor brdf = material->albedo * F32_INV_PI;
-            F32 inversePdf = 1.0f / (cosTheta / F32_PI);
+            F32 inversePdf = F32_PI * invCosTheta;
 
             transmission *= material->emittance() + rrScale * inversePdf * cosTheta * brdf * mediumScale;
         }
@@ -546,9 +547,10 @@ void Renderer::recordFrame(
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, Camera& camera, Scene& scene)
+WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig config, Camera& camera, Scene& scene)
     :
     m_context(std::move(renderContext)),
+    m_config(config),
     m_camera(camera),
     m_scene(scene)
 {
@@ -582,7 +584,8 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, Camera& camera
     m_framebuffers.reserve(m_context.swapchain.image_count);
     for (const auto& imageView : m_context.swapImageViews)
     {
-        // Needs a render pass before create
+        Framebuffer swapFramebuffer(m_context.device, m_presentPass, { imageView }, m_framebufferSize.width, m_framebufferSize.height);
+        m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 }
 
@@ -600,7 +603,12 @@ WaveFrontRenderer::~WaveFrontRenderer()
     }
 }
 
+void WaveFrontRenderer::clearAccumulator()
+{
+    // TODO: clear accumulator buffer
+}
+
 void WaveFrontRenderer::render(F32 deltaTime)
 {
-    // TODO: implement
+    // TODO: render frame using compute shader pipelines
 }

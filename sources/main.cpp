@@ -30,6 +30,9 @@
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
+#define FRAMEDATA_OUTPUT		1
+#define WAVEFRONT_PATHTRACING	0
+
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
 	updated = false;
@@ -235,12 +238,21 @@ int main()
 
 	// -- END Scene setup
 
+#if WAVEFRONT_PATHTRACING == 0
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces
 		1	// Samples per frame
 	};
 
 	Renderer renderer(std::move(renderContext), rendererConfig, resultBuffer, worldCam, scene);
+#else
+	RendererConfig rendererConfig = RendererConfig{
+		5,	// Max bounces
+		1	// Samples per frame
+	};
+
+	WaveFrontRenderer renderer(std::move(renderContext), rendererConfig, worldCam, scene);
+#endif
 
 	// Create frame timer
 	Timer frameTimer;
@@ -274,6 +286,7 @@ int main()
 		frameTimer.tick();
 		deltaTime = frameTimer.deltaTime();
 
+#if FRAMEDATA_OUTPUT == 1
 		AVERAGE_FRAMETIME = (1.0f - ALPHA) * AVERAGE_FRAMETIME + ALPHA * (deltaTime * 1'000.0f);
 		if (ALPHA > SMOOTH_FRAC) ALPHA *= 0.5;
 
@@ -290,6 +303,7 @@ int main()
 			config.samplesPerFrame,
 			frameInfo.energy
 		);
+#endif
 
 		glfwPollEvents();
 	}
