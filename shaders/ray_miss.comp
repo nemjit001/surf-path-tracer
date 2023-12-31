@@ -3,6 +3,11 @@
 
 #include "wavefront_common.glsl"
 
+layout(set = 0, binding = 1) buffer AccumulatorBuffer
+{
+	vec4 accumulator[];
+};
+
 layout(set = 1, binding = 2) buffer MissRayBuffer
 {
 	uint counter;
@@ -11,7 +16,16 @@ layout(set = 1, binding = 2) buffer MissRayBuffer
 
 layout(local_size_x = 1, local_size_y = 1) in;
 
+const vec3 skyA = vec3(1);
+const vec3 skyB = vec3(0.2, 0.7, 0.9);
+
 void main()
 {
-	// TODO: process ray misses -> shade pixel idx according to HDRI / gradient / whatever
+	// TODO: add check for empty stack -> nothing to do
+	atomicAdd(missRayStack.counter, -1);
+	Ray ray = missRayStack.rays[missRayStack.counter];
+
+	float alpha = 0.5 * (1.0 + ray.direction.y);
+	vec3 skyColor = alpha * skyB + (1.0 - alpha) * skyA;
+	accumulator[ray.pixelIdx] += vec4(skyColor, 1);
 }

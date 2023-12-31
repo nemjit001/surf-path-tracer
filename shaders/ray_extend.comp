@@ -3,6 +3,21 @@
 
 #include "wavefront_common.glsl"
 
+// BVH node matching c++ struct
+struct BvhNode
+{
+	uint leftFirst;
+	uint count;
+	vec3 aabbMin;
+	vec3 aabbMax;
+};
+
+// Instance matching c++ struct
+struct Instance
+{
+	mat4 transform;
+};
+
 layout(set = 1, binding = 0) buffer RayBuffer
 {
 	uint counter;
@@ -25,5 +40,13 @@ layout(local_size_x = 1, local_size_y = 1) in;
 
 void main()
 {
-	// TODO: extend rays -> intersect TLAS and BLAS BVHs -> store in hit or miss
+	// TODO: add check for empty stack -> nothing to do
+	atomicAdd(rayStack.counter, -1);
+	Ray ray = rayStack.rays[rayStack.counter];
+
+	// TODO: intersect with TLAS / BLAS
+
+	// For now all rays miss
+	missRayStack.rays[missRayStack.counter] = ray;
+	atomicAdd(missRayStack.counter, 1);
 }

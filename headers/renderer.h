@@ -203,9 +203,10 @@ private:
 
     // Wavefront layout & pipelines
     PipelineLayout m_wavefrontLayout = PipelineLayout(m_context.device, std::vector{
-        DescriptorSetLayout{    // Per frame data uniforms (camera)
+        DescriptorSetLayout{    // Per frame data uniforms (camera, accumulator)
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
+                DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
         DescriptorSetLayout{    // Compute SSBOs (rays, hits, misses)
