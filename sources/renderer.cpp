@@ -588,6 +588,22 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         Framebuffer swapFramebuffer(m_context.device, m_presentPass, { imageView }, m_framebufferSize.width, m_framebufferSize.height);
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
+
+    // TODO: update compute descriptor sets
+
+    m_presentPipeline.updateDescriptorSets({
+        WriteDescriptorSet{
+            0, 0,
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            VkDescriptorImageInfo{
+                m_frameImageSampler.handle(),
+                m_frameImage.view(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            }
+        }
+    });
+
+    // TODO: bake compute passes
 }
 
 WaveFrontRenderer::~WaveFrontRenderer()
@@ -611,5 +627,97 @@ void WaveFrontRenderer::clearAccumulator()
 
 void WaveFrontRenderer::render(F32 deltaTime)
 {
-    // TODO: render frame using compute shader pipelines
+    const FrameData& activeFrame = m_frames[m_currentFrame];
+    
+    U32 swapImageIdx = 0;
+    VK_CHECK(vkAcquireNextImageKHR(m_context.device, m_context.swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &swapImageIdx));
+    VK_CHECK(vkWaitForFences(m_context.device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
+
+    // Record present pass
+    const Framebuffer& activeFramebuffer = m_framebuffers[swapImageIdx];
+    VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* reset flags */ 0));
+    recordPresentPass(activeFrame.commandBuffer, activeFramebuffer);
+
+    // Submit baked compute passes
+    VkPipelineStageFlags computeWaitStages[] = {
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT    // Wait until compute passes have completed
+    };
+
+    VkSubmitInfo computeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    computeSubmit.commandBufferCount = 0;
+    computeSubmit.pCommandBuffers = nullptr;
+    computeSubmit.waitSemaphoreCount = 0;
+    computeSubmit.pWaitSemaphores = nullptr;
+    computeSubmit.pWaitDstStageMask = computeWaitStages;
+    computeSubmit.signalSemaphoreCount = 0; // FIXME: signal compute passes finished
+    computeSubmit.pSignalSemaphores = nullptr;
+
+    VK_CHECK(vkQueueSubmit(m_context.queues.computeQueue.handle, 1, &computeSubmit, VK_NULL_HANDLE));   // Compute finished fence
+
+    VkPipelineStageFlags gfxWaitStages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
+    };
+
+    VkSubmitInfo renderSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    renderSubmit.commandBufferCount = 1;
+    renderSubmit.pCommandBuffers = &activeFrame.commandBuffer;
+    renderSubmit.waitSemaphoreCount = 1;
+    renderSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
+    renderSubmit.pWaitDstStageMask = gfxWaitStages;
+    renderSubmit.signalSemaphoreCount = 1;
+    renderSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
+
+    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &renderSubmit, activeFrame.frameReady));
+
+    VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pImageIndices = &swapImageIdx;
+    presentInfo.pSwapchains = &m_context.swapchain.swapchain;
+    presentInfo.pResults = nullptr;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
+
+    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue.handle, &presentInfo));
+    m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
+}
+
+void WaveFrontRenderer::recordPresentPass(VkCommandBuffer commandBuffer, const Framebuffer& framebuffer)
+{
+    assert(commandBuffer != VK_NULL_HANDLE);
+    
+    VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    cmdBeginInfo.flags = 0;
+    cmdBeginInfo.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
+
+    VkClearValue clearValue = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+    VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    renderPassBeginInfo.renderPass = m_presentPass.handle();
+    renderPassBeginInfo.framebuffer = framebuffer.handle();
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValue;
+    renderPassBeginInfo.renderArea = {
+        0, 0,
+        m_framebufferSize.width, m_framebufferSize.height
+    };
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    const std::vector<VkDescriptorSet>& descriptorSets = m_presentPipeline.descriptorSets();
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        m_presentPipeline.bindPoint(),
+        m_presentLayout.handle(),
+        0, static_cast<U32>(descriptorSets.size()),
+        descriptorSets.data(),
+        0, nullptr
+    );
+
+    vkCmdBindPipeline(commandBuffer, m_presentPipeline.bindPoint(), m_presentPipeline.handle());
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);   // Single instance -> shader takes vertex index and transforms it to screen coords
+
+    vkCmdEndRenderPass(commandBuffer);
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }

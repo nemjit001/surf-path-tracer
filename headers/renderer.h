@@ -175,6 +175,12 @@ public:
     virtual inline const FrameInstrumentationData& frameInfo() override { return m_frameInstrumentationData; }
 
 private:
+    void recordPresentPass(
+        VkCommandBuffer commandBuffer,
+        const Framebuffer& framebuffer
+    );
+
+private:
     RenderContext m_context;
     RendererConfig m_config;
     Camera& m_camera;

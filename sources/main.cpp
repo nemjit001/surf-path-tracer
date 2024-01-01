@@ -30,7 +30,7 @@
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
-#define FRAMEDATA_OUTPUT		0
+#define FRAMEDATA_OUTPUT		1
 #define WAVEFRONT_PATHTRACING	1
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
@@ -298,7 +298,7 @@ int main()
 		if (ALPHA > SMOOTH_FRAC) ALPHA *= 0.5;
 
 		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
-		F32 rps = (resultBuffer.width * resultBuffer.height * config.samplesPerFrame) * inv_avg_frametime;
+		F32 rps = (resolution.width * RESOLUTION_SCALE * resolution.height * RESOLUTION_SCALE * config.samplesPerFrame) * inv_avg_frametime;
 		const FrameInstrumentationData& frameInfo = renderer.frameInfo();
 		
 		printf(
