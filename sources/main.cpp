@@ -127,16 +127,18 @@ int main()
 	RenderContext renderContext(window);
 	FramebufferSize resolution = renderContext.getFramebufferSize();
 
+#if WAVEFRONT_PATHTRACING == 0
 	PixelBuffer resultBuffer(
 		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
 		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
 	);
+#endif
 
 	Camera worldCam(
 		Float3(0.0f, 0.0f, -7.0f),
 		Float3(0.0f, 0.0f, 0.0f),
-		resultBuffer.width,
-		resultBuffer.height
+		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
+		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
 	);
 
 	// -- BEGIN Scene setup
@@ -251,7 +253,12 @@ int main()
 		1	// Samples per frame
 	};
 
-	WaveFrontRenderer renderer(std::move(renderContext), rendererConfig, worldCam, scene);
+	FramebufferSize renderResolution = FramebufferSize{
+		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
+		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
+	};
+
+	WaveFrontRenderer renderer(std::move(renderContext), rendererConfig, renderResolution, worldCam, scene);
 #endif
 
 	// Create frame timer

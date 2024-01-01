@@ -547,12 +547,13 @@ void Renderer::recordFrame(
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig config, Camera& camera, Scene& scene)
+WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, Scene& scene)
     :
     m_context(std::move(renderContext)),
     m_config(config),
     m_camera(camera),
-    m_scene(scene)
+    m_scene(scene),
+    m_renderResolution(renderResolution)
 {
     // Set up per frame structures
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
