@@ -8,6 +8,16 @@
 #define WORLD_RIGHT		Float3(1.0f, 0.0f, 0.0f)
 #define WORLD_UP		Float3(0.0f, 1.0f, 0.0f)
 
+// GLSL UBO format for camera data
+struct CameraUBO
+{
+	Float3 position;
+	Float3 firstPixel;
+	Float3 uVector;
+	Float3 vVector;
+	Float2 resolution;
+};
+
 struct ViewPlane
 {
 	Float3 firstPixel;

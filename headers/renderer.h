@@ -18,7 +18,7 @@
 #include "vk_layer/render_pass.h"
 #include "vk_layer/sampler.h"
 
-#define FRAMES_IN_FLIGHT 2
+#define FRAMES_IN_FLIGHT    2
 
 struct RendererConfig
 {
@@ -222,6 +222,7 @@ private:
     Shader m_rayExtend      = Shader(m_context.device, ShaderType::Compute, "shaders/ray_extend.comp.spv");
     Shader m_rayShade       = Shader(m_context.device, ShaderType::Compute, "shaders/ray_shade.comp.spv");
     Shader m_rayMiss        = Shader(m_context.device, ShaderType::Compute, "shaders/ray_miss.comp.spv");
+    Shader m_wfFinalize     = Shader(m_context.device, ShaderType::Compute, "shaders/wavefront_finalize.comp.spv");
 
     // Wavefront layout & pipelines
     PipelineLayout m_wavefrontLayout = PipelineLayout(m_context.device, std::vector{
@@ -241,10 +242,49 @@ private:
         },
     });
 
-    ComputePipeline m_rayGenPipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
-    ComputePipeline m_rayExtPipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
-    ComputePipeline m_rayShadePipeline  = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayShade);
-    ComputePipeline m_rayMissPipeline   = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayMiss);
+    ComputePipeline m_rayGenPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
+    ComputePipeline m_rayExtPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
+    ComputePipeline m_rayShadePipeline      = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayShade);
+    ComputePipeline m_rayMissPipeline       = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayMiss);
+    ComputePipeline m_wfFinalizePipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_wfFinalize);
+
+    // Compute descriptors
+    Buffer m_cameraUBO = Buffer(
+        m_context.allocator, sizeof(CameraUBO),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    );
+
+    Buffer m_accumulatorSSBO = Buffer(
+        m_context.allocator, m_renderResolution.width * m_renderResolution.height * sizeof(Float4),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0 /* Allocation create flags */
+    );
+
+    const SizeType c_raySSBOSize = sizeof(U32) + m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
+    Buffer m_rayGenSSBO = Buffer(
+        m_context.allocator, c_raySSBOSize,
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0 /* Allocation create flags */
+    );
+
+    Buffer m_rayHitSSBO = Buffer(
+        m_context.allocator, c_raySSBOSize,
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0 /* Allocation create flags */
+    );
+
+    Buffer m_rayMissSSBO = Buffer(
+        m_context.allocator, c_raySSBOSize,
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0 /* Allocation create flags */
+    );
 
     // Present shaders
     Shader m_presentVert    = Shader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
@@ -270,9 +310,9 @@ private:
     Image m_frameImage = Image(
         m_context.device,
         m_context.allocator,
-        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
+        VkFormat::VK_FORMAT_R8G8B8A8_SNORM,                     // Standard RGBA format (Scaled normalized)
         m_renderResolution.width, m_renderResolution.height,
-        VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
+        VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT        // Used as storage for wavefront compute shaders
         | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
     );
 };

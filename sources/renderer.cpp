@@ -607,21 +607,98 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 
-    // TODO: update compute descriptor sets
+    // Create writesets for all compute descriptors
+    WriteDescriptorSet cameraWriteSet = {};
+    cameraWriteSet.set = 0;
+    cameraWriteSet.binding = 0;
+    cameraWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    cameraWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_cameraUBO.handle(),
+        0, sizeof(CameraUBO)
+    };
+
+    WriteDescriptorSet accumulatorWriteSet = {};
+    accumulatorWriteSet.set = 0;
+    accumulatorWriteSet.binding = 1;
+    accumulatorWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    accumulatorWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_accumulatorSSBO.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet outputImageWriteSet = {};
+    outputImageWriteSet.set = 0;
+    outputImageWriteSet.binding = 2;
+    outputImageWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    outputImageWriteSet.imageInfo = VkDescriptorImageInfo{
+        VK_NULL_HANDLE,
+        m_frameImage.view(),
+        VK_IMAGE_LAYOUT_GENERAL
+    };
+
+    WriteDescriptorSet rayGenWriteSet = {};
+    rayGenWriteSet.set = 1;
+    rayGenWriteSet.binding = 0;
+    rayGenWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    rayGenWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_rayGenSSBO.handle(),
+        0, c_raySSBOSize
+    };
+
+    WriteDescriptorSet rayHitWriteSet = {};
+    rayHitWriteSet.set = 1;
+    rayHitWriteSet.binding = 1;
+    rayHitWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    rayHitWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_rayHitSSBO.handle(),
+        0, c_raySSBOSize
+    };
+
+    WriteDescriptorSet rayMissWriteSet = {};
+    rayMissWriteSet.set = 1;
+    rayMissWriteSet.binding = 2;
+    rayMissWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    rayMissWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_rayMissSSBO.handle(),
+        0, c_raySSBOSize
+    };
+
+    // Update all compute pipeline descriptor sets
     m_rayGenPipeline.updateDescriptorSets({
-        //
+        cameraWriteSet,
+        rayGenWriteSet,
     });
 
+    m_rayExtPipeline.updateDescriptorSets({
+        rayGenWriteSet,
+        rayHitWriteSet,
+        rayMissWriteSet,
+    });
+
+    m_rayMissPipeline.updateDescriptorSets({
+        rayMissWriteSet,
+        accumulatorWriteSet,
+    });
+
+    m_wfFinalizePipeline.updateDescriptorSets({
+        accumulatorWriteSet,
+        outputImageWriteSet,
+    });
+
+    // Create write sets for graphics pipeline pass
+    WriteDescriptorSet frameImageSamplerSet = {};
+    frameImageSamplerSet.set = 0;
+    frameImageSamplerSet.binding = 0;
+    frameImageSamplerSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    frameImageSamplerSet.imageInfo = VkDescriptorImageInfo{
+        m_frameImageSampler.handle(),
+        m_frameImage.view(),
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+
+    // Update all graphics pipeline descriptor sets
     m_presentPipeline.updateDescriptorSets({
-        WriteDescriptorSet{
-            0, 0,
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            VkDescriptorImageInfo{
-                m_frameImageSampler.handle(),
-                m_frameImage.view(),
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            }
-        }
+        frameImageSamplerSet
     });
 
     bakeWavefrontPass(m_wavefrontCompute.commandBuffer);
@@ -661,6 +738,16 @@ void WaveFrontRenderer::render(F32 deltaTime)
     VkFence fences[] = { activeFrame.frameReady, m_wavefrontCompute.computeReady };
     VK_CHECK(vkWaitForFences(m_context.device, 2, fences, VK_TRUE, UINT64_MAX));
     VK_CHECK(vkResetFences(m_context.device, 2, fences));
+
+    // Update cameraUBO
+    CameraUBO cameraUBO = CameraUBO{
+        m_camera.position,
+        m_camera.viewPlane.firstPixel,
+        m_camera.viewPlane.uVector,
+        m_camera.viewPlane.vVector,
+        Float2(m_camera.screenWidth, m_camera.screenHeight)
+    };
+    m_cameraUBO.copyToBuffer(sizeof(CameraUBO), &cameraUBO);
 
     // Record present pass
     const Framebuffer& activeFramebuffer = m_framebuffers[swapImageIdx];
@@ -718,6 +805,7 @@ void WaveFrontRenderer::bakeWavefrontPass(VkCommandBuffer commandBuffer)
 
     VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
 
+    // Transition storage image to write layout
     VkImageMemoryBarrier storageTransitionBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     storageTransitionBarrier.srcAccessMask = 0;
     storageTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -742,20 +830,121 @@ void WaveFrontRenderer::bakeWavefrontPass(VkCommandBuffer commandBuffer)
         1, &storageTransitionBarrier
     );
 
-    const std::vector<VkDescriptorSet>& rayGenSets = m_rayGenPipeline.descriptorSets();
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        m_rayGenPipeline.bindPoint(),
-        m_wavefrontLayout.handle(),
-        0, static_cast<U32>(rayGenSets.size()),
-        rayGenSets.data(),
-        0, nullptr
-    );
-    vkCmdBindPipeline(commandBuffer, m_rayGenPipeline.bindPoint(), m_rayGenPipeline.handle());
-    // XXX: local invocations for shader may change dispatch size -> CHECK!
-    vkCmdDispatch(commandBuffer, m_renderResolution.width, m_renderResolution.height, 1);
+    // Setup all compute memory barriers
+    VkBufferMemoryBarrier rayGenBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+    rayGenBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    rayGenBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    rayGenBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayGenBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayGenBarrier.buffer = m_rayGenSSBO.handle();
+    rayGenBarrier.offset = 0;
+    rayGenBarrier.size = c_raySSBOSize;
 
-    // TODO: transfer image to read only layout for shader reads
+    VkBufferMemoryBarrier rayHitBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+    rayHitBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    rayHitBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    rayHitBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayHitBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayHitBarrier.buffer = m_rayHitSSBO.handle();
+    rayHitBarrier.offset = 0;
+    rayHitBarrier.size = c_raySSBOSize;
+
+    VkBufferMemoryBarrier rayMissBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+    rayMissBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    rayMissBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    rayMissBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayMissBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayMissBarrier.buffer = m_rayMissSSBO.handle();
+    rayMissBarrier.offset = 0;
+    rayMissBarrier.size = c_raySSBOSize;
+
+    VkBufferMemoryBarrier genBarriers[] = {
+        rayGenBarrier
+    };
+
+    VkBufferMemoryBarrier extendBarriers[] = {
+        rayHitBarrier, rayMissBarrier
+    };
+
+    // Generate primary rays
+    {
+        const std::vector<VkDescriptorSet>& rayGenSets = m_rayGenPipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_rayGenPipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(rayGenSets.size()),
+            rayGenSets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_rayGenPipeline.bindPoint(), m_rayGenPipeline.handle());
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 16, m_renderResolution.height / 16, 1);
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            0, nullptr,
+            1, genBarriers,
+            0, nullptr
+        );
+    }
+
+    // Extend rays through scene
+    {
+        const std::vector<VkDescriptorSet>& rayExtendSets = m_rayExtPipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_rayExtPipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(rayExtendSets.size()),
+            rayExtendSets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_rayExtPipeline.bindPoint(), m_rayExtPipeline.handle());
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 16, m_renderResolution.height / 16, 1);
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            0, nullptr,
+            2, extendBarriers,
+            0, nullptr
+        );
+    }
+
+    // Handle ray misses and hits
+    {
+        const std::vector<VkDescriptorSet>& rayMissSets = m_rayMissPipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_rayMissPipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(rayMissSets.size()),
+            rayMissSets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_rayMissPipeline.bindPoint(), m_rayMissPipeline.handle());
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 16, m_renderResolution.height / 16, 1);
+    }
+
+    // Finalize wavefront pt results
+    {
+        const std::vector<VkDescriptorSet>& wfFinalizeSets = m_wfFinalizePipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_wfFinalizePipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(wfFinalizeSets.size()),
+            wfFinalizeSets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_wfFinalizePipeline.bindPoint(), m_wfFinalizePipeline.handle());
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 16, m_renderResolution.height / 16, 1);
+    }
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }

@@ -165,7 +165,7 @@ void IPipeline::updateDescriptorSets(const std::vector<WriteDescriptorSet>& sets
         case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
         case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
         case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-            // TODO: handle pBufferInfo
+            writeSet.pBufferInfo = &set.bufferInfo;
             break;
         case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
         default:

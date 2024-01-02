@@ -6,13 +6,11 @@
 layout(set = 0, binding = 0) uniform CameraData
 {
 	vec3 position;
-	vec3 topLeft;
+	vec3 firstPixel;
 	vec3 uVector;
 	vec3 vVector;
 	vec2 resolution;
 } camera;
-
-layout(set = 0, binding = 2, rgba8) uniform image2D outputImage;
 
 layout(set = 1, binding = 0) buffer RayBuffer
 {
@@ -20,19 +18,19 @@ layout(set = 1, binding = 0) buffer RayBuffer
 	Ray rays[];
 } rayOut;
 
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 
 void main()
 {
-	uint xPixel = gl_WorkGroupID.x;
-	uint yPixel = gl_WorkGroupID.y;
-	uint pixelIdx = xPixel + gl_WorkGroupSize.x * yPixel;
+	uint xPixel = gl_LocalInvocationID.x + (gl_WorkGroupID.x * gl_WorkGroupSize.x);
+	uint yPixel = gl_LocalInvocationID.y + (gl_WorkGroupID.y * gl_WorkGroupSize.y);
+	uint pixelIdx = xPixel + (yPixel * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
 
 	float u = xPixel / camera.resolution.x;
 	float v = yPixel / camera.resolution.y;
 
 	vec3 origin = camera.position;
-	vec3 planePos = camera.topLeft + u * camera.uVector + v * camera.vVector;
+	vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
 	vec3 direction = normalize(planePos - origin);
 
 	Ray newRay = Ray(
@@ -45,10 +43,5 @@ void main()
 		vec2(0, 0)
 	);
 
-	rayOut.rays[rayOut.counter] = newRay;
-	atomicAdd(rayOut.counter, 1);
-	
-	// Temp output to storage image -> test if write works
-	vec3 outColor = 0.5 * (vec3(1.0) + newRay.direction);
-	imageStore(outputImage, ivec2(xPixel, yPixel), vec4(outColor, 1));
+	rayOut.rays[atomicAdd(rayOut.counter, 1)] = newRay;
 }

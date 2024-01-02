@@ -35,7 +35,10 @@ struct WriteDescriptorSet
     U32 set;
     U32 binding;
     VkDescriptorType descriptorType;
-    VkDescriptorImageInfo imageInfo;
+    union {
+        VkDescriptorImageInfo imageInfo;
+        VkDescriptorBufferInfo bufferInfo;
+    };
 };
 
 class PipelineLayout

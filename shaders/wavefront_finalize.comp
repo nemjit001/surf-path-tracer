@@ -1,0 +1,30 @@
+#version 450
+#pragma shader_stage(compute)
+
+// TODO: add samples per frame, lumen, total samples tracking
+
+layout(set = 0, binding = 1) buffer AccumulatorBuffer
+{
+	vec4 accumulator[];
+};
+
+layout(set = 0, binding = 2, rgba8) uniform image2D outputImage;
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+void main()
+{
+	uint xPixel = gl_LocalInvocationID.x + (gl_WorkGroupID.x * gl_WorkGroupSize.x);
+	uint yPixel = gl_LocalInvocationID.y + (gl_WorkGroupID.y * gl_WorkGroupSize.y);
+	uint pixelIdx = xPixel + (yPixel * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
+
+	ivec2 imgSize = imageSize(outputImage);
+	uint xLoc = pixelIdx % imgSize.x;
+	uint yLoc = pixelIdx / imgSize.x;
+
+	imageStore(
+		outputImage,
+		ivec2(xLoc, yLoc),
+		accumulator[pixelIdx]
+	);
+}
