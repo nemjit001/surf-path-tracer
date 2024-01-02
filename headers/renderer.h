@@ -52,6 +52,14 @@ struct FrameData
     VkSemaphore renderingFinished;
 };
 
+struct WavefrontCompute
+{
+    VkCommandPool pool;
+    VkCommandBuffer commandBuffer;
+    VkFence computeReady;
+    VkSemaphore computeFinished;
+};
+
 class IRenderer
 {
 public:
@@ -175,6 +183,10 @@ public:
     virtual inline const FrameInstrumentationData& frameInfo() override { return m_frameInstrumentationData; }
 
 private:
+    void bakeWavefrontPass(
+        VkCommandBuffer commandBuffer
+    );
+
     void recordPresentPass(
         VkCommandBuffer commandBuffer,
         const Framebuffer& framebuffer
@@ -195,6 +207,9 @@ private:
     FramebufferSize m_framebufferSize = m_context.getFramebufferSize();
     FrameData m_frames[FRAMES_IN_FLIGHT] = {};
 
+    // Compute setup
+    WavefrontCompute m_wavefrontCompute = {};
+
     // Default render pass w/ framebuffers
     RenderPass m_presentPass = RenderPass(m_context.device, m_context.swapchain.image_format);
     std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
@@ -210,10 +225,11 @@ private:
 
     // Wavefront layout & pipelines
     PipelineLayout m_wavefrontLayout = PipelineLayout(m_context.device, std::vector{
-        DescriptorSetLayout{    // Per frame data uniforms (camera, accumulator)
+        DescriptorSetLayout{    // Per frame data uniforms (camera, accumulator, output image)
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
             }
         },
         DescriptorSetLayout{    // Compute SSBOs (rays, hits, misses)

@@ -12,6 +12,8 @@ layout(set = 0, binding = 0) uniform CameraData
 	vec2 resolution;
 } camera;
 
+layout(set = 0, binding = 2, rgba8) uniform image2D outputImage;
+
 layout(set = 1, binding = 0) buffer RayBuffer
 {
 	uint counter;
@@ -45,4 +47,8 @@ void main()
 
 	rayOut.rays[rayOut.counter] = newRay;
 	atomicAdd(rayOut.counter, 1);
+	
+	// Temp output to storage image -> test if write works
+	vec3 outColor = 0.5 * (vec3(1.0) + newRay.direction);
+	imageStore(outputImage, ivec2(xPixel, yPixel), vec4(outColor, 1));
 }
