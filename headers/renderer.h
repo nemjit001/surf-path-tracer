@@ -50,6 +50,14 @@ struct FrameStateUBO
     U32 totalSamples        = 0;
 };
 
+/// @brief The RayGenUBO maps to a GLSL SSBO, this SSBO is used as to check the kernel execution state during
+/// wavefront rendering.
+struct RayGenUBO
+{
+    U32 count;
+    GPURay rays[];
+};
+
 struct FrameData
 {
     VkCommandPool pool;
@@ -187,12 +195,21 @@ public:
 
     virtual inline RendererConfig& config() override { return m_config; }
 
-    virtual inline const FrameInstrumentationData& frameInfo() override { return m_frameInstrumentationData; }
+    virtual inline const FrameInstrumentationData& frameInfo() override {
+        m_frameInstrumentationData.totalSamples = m_frameState.totalSamples;
+        return m_frameInstrumentationData;
+    }
 
 private:
-    void bakeWavefrontPass(
+#if GPU_MEGAKERNEL == 1
+    void bakeMegakernelPass(
         VkCommandBuffer commandBuffer
     );
+#else
+    // bake raygen
+    // bake loop body
+    // bake finalize
+#endif
 
     void recordPresentPass(
         VkCommandBuffer commandBuffer,
@@ -292,11 +309,12 @@ private:
 
 #if GPU_MEGAKERNEL == 0
     const SizeType c_raySSBOSize = sizeof(U32) + m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
-    Buffer m_rayGenSSBO = Buffer(
+    Buffer m_raySSBO = Buffer(
         m_context.allocator, c_raySSBOSize,
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        0 /* Allocation create flags */
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     );
 
     Buffer m_rayHitSSBO = Buffer(

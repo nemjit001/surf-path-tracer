@@ -7,29 +7,23 @@ layout(set = 1, binding = 0) buffer RayBuffer
 {
 	uint counter;
 	Ray rays[];
-} rayStack;
+} rayBuffer;
 
 layout(set = 1, binding = 1) buffer HitRayBuffer
 {
 	uint counter;
-	Ray rays[];
+	Ray rayIndices[];
 } hitRayStack;
 
 layout(set = 1, binding = 2) buffer MissRayBuffer
 {
 	uint counter;
-	Ray rays[];
+	Ray rayIndices[];
 } missRayStack;
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
 void main()
 {
-	if (rayStack.counter == 0)
-		return;
-
-	Ray currRay = rayStack.rays[atomicAdd(rayStack.counter, -1) - 1];
-	// TODO: intersect w/ TLAS & BLAS in scene
-	
-	missRayStack.rays[atomicAdd(missRayStack.counter, 1)] = currRay;
+	//
 }

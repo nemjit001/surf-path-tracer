@@ -83,3 +83,37 @@ vec3 rayHitPosition(Ray ray)
 {
 	return ray.origin + ray.depth * ray.direction;
 }
+
+// XXX: Temp sphere stuff for test scene
+#define SPHERE_POSITION	vec3(0, 0, 0)
+#define SPHERE_RADIUS	1.0
+
+vec3 sphereNormal(vec3 hitPosition)
+{
+	return (hitPosition - SPHERE_POSITION) / SPHERE_RADIUS;
+}
+
+bool sphereIntersect(inout Ray ray)
+{
+	vec3 oc = ray.origin - SPHERE_POSITION;
+	float a = dot(ray.direction, ray.direction);
+	float halfB = dot(oc, ray.direction);
+	float c = dot(oc, oc) - (SPHERE_RADIUS * SPHERE_RADIUS);
+
+	float d = (halfB * halfB) - (a * c);
+	if (d < 0.0)
+		return false;
+
+	float depth = (-halfB - sqrt(d)) / a;
+	if (!rayDepthInBounds(ray, depth))
+	{
+		depth = (-halfB + sqrt(d)) / a;
+		if (!rayDepthInBounds(ray, depth))
+		{
+			return false;
+		}
+	}
+
+	ray.depth = depth;
+	return true;
+}

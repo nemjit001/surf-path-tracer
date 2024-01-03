@@ -16,7 +16,7 @@ layout(set = 1, binding = 0) buffer RayBuffer
 {
 	uint counter;
 	Ray rays[];
-} rayOut;
+} rayBuffer;
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -33,7 +33,7 @@ void main()
 	vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
 	vec3 direction = normalize(planePos - origin);
 
-	Ray newRay = Ray(
+	rayBuffer.rays[atomicAdd(rayBuffer.counter, 1)] = Ray(
 		origin,
 		direction,
 		F32_FAR_AWAY,
@@ -42,6 +42,4 @@ void main()
 		UNSET_IDX,
 		vec2(0, 0)
 	);
-
-	rayOut.rays[atomicAdd(rayOut.counter, 1)] = newRay;
 }

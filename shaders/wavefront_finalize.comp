@@ -1,14 +1,18 @@
 #version 450
 #pragma shader_stage(compute)
 
-// TODO: add samples per frame, lumen, total samples tracking
+layout(set = 0, binding = 1) uniform FrameState
+{
+	uint samplesPerFrame;
+	uint totalSamples;
+} frameState;
 
-layout(set = 0, binding = 1) buffer AccumulatorBuffer
+layout(set = 0, binding = 2) buffer AccumulatorBuffer
 {
 	vec4 accumulator[];
 };
 
-layout(set = 0, binding = 2, rgba8) uniform image2D outputImage;
+layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -22,9 +26,10 @@ void main()
 	uint xLoc = pixelIdx % imgSize.x;
 	uint yLoc = pixelIdx / imgSize.x;
 
+	float invSamples = 1.0 / frameState.totalSamples;
 	imageStore(
 		outputImage,
 		ivec2(xLoc, yLoc),
-		accumulator[pixelIdx]
+		accumulator[pixelIdx] * invSamples
 	);
 }
