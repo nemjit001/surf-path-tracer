@@ -1,4 +1,10 @@
 #define F32_FAR_AWAY	1e30
+#define F32_EPSILON		1e-5
+
+#define F32_PI			3.14159265358979323846264
+#define F32_INV_PI		0.31830988618379067153777
+#define F32_INV_2PI		0.15915494309189533576888
+#define F32_2PI			6.28318530717958647692528
 
 #define UNSET_IDX		~0
 
@@ -22,6 +28,11 @@ uint WangHash(uint seed)
 	seed = seed ^ (seed >> 15);
 
 	return seed;
+}
+
+uint initSeed(uint seed)
+{
+	return WangHash((seed + 1) * 0x11);
 }
 
 uint randomU32(inout uint seed)
@@ -61,4 +72,14 @@ vec3 diffuseReflect(inout uint seed, vec3 normal)
 	}
 
 	return normalize(direction);
+}
+
+bool rayDepthInBounds(Ray ray, float depth)
+{
+	return F32_EPSILON < depth && depth < ray.depth;
+}
+
+vec3 rayHitPosition(Ray ray)
+{
+	return ray.origin + ray.depth * ray.direction;
 }

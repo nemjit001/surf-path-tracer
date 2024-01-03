@@ -1,0 +1,129 @@
+#version 450
+#pragma shader_stage(compute)
+
+#include "wavefront_common.glsl"
+
+layout(set = 0, binding = 0) uniform CameraData
+{
+	vec3 position;
+	vec3 firstPixel;
+	vec3 uVector;
+	vec3 vVector;
+	vec2 resolution;
+} camera;
+
+layout(set = 0, binding = 1) uniform FrameState
+{
+	uint samplesPerFrame;
+	uint totalSamples;
+} frameState;
+
+layout(set = 0, binding = 2) buffer AccumulatorBuffer
+{
+	vec4 accumulator[];
+};
+
+layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+#define SPHERE_POSITION	vec3(0, 0, 0)
+#define SPHERE_RADIUS	1.0
+
+vec3 sphereNormal(vec3 hitPosition)
+{
+	return (hitPosition - SPHERE_POSITION) / SPHERE_RADIUS;
+}
+
+bool intersect(inout Ray ray)
+{
+	vec3 oc = ray.origin - SPHERE_POSITION;
+	float a = dot(ray.direction, ray.direction);
+	float halfB = dot(oc, ray.direction);
+	float c = dot(oc, oc) - (SPHERE_RADIUS * SPHERE_RADIUS);
+
+	float d = (halfB * halfB) - (a * c);
+	if (d < 0.0)
+		return false;
+
+	float depth = (-halfB - sqrt(d)) / a;
+	if (!rayDepthInBounds(ray, depth))
+	{
+		depth = (-halfB + sqrt(d)) / a;
+		if (!rayDepthInBounds(ray, depth))
+		{
+			return false;
+		}
+	}
+
+	ray.depth = depth;
+	return true;
+}
+
+void main()
+{
+	uint xPixel = gl_LocalInvocationID.x + (gl_WorkGroupID.x * gl_WorkGroupSize.x);
+	uint yPixel = gl_LocalInvocationID.y + (gl_WorkGroupID.y * gl_WorkGroupSize.y);
+	uint pixelIdx = xPixel + (yPixel * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
+	uint pixelSeed = initSeed(pixelIdx + frameState.totalSamples * 1799);
+
+	for (uint s = 0; s < frameState.samplesPerFrame; s++)
+	{
+		float xAA = xPixel + randomRange(pixelSeed, -0.5, 0.5);
+		float yAA = yPixel + randomRange(pixelSeed, -0.5, 0.5);
+
+		float u = xAA / camera.resolution.x;
+		float v = yAA / camera.resolution.y;
+
+		vec3 origin = camera.position;
+		vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
+		vec3 direction = normalize(planePos - origin);
+
+		vec3 energy = vec3(0);
+		vec3 transmission = vec3(1);
+		Ray ray = Ray(origin, direction, F32_FAR_AWAY, pixelIdx, UNSET_IDX, UNSET_IDX, vec2(0, 0));
+
+		while(true)
+		{
+			// TODO: actual scene intersect with BVH TLAS / BLAS
+			if (!intersect(ray))
+			{
+				energy += transmission * (0.5 * (vec3(1) + ray.direction));	// background is ray direction -> sample scene sky color in final setup
+				break;
+			}
+
+			// TODO: retrieve material from intersect data (for now red without emmitance
+			vec3 albedo = vec3(1, 0, 0);
+			vec3 emittance = vec3(0, 0, 0);
+
+			// TODO: retrieve normal & texCoords from intersect data
+			vec3 normal = sphereNormal(rayHitPosition(ray));
+			vec2 texCoords = vec2(0, 0);
+
+			if (dot(ray.direction, normal) > 0.0f)
+				normal *= -1;
+
+			// TODO: add randomized reflectivity & refractivity
+
+			// calculate BRDF and new direction
+			vec3 newDirection = diffuseReflect(pixelSeed, normal);
+			vec3 newOrigin = rayHitPosition(ray) + F32_EPSILON * newDirection;
+			ray = Ray(newOrigin, newDirection, F32_FAR_AWAY, pixelIdx, UNSET_IDX, UNSET_IDX, vec2(0, 0));
+
+			float cosTheta = dot(newDirection, normal);
+			vec3 brdf = albedo * F32_INV_PI;
+			float inversePdf = F32_2PI;
+
+			transmission *= emittance + inversePdf * cosTheta * brdf;
+		}
+
+		accumulator[pixelIdx] += vec4(energy, 1);
+	}
+
+	float invSamples = 1.0 / frameState.totalSamples;
+	imageStore(
+		outputImage,
+		ivec2(xPixel, yPixel),
+		accumulator[pixelIdx] * invSamples
+	);
+}

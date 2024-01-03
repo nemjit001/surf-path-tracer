@@ -617,9 +617,18 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         0, sizeof(CameraUBO)
     };
 
+    WriteDescriptorSet frameStateWriteSet = {};
+    frameStateWriteSet.set = 0;
+    frameStateWriteSet.binding = 1;
+    frameStateWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    frameStateWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_frameStateUBO.handle(),
+        0, sizeof(FrameStateUBO)
+    };
+
     WriteDescriptorSet accumulatorWriteSet = {};
     accumulatorWriteSet.set = 0;
-    accumulatorWriteSet.binding = 1;
+    accumulatorWriteSet.binding = 2;
     accumulatorWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     accumulatorWriteSet.bufferInfo = VkDescriptorBufferInfo{
         m_accumulatorSSBO.handle(),
@@ -628,7 +637,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
 
     WriteDescriptorSet outputImageWriteSet = {};
     outputImageWriteSet.set = 0;
-    outputImageWriteSet.binding = 2;
+    outputImageWriteSet.binding = 3;
     outputImageWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     outputImageWriteSet.imageInfo = VkDescriptorImageInfo{
         VK_NULL_HANDLE,
@@ -636,6 +645,14 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         VK_IMAGE_LAYOUT_GENERAL
     };
 
+#if GPU_MEGAKERNEL == 1
+    m_megakernelPipeline.updateDescriptorSets({
+        cameraWriteSet,
+        frameStateWriteSet,
+        accumulatorWriteSet,
+        outputImageWriteSet,
+    });
+#else
     WriteDescriptorSet rayGenWriteSet = {};
     rayGenWriteSet.set = 1;
     rayGenWriteSet.binding = 0;
@@ -684,6 +701,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         accumulatorWriteSet,
         outputImageWriteSet,
     });
+#endif
 
     // Create write sets for graphics pipeline pass
     WriteDescriptorSet frameImageSamplerSet = {};
@@ -725,7 +743,11 @@ WaveFrontRenderer::~WaveFrontRenderer()
 
 void WaveFrontRenderer::clearAccumulator()
 {
-    // TODO: clear accumulator buffer
+    vkDeviceWaitIdle(m_context.device);
+
+    // clear accumulator buffer
+    m_frameState.totalSamples = 0;
+    m_accumulatorSSBO.clear();
 }
 
 void WaveFrontRenderer::render(F32 deltaTime)
@@ -748,6 +770,14 @@ void WaveFrontRenderer::render(F32 deltaTime)
         Float2(m_camera.screenWidth, m_camera.screenHeight)
     };
     m_cameraUBO.copyToBuffer(sizeof(CameraUBO), &cameraUBO);
+
+    // Update frameStateUBO
+    m_frameState.samplesPerFrame = m_config.samplesPerFrame;
+    m_frameState.totalSamples += m_frameState.samplesPerFrame;
+    m_frameStateUBO.copyToBuffer(sizeof(FrameStateUBO), &m_frameState);
+
+    // Update frame instrumentation data
+    m_frameInstrumentationData.totalSamples = m_frameState.totalSamples;
 
     // Record present pass
     const Framebuffer& activeFramebuffer = m_framebuffers[swapImageIdx];
@@ -830,6 +860,19 @@ void WaveFrontRenderer::bakeWavefrontPass(VkCommandBuffer commandBuffer)
         1, &storageTransitionBarrier
     );
 
+#if GPU_MEGAKERNEL == 1
+    const std::vector<VkDescriptorSet>& megaKernelSets = m_megakernelPipeline.descriptorSets();
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        m_megakernelPipeline.bindPoint(),
+        m_wavefrontLayout.handle(),
+        0, static_cast<U32>(megaKernelSets.size()),
+        megaKernelSets.data(),
+        0, nullptr
+    );
+    vkCmdBindPipeline(commandBuffer, m_megakernelPipeline.bindPoint(), m_megakernelPipeline.handle());
+    vkCmdDispatch(commandBuffer, m_renderResolution.width / 16, m_renderResolution.height / 16, 1);
+#else
     // Setup all compute memory barriers
     VkBufferMemoryBarrier rayGenBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
     rayGenBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -945,6 +988,7 @@ void WaveFrontRenderer::bakeWavefrontPass(VkCommandBuffer commandBuffer)
         vkCmdBindPipeline(commandBuffer, m_wfFinalizePipeline.bindPoint(), m_wfFinalizePipeline.handle());
         vkCmdDispatch(commandBuffer, m_renderResolution.width / 16, m_renderResolution.height / 16, 1);
     }
+#endif
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }

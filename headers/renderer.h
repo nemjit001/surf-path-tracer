@@ -19,6 +19,7 @@
 #include "vk_layer/sampler.h"
 
 #define FRAMES_IN_FLIGHT    2
+#define GPU_MEGAKERNEL      1
 
 struct RendererConfig
 {
@@ -41,6 +42,12 @@ struct AccumulatorState
     AccumulatorState(U32 width, U32 height);
 
     ~AccumulatorState();
+};
+
+struct FrameStateUBO
+{
+    U32 samplesPerFrame     = 0;
+    U32 totalSamples        = 0;
 };
 
 struct FrameData
@@ -200,6 +207,7 @@ private:
 
     // Frame data
     FramebufferSize m_renderResolution;
+    FrameStateUBO m_frameState = FrameStateUBO{};
     FrameInstrumentationData m_frameInstrumentationData = FrameInstrumentationData{};
 
     // Frame management
@@ -217,20 +225,25 @@ private:
     // Default descriptor pool
     DescriptorPool m_descriptorPool = DescriptorPool(m_context.device);
 
+#if GPU_MEGAKERNEL == 1
+    Shader m_megakernel = Shader(m_context.device, ShaderType::Compute, "shaders/megakernel.comp.spv");
+#else
     // Wavefront kernels
     Shader m_rayGeneration  = Shader(m_context.device, ShaderType::Compute, "shaders/ray_generation.comp.spv");
     Shader m_rayExtend      = Shader(m_context.device, ShaderType::Compute, "shaders/ray_extend.comp.spv");
     Shader m_rayShade       = Shader(m_context.device, ShaderType::Compute, "shaders/ray_shade.comp.spv");
     Shader m_rayMiss        = Shader(m_context.device, ShaderType::Compute, "shaders/ray_miss.comp.spv");
     Shader m_wfFinalize     = Shader(m_context.device, ShaderType::Compute, "shaders/wavefront_finalize.comp.spv");
+#endif
 
     // Wavefront layout & pipelines
     PipelineLayout m_wavefrontLayout = PipelineLayout(m_context.device, std::vector{
-        DescriptorSetLayout{    // Per frame data uniforms (camera, accumulator, output image)
+        DescriptorSetLayout{    // Per frame data uniforms (camera, frame state, accumulator, output image)
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
-                DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
-                DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
+                DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
+                DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
             }
         },
         DescriptorSetLayout{    // Compute SSBOs (rays, hits, misses)
@@ -242,11 +255,15 @@ private:
         },
     });
 
+#if GPU_MEGAKERNEL == 1
+    ComputePipeline m_megakernelPipeline = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_megakernel);
+#else
     ComputePipeline m_rayGenPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
     ComputePipeline m_rayExtPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
     ComputePipeline m_rayShadePipeline      = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayShade);
     ComputePipeline m_rayMissPipeline       = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayMiss);
     ComputePipeline m_wfFinalizePipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_wfFinalize);
+#endif
 
     // Compute descriptors
     Buffer m_cameraUBO = Buffer(
@@ -257,13 +274,23 @@ private:
         VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     );
 
+    Buffer m_frameStateUBO = Buffer(
+        m_context.allocator, sizeof(FrameStateUBO),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    );
+
     Buffer m_accumulatorSSBO = Buffer(
         m_context.allocator, m_renderResolution.width * m_renderResolution.height * sizeof(Float4),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        0 /* Allocation create flags */
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     );
 
+#if GPU_MEGAKERNEL == 0
     const SizeType c_raySSBOSize = sizeof(U32) + m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
     Buffer m_rayGenSSBO = Buffer(
         m_context.allocator, c_raySSBOSize,
@@ -285,6 +312,7 @@ private:
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         0 /* Allocation create flags */
     );
+#endif
 
     // Present shaders
     Shader m_presentVert    = Shader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
