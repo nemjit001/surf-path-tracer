@@ -59,7 +59,7 @@ void main()
 				break;
 			}
 
-			// TODO: retrieve material from intersect data (for now red without emmitance
+			// TODO: retrieve material from intersect data (for now red without emmitance)
 			vec3 albedo = vec3(1, 0, 0);
 			vec3 emittance = vec3(0, 0, 0);
 

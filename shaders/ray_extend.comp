@@ -5,25 +5,35 @@
 
 layout(set = 1, binding = 0) buffer RayBuffer
 {
-	uint counter;
+	int counter;
 	Ray rays[];
 } rayBuffer;
 
 layout(set = 1, binding = 1) buffer HitRayBuffer
 {
-	uint counter;
-	Ray rayIndices[];
-} hitRayStack;
+	int counter;
+	Ray rays[];
+} hitBuffer;
 
 layout(set = 1, binding = 2) buffer MissRayBuffer
 {
-	uint counter;
-	Ray rayIndices[];
-} missRayStack;
+	int counter;
+	Ray rays[];
+} missBuffer;
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 void main()
 {
-	//
+	// Claim processing IDX
+	int idx = atomicAdd(rayBuffer.counter, -1) - 1;
+	if (idx < 0)
+	{
+		atomicExchange(rayBuffer.counter, 0); // reset counter to 0 -> nice for cleanup, no need to reset on host side
+		return; // invalid IDX requested
+	}
+
+	Ray ray = rayBuffer.rays[idx];
+	// Don't do anything yet (everything misses) -> check for hit or miss using sphere funcs
+	missBuffer.rays[atomicAdd(missBuffer.counter, 1)] = ray;
 }

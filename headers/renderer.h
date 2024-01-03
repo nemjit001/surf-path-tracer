@@ -54,7 +54,7 @@ struct FrameStateUBO
 /// wavefront rendering.
 struct RayGenUBO
 {
-    U32 count;
+    I32 count;
     GPURay rays[];
 };
 
@@ -70,7 +70,15 @@ struct FrameData
 struct WavefrontCompute
 {
     VkCommandPool pool;
+#if GPU_MEGAKERNEL == 1
     VkCommandBuffer commandBuffer;
+#else
+    // raygen, loop, finalize
+    union {
+        struct { VkCommandBuffer rayGenBuffer, waveBuffer, finalizeBuffer; };
+        VkCommandBuffer wavefrontBuffers[3];
+    };
+#endif
     VkFence computeReady;
     VkSemaphore computeFinished;
 };
@@ -206,9 +214,11 @@ private:
         VkCommandBuffer commandBuffer
     );
 #else
-    // bake raygen
-    // bake loop body
-    // bake finalize
+    void bakeRayGenPass(VkCommandBuffer commandBuffer);
+
+    void bakeWavePass(VkCommandBuffer commandBuffer);
+
+    void bakeFinalizePass(VkCommandBuffer commandBuffer);
 #endif
 
     void recordPresentPass(
@@ -308,7 +318,7 @@ private:
     );
 
 #if GPU_MEGAKERNEL == 0
-    const SizeType c_raySSBOSize = sizeof(U32) + m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
+    const SizeType c_raySSBOSize = sizeof(I32) + m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
     Buffer m_raySSBO = Buffer(
         m_context.allocator, c_raySSBOSize,
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,

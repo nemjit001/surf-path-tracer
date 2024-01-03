@@ -14,7 +14,7 @@ layout(set = 0, binding = 0) uniform CameraData
 
 layout(set = 1, binding = 0) buffer RayBuffer
 {
-	uint counter;
+	int counter;
 	Ray rays[];
 } rayBuffer;
 

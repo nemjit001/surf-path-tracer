@@ -29,6 +29,10 @@ public:
 
     void clear();
 
+    void persistentMap(void** ppData);
+
+    void unmap();
+
     VkBuffer handle() const;
 
 private:

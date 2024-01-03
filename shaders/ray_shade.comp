@@ -3,21 +3,46 @@
 
 #include "wavefront_common.glsl"
 
-layout(set = 1, binding = 0) buffer RayBuffer
-{
-	uint counter;
-	Ray rays[];
-} rayStack;
-
 layout(set = 1, binding = 1) buffer HitRayBuffer
 {
-	uint counter;
+	int counter;
 	Ray rays[];
-} hitRayStack;
+} rayBuffer;
 
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 void main()
 {
-	// TODO: process ray hits -> shade pixel idx accordingly -> store new rays in ray buffer to be processed by extend again
+	uint seed = initSeed(gl_LocalInvocationIndex * 1799);
+
+	// Claim processing IDX
+	int idx = atomicAdd(rayBuffer.counter, -1) - 1;
+	if (idx < 0)
+	{
+		atomicExchange(rayBuffer.counter, 0); // reset counter to 0 -> nice for cleanup, no need to reset on host side
+		return; // invalid IDX requested
+	}
+
+	Ray ray = rayBuffer.rays[idx];
+
+	// TODO: retrieve material from intersect data (for now red without emmitance)
+	vec3 albedo = vec3(1, 0, 0);
+	vec3 emittance = vec3(0, 0, 0);
+
+	// TODO: retrieve normal & texCoords from intersect data
+	vec3 normal = sphereNormal(rayHitPosition(ray));
+	vec2 texCoords = vec2(0, 0);
+
+	if (dot(ray.direction, normal) > 0.0f)
+		normal *= -1;
+
+	vec3 newDirection = diffuseReflect(seed, normal);
+	vec3 newOrigin = rayHitPosition(ray) + F32_EPSILON * newDirection;
+	Ray newRay = Ray(newOrigin, newDirection, F32_FAR_AWAY, ray.pixelIdx, UNSET_IDX, UNSET_IDX, vec2(0, 0));
+
+	float cosTheta = dot(newDirection, normal);
+	vec3 brdf = albedo * F32_INV_PI;
+	float inversePdf = F32_2PI;
+
+	inversePdf * cosTheta * brdf;	// *= transmission in transmission buffer
 }

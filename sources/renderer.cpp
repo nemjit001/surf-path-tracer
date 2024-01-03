@@ -586,11 +586,19 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
     wfPoolCreateInfo.queueFamilyIndex = m_context.queues.computeQueue.familyIndex;
     VK_CHECK(vkCreateCommandPool(m_context.device, &wfPoolCreateInfo, nullptr, &m_wavefrontCompute.pool));
 
+#if GPU_MEGAKERNEL == 1
     VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     computeBufferAllocateInfo.commandPool = m_wavefrontCompute.pool;
     computeBufferAllocateInfo.commandBufferCount = 1;
     VK_CHECK(vkAllocateCommandBuffers(m_context.device, &computeBufferAllocateInfo, &m_wavefrontCompute.commandBuffer));
+#else
+    VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    computeBufferAllocateInfo.commandPool = m_wavefrontCompute.pool;
+    computeBufferAllocateInfo.commandBufferCount = 3;
+    VK_CHECK(vkAllocateCommandBuffers(m_context.device, &computeBufferAllocateInfo, m_wavefrontCompute.wavefrontBuffers));
+#endif
 
     VkFenceCreateInfo computeReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     computeReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -692,10 +700,13 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         rayMissWriteSet,
     });
 
+    m_rayShadePipeline.updateDescriptorSets({
+        rayHitWriteSet,
+    });
+
     m_rayMissPipeline.updateDescriptorSets({
-        raySSBOWriteSet,
-        rayMissWriteSet,
         accumulatorWriteSet,
+        rayMissWriteSet,
     });
 
     m_wfFinalizePipeline.updateDescriptorSets({
@@ -724,7 +735,9 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
 #if GPU_MEGAKERNEL == 1
     bakeMegakernelPass(m_wavefrontCompute.commandBuffer);
 #else
-    // TODO: bake generate, extend, shade, connect passes
+    bakeRayGenPass(m_wavefrontCompute.rayGenBuffer);
+    bakeWavePass(m_wavefrontCompute.waveBuffer);
+    bakeFinalizePass(m_wavefrontCompute.finalizeBuffer);
 #endif
 }
 
@@ -787,13 +800,12 @@ void WaveFrontRenderer::render(F32 deltaTime)
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* reset flags */ 0));
     recordPresentPass(activeFrame.commandBuffer, activeFramebuffer);
 
-
-#ifdef GPU_MEGAKERNEL == 1
-    // Submit baked megakernel pass
     VkPipelineStageFlags computeWaitStages[] = {
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT    // Wait until compute passes have completed
     };
 
+#if GPU_MEGAKERNEL == 1
+    // Submit baked megakernel pass
     VkSubmitInfo computeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     computeSubmit.commandBufferCount = 1;
     computeSubmit.pCommandBuffers = &m_wavefrontCompute.commandBuffer;
@@ -804,13 +816,48 @@ void WaveFrontRenderer::render(F32 deltaTime)
     computeSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
     VK_CHECK(vkQueueSubmit(m_context.queues.computeQueue.handle, 1, &computeSubmit, m_wavefrontCompute.computeReady));
 #else
-    // TODO: submit baked wavefront passes
-    // - Map ray gpu buffer memory
-    // - submit raygen
-    // - while ray count != 0
-    // -    submit extend, shade, connect
-    // - submit finalize
-    // - unmap ray GPU buffer memory
+    RayGenUBO* rayGenState = nullptr;
+    m_raySSBO.persistentMap(reinterpret_cast<void**>(&rayGenState));
+    assert(rayGenState != nullptr);
+
+    VkSubmitInfo rayGenSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    rayGenSubmit.commandBufferCount = 1;
+    rayGenSubmit.pCommandBuffers = &m_wavefrontCompute.rayGenBuffer;
+    rayGenSubmit.waitSemaphoreCount = 1;
+    rayGenSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
+    rayGenSubmit.pWaitDstStageMask = computeWaitStages;
+    rayGenSubmit.signalSemaphoreCount = 1;
+    rayGenSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
+    VK_CHECK(vkQueueSubmit(m_context.queues.computeQueue.handle, 1, &rayGenSubmit, m_wavefrontCompute.computeReady));
+
+    VK_CHECK(vkWaitForFences(m_context.device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context.device, 1, &m_wavefrontCompute.computeReady));
+
+    while (rayGenState->count > 0)
+    {
+        VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+        waveSubmit.commandBufferCount = 1;
+        waveSubmit.pCommandBuffers = &m_wavefrontCompute.waveBuffer;
+        waveSubmit.waitSemaphoreCount = 1;
+        waveSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
+        waveSubmit.pWaitDstStageMask = computeWaitStages;
+        waveSubmit.signalSemaphoreCount = 1;
+        waveSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
+        VK_CHECK(vkQueueSubmit(m_context.queues.computeQueue.handle, 1, &waveSubmit, m_wavefrontCompute.computeReady));
+        VK_CHECK(vkWaitForFences(m_context.device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
+        VK_CHECK(vkResetFences(m_context.device, 1, &m_wavefrontCompute.computeReady));
+    }
+
+    VkSubmitInfo finalizeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    finalizeSubmit.commandBufferCount = 1;
+    finalizeSubmit.pCommandBuffers = &m_wavefrontCompute.finalizeBuffer;
+    finalizeSubmit.waitSemaphoreCount = 1;
+    finalizeSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
+    finalizeSubmit.pWaitDstStageMask = computeWaitStages;
+    finalizeSubmit.signalSemaphoreCount = 1;
+    finalizeSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
+    VK_CHECK(vkQueueSubmit(m_context.queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
+    m_raySSBO.unmap();
 #endif
 
     VkPipelineStageFlags gfxWaitStages[] = {
@@ -840,6 +887,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
 }
 
 #if GPU_MEGAKERNEL == 1
+
 void WaveFrontRenderer::bakeMegakernelPass(VkCommandBuffer commandBuffer)
 {
     assert(commandBuffer != VK_NULL_HANDLE);
@@ -889,6 +937,170 @@ void WaveFrontRenderer::bakeMegakernelPass(VkCommandBuffer commandBuffer)
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
+
+#else
+
+void WaveFrontRenderer::bakeRayGenPass(VkCommandBuffer commandBuffer)
+{
+    assert(commandBuffer != VK_NULL_HANDLE);
+
+    VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    cmdBeginInfo.flags = 0;
+    cmdBeginInfo.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
+
+    // Transition storage image to write layout
+    VkImageMemoryBarrier storageTransitionBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    storageTransitionBarrier.srcAccessMask = 0;
+    storageTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    storageTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    storageTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    storageTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    storageTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    storageTransitionBarrier.image = m_frameImage.handle();
+    storageTransitionBarrier.subresourceRange = VkImageSubresourceRange{
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0, 1,
+        0, 1
+    };
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &storageTransitionBarrier
+    );
+
+    const std::vector<VkDescriptorSet>& rayGenSets = m_rayGenPipeline.descriptorSets();
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        m_rayGenPipeline.bindPoint(),
+        m_wavefrontLayout.handle(),
+        0, static_cast<U32>(rayGenSets.size()),
+        rayGenSets.data(),
+        0, nullptr
+    );
+    vkCmdBindPipeline(commandBuffer, m_rayGenPipeline.bindPoint(), m_rayGenPipeline.handle());
+    vkCmdDispatch(commandBuffer, m_renderResolution.width / 16, m_renderResolution.height / 16, 1);
+
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
+}
+
+void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
+{
+    assert(commandBuffer != VK_NULL_HANDLE);
+
+    VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    cmdBeginInfo.flags = 0;
+    cmdBeginInfo.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
+
+    // Extend kernel dispatch
+    {
+        const std::vector<VkDescriptorSet>& sets = m_rayExtPipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_rayExtPipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(sets.size()),
+            sets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_rayExtPipeline.bindPoint(), m_rayExtPipeline.handle());
+        vkCmdDispatch(commandBuffer, 32, 32, 1);
+    }
+
+    VkBufferMemoryBarrier rayHitBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+    rayHitBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    rayHitBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    rayHitBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayHitBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayHitBarrier.buffer = m_rayHitSSBO.handle();
+    rayHitBarrier.offset = 0;
+    rayHitBarrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier rayMissBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+    rayMissBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    rayMissBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    rayMissBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayMissBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayMissBarrier.buffer = m_rayMissSSBO.handle();
+    rayMissBarrier.offset = 0;
+    rayMissBarrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier barriers[] = { rayHitBarrier, rayMissBarrier };
+
+    vkCmdPipelineBarrier(
+        commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+        0, nullptr, 2, barriers, 0, nullptr
+    );
+
+    // shade kernel dispatch
+    {
+        const std::vector<VkDescriptorSet>& sets = m_rayShadePipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_rayShadePipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(sets.size()),
+            sets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_rayShadePipeline.bindPoint(), m_rayShadePipeline.handle());
+        vkCmdDispatch(commandBuffer, 32, 32, 1);
+    }
+
+    // miss kernel dispatch
+    {
+        const std::vector<VkDescriptorSet>& sets = m_rayMissPipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_rayMissPipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(sets.size()),
+            sets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_rayMissPipeline.bindPoint(), m_rayMissPipeline.handle());
+        vkCmdDispatch(commandBuffer, 32, 32, 1);
+    }
+
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
+}
+
+void WaveFrontRenderer::bakeFinalizePass(VkCommandBuffer commandBuffer)
+{
+    assert(commandBuffer != VK_NULL_HANDLE);
+
+    VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    cmdBeginInfo.flags = 0;
+    cmdBeginInfo.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
+
+    // finalize kernel dispatch
+    {
+        const std::vector<VkDescriptorSet>& sets = m_wfFinalizePipeline.descriptorSets();
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            m_wfFinalizePipeline.bindPoint(),
+            m_wavefrontLayout.handle(),
+            0, static_cast<U32>(sets.size()),
+            sets.data(),
+            0, nullptr
+        );
+        vkCmdBindPipeline(commandBuffer, m_wfFinalizePipeline.bindPoint(), m_wfFinalizePipeline.handle());
+        vkCmdDispatch(commandBuffer, m_renderResolution.width, m_renderResolution.height, 1);
+    }
+
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
+}
+
 #endif
 
 void WaveFrontRenderer::recordPresentPass(VkCommandBuffer commandBuffer, const Framebuffer& framebuffer)

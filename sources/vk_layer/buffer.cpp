@@ -105,6 +105,19 @@ void Buffer::clear()
     vmaUnmapMemory(m_allocator, m_allocation);
 }
 
+void Buffer::persistentMap(void** ppData)
+{
+    void* pBufferData = nullptr;
+    vmaMapMemory(m_allocator, m_allocation, &pBufferData);
+    assert(pBufferData != nullptr);
+    *ppData = pBufferData;
+}
+
+void Buffer::unmap()
+{
+    vmaUnmapMemory(m_allocator, m_allocation);
+}
+
 VkBuffer Buffer::handle() const
 {
     return m_buffer;
