@@ -1,6 +1,7 @@
 #version 450
 #pragma shader_stage(compute)
 
+#include "bvh.glsl"
 #include "wavefront_common.glsl"
 
 layout(set = 0, binding = 0) uniform CameraData
@@ -25,7 +26,36 @@ layout(set = 0, binding = 2) buffer AccumulatorBuffer
 
 layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
+layout(set = 2, binding = 0) uniform SceneData
+{
+	SceneBackground background;
+} sceneData;
+
+layout(set = 2, binding = 1) buffer TriangleBuffer
+{
+	Triangle triangles[];
+} tris;
+
+layout(set = 2, binding = 2) buffer BLASBuffer
+{
+	BvhNode nodes[];
+} blas;
+
+layout(set = 2, binding = 3) buffer InstanceBuffer
+{
+	Instance instances[];
+} instances;
+
+layout(set = 2, binding = 4) buffer TLASBuffer
+{
+	uint nodesUsed;
+	BvhNode nodes[];
+} tlas;
+
 layout(local_size_x = 32, local_size_y = 32) in;
+
+const vec3 albedo		= vec3(1, 0, 0);
+const vec3 emittance	= vec3(0, 0, 0);
 
 void main()
 {
@@ -62,26 +92,22 @@ void main()
 			// TODO: actual scene intersect with BVH TLAS / BLAS
 			if (!sphereIntersect(ray))
 			{
-				energy = ray.transmission * (0.5 * (vec3(1) + ray.direction));	// background is ray direction -> sample scene sky color in final setup
+				energy = ray.transmission * sampleSkyColor(ray, sceneData.background);
 				break;
 			}
 
-			// TODO: retrieve material from intersect data (for now red without emmitance)
-			vec3 albedo = vec3(1, 0, 0);
-			vec3 emittance = vec3(0, 0, 0);
-
-			// TODO: retrieve normal & texCoords from intersect data
-			vec3 normal = sphereNormal(rayHitPosition(ray));
+			vec3 I = rayHitPosition(ray);
+			vec3 N = sphereNormal(rayHitPosition(ray));
 			vec2 texCoords = vec2(0, 0);
 
-			if (dot(ray.direction, normal) > 0.0f)
-				normal *= -1;
+			if (dot(ray.direction, N) > 0.0f)
+				N *= -1;
 
 			// TODO: add randomized reflectivity & refractivity
 
 			// calculate BRDF and new direction
-			vec3 newDirection = diffuseReflect(pixelSeed, normal);
-			vec3 newOrigin = rayHitPosition(ray) + F32_EPSILON * newDirection;
+			vec3 newDirection = diffuseReflect(pixelSeed, N);
+			vec3 newOrigin = I + F32_EPSILON * newDirection;
 			ray = Ray(
 				newOrigin,
 				newDirection,
@@ -92,7 +118,7 @@ void main()
 				vec2(0, 0)
 			);
 
-			float cosTheta = dot(newDirection, normal);
+			float cosTheta = dot(newDirection, N);
 			vec3 brdf = albedo * F32_INV_PI;
 			float inversePdf = F32_2PI;
 

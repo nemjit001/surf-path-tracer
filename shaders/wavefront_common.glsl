@@ -1,3 +1,6 @@
+#ifndef GLSL_WF_COMMON
+#define GLSL_WF_COMMON
+
 #define F32_FAR_AWAY	1e30
 #define F32_EPSILON		1e-5
 
@@ -7,6 +10,18 @@
 #define F32_2PI			6.28318530717958647692528
 
 #define UNSET_IDX		~0
+
+// Background type enum vals in scene UBO
+#define SCENE_BG_TYPE_SOLID		0
+#define SCENE_BG_TYPE_GRADIENT	1
+
+struct SceneBackground
+{
+	uint type;
+	vec3 solidColor;
+	vec3 gradientA;
+	vec3 gradientB;
+};
 
 struct Ray
 {
@@ -74,6 +89,20 @@ vec3 diffuseReflect(inout uint seed, vec3 normal)
 	return normalize(direction);
 }
 
+vec3 sampleSkyColor(Ray ray, SceneBackground background)
+{
+	if (background.type == SCENE_BG_TYPE_SOLID)
+		return background.solidColor;
+
+	if (background.type == SCENE_BG_TYPE_GRADIENT)
+	{
+		float alpha = 0.5 * (1.0 + ray.direction.y);
+		return alpha * background.gradientB + (1.0 - alpha) * background.gradientA;
+	}
+
+	return vec3(0);	// Default to black
+}
+
 bool rayDepthInBounds(Ray ray, float depth)
 {
 	return F32_EPSILON < depth && depth < ray.depth;
@@ -117,3 +146,5 @@ bool sphereIntersect(inout Ray ray)
 	ray.depth = depth;
 	return true;
 }
+
+#endif

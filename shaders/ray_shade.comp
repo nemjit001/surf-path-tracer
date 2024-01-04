@@ -18,7 +18,7 @@ layout(set = 1, binding = 0) buffer RayBuffer
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
-const vec3 SKY_COLOR_A	= vec3(1);
+const vec3 SKY_COLOR_A	= vec3(1.0, 1.0, 1.0);
 const vec3 SKY_COLOR_B	= vec3(0.2, 0.7, 0.9);
 
 const vec3 albedo		= vec3(1, 0, 0);

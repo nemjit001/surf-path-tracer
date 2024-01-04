@@ -28,6 +28,8 @@ public:
 
 	inline const Instance& hitInstance(SizeType instanceIndex);
 
+	inline const SceneBackground& backgroundSettings() const;
+
 	RgbColor sampleBackground(const Ray& ray) const;
 
 	void update(F32 deltaTime);
@@ -45,4 +47,9 @@ bool Scene::intersect(Ray& ray) const
 const Instance& Scene::hitInstance(SizeType instanceIndex)
 {
 	return m_sceneTlas.instance(instanceIndex);
+}
+
+const SceneBackground& Scene::backgroundSettings() const
+{
+	return m_background;
 }

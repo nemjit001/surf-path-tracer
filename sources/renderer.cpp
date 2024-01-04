@@ -615,6 +615,9 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 
+    // Upload scene background data -> One off action
+    m_sceneDataUBO.copyToBuffer(sizeof(SceneBackground), &m_scene.backgroundSettings());
+
     // Create writesets for all compute descriptors
     WriteDescriptorSet cameraWriteSet = {};
     cameraWriteSet.set = 0;
@@ -653,12 +656,22 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
         VK_IMAGE_LAYOUT_GENERAL
     };
 
+    WriteDescriptorSet sceneDataWriteSet = {};
+    sceneDataWriteSet.set = 2;
+    sceneDataWriteSet.binding = 0;
+    sceneDataWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    sceneDataWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_sceneDataUBO.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
 #if GPU_MEGAKERNEL == 1
     m_megakernelPipeline.updateDescriptorSets({
         cameraWriteSet,
         frameStateWriteSet,
         accumulatorWriteSet,
         outputImageWriteSet,
+        sceneDataWriteSet,
     });
 #else
     WriteDescriptorSet raySSBOWriteSet = {};
@@ -910,7 +923,7 @@ void WaveFrontRenderer::bakeMegakernelPass(VkCommandBuffer commandBuffer)
         0, nullptr
     );
     vkCmdBindPipeline(commandBuffer, m_megakernelPipeline.bindPoint(), m_megakernelPipeline.handle());
-    vkCmdDispatch(commandBuffer, m_renderResolution.width / 32, m_renderResolution.height / 32, 1);
+    vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32), (m_renderResolution.height / 32) + 1, 1);
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
