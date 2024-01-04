@@ -12,34 +12,56 @@ layout(set = 0, binding = 0) uniform CameraData
 	vec2 resolution;
 } camera;
 
-layout(set = 1, binding = 0) buffer RayBuffer
+layout(set = 0, binding = 1) uniform FrameState
 {
-	int counter;
+	uint samplesPerFrame;
+	uint totalSamples;
+} frameState;
+
+layout(set = 1, binding = 0) coherent buffer RayBuffer
+{
+	int count;
 	Ray rays[];
 } rayBuffer;
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-void main()
+vec3 generateRayDirection(float xPixel, float yPixel)
 {
-	uint xPixel = gl_LocalInvocationID.x + (gl_WorkGroupID.x * gl_WorkGroupSize.x);
-	uint yPixel = gl_LocalInvocationID.y + (gl_WorkGroupID.y * gl_WorkGroupSize.y);
-	uint pixelIdx = xPixel + (yPixel * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
-
 	float u = xPixel / camera.resolution.x;
 	float v = yPixel / camera.resolution.y;
 
-	vec3 origin = camera.position;
 	vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
-	vec3 direction = normalize(planePos - origin);
+	return normalize(planePos - camera.position);
+}
 
-	rayBuffer.rays[atomicAdd(rayBuffer.counter, 1)] = Ray(
+void main()
+{
+	uint seed = initSeed((gl_GlobalInvocationID.x + gl_GlobalInvocationID.y + frameState.totalSamples) * 1799);
+
+	uvec3 pixelBaseOffset = gl_WorkGroupID * gl_WorkGroupSize;
+	uvec3 totalInvocations = gl_NumWorkGroups * gl_WorkGroupSize;
+
+	uint xPixel = gl_LocalInvocationID.x + pixelBaseOffset.x;
+	uint yPixel = gl_LocalInvocationID.y + pixelBaseOffset.y;
+	uint pixelIdx = xPixel + (yPixel * totalInvocations.x);
+
+	float aaSampleX = xPixel + randomRange(seed, -0.5, 0.5);
+	float aaSampleY = yPixel + randomRange(seed, -0.5, 0.5);
+
+	vec3 origin = camera.position;
+	vec3 direction = generateRayDirection(aaSampleX, aaSampleY);
+
+	Ray ray = Ray(
 		origin,
 		direction,
 		F32_FAR_AWAY,
+		vec3(1),
 		pixelIdx,
-		UNSET_IDX,
 		UNSET_IDX,
 		vec2(0, 0)
 	);
+
+	rayBuffer.rays[pixelIdx] = ray;
+	rayBuffer.count = 0;// int(totalInvocations.x * totalInvocations.y * totalInvocations.z);
 }

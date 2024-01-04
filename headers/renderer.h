@@ -259,7 +259,6 @@ private:
     Shader m_rayGeneration  = Shader(m_context.device, ShaderType::Compute, "shaders/ray_generation.comp.spv");
     Shader m_rayExtend      = Shader(m_context.device, ShaderType::Compute, "shaders/ray_extend.comp.spv");
     Shader m_rayShade       = Shader(m_context.device, ShaderType::Compute, "shaders/ray_shade.comp.spv");
-    Shader m_rayMiss        = Shader(m_context.device, ShaderType::Compute, "shaders/ray_miss.comp.spv");
     Shader m_wfFinalize     = Shader(m_context.device, ShaderType::Compute, "shaders/wavefront_finalize.comp.spv");
 #endif
 
@@ -273,11 +272,9 @@ private:
                 DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
             }
         },
-        DescriptorSetLayout{    // Compute SSBOs (rays, hits, misses)
+        DescriptorSetLayout{    // Compute SSBOs (rays)
             std::vector{
                  DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
-                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
-                 DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
     });
@@ -288,7 +285,6 @@ private:
     ComputePipeline m_rayGenPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
     ComputePipeline m_rayExtPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
     ComputePipeline m_rayShadePipeline      = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayShade);
-    ComputePipeline m_rayMissPipeline       = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayMiss);
     ComputePipeline m_wfFinalizePipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_wfFinalize);
 #endif
 
@@ -317,7 +313,7 @@ private:
         VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     );
 
-#if GPU_MEGAKERNEL == 0
+#if GPU_MEGAKERNEL != 1
     const SizeType c_raySSBOSize = sizeof(I32) + m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
     Buffer m_raySSBO = Buffer(
         m_context.allocator, c_raySSBOSize,
@@ -325,20 +321,6 @@ private:
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-    );
-
-    Buffer m_rayHitSSBO = Buffer(
-        m_context.allocator, c_raySSBOSize,
-        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        0 /* Allocation create flags */
-    );
-
-    Buffer m_rayMissSSBO = Buffer(
-        m_context.allocator, c_raySSBOSize,
-        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        0 /* Allocation create flags */
     );
 #endif
 

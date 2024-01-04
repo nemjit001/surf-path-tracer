@@ -25,7 +25,7 @@ layout(set = 0, binding = 2) buffer AccumulatorBuffer
 
 layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 void main()
 {
@@ -46,16 +46,23 @@ void main()
 		vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
 		vec3 direction = normalize(planePos - origin);
 
-		vec3 energy = vec3(0);
-		vec3 transmission = vec3(1);
-		Ray ray = Ray(origin, direction, F32_FAR_AWAY, pixelIdx, UNSET_IDX, UNSET_IDX, vec2(0, 0));
+		Ray ray = Ray(
+			origin,
+			direction,
+			F32_FAR_AWAY,
+			vec3(1),
+			pixelIdx,
+			UNSET_IDX,
+			vec2(0, 0)
+		);
 
+		vec3 energy = vec3(0);
 		while(true)
 		{
 			// TODO: actual scene intersect with BVH TLAS / BLAS
 			if (!sphereIntersect(ray))
 			{
-				energy += transmission * (0.5 * (vec3(1) + ray.direction));	// background is ray direction -> sample scene sky color in final setup
+				energy = ray.transmission * (0.5 * (vec3(1) + ray.direction));	// background is ray direction -> sample scene sky color in final setup
 				break;
 			}
 
@@ -75,13 +82,21 @@ void main()
 			// calculate BRDF and new direction
 			vec3 newDirection = diffuseReflect(pixelSeed, normal);
 			vec3 newOrigin = rayHitPosition(ray) + F32_EPSILON * newDirection;
-			ray = Ray(newOrigin, newDirection, F32_FAR_AWAY, pixelIdx, UNSET_IDX, UNSET_IDX, vec2(0, 0));
+			ray = Ray(
+				newOrigin,
+				newDirection,
+				F32_FAR_AWAY,
+				ray.transmission,
+				pixelIdx,
+				UNSET_IDX,
+				vec2(0, 0)
+			);
 
 			float cosTheta = dot(newDirection, normal);
 			vec3 brdf = albedo * F32_INV_PI;
 			float inversePdf = F32_2PI;
 
-			transmission *= emittance + inversePdf * cosTheta * brdf;
+			ray.transmission *= emittance + inversePdf * cosTheta * brdf;
 		}
 
 		accumulator[pixelIdx] += vec4(energy, 1);

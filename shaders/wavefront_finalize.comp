@@ -14,22 +14,20 @@ layout(set = 0, binding = 2) buffer AccumulatorBuffer
 
 layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 
 void main()
 {
-	uint xPixel = gl_LocalInvocationID.x + (gl_WorkGroupID.x * gl_WorkGroupSize.x);
-	uint yPixel = gl_LocalInvocationID.y + (gl_WorkGroupID.y * gl_WorkGroupSize.y);
-	uint pixelIdx = xPixel + (yPixel * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
-
-	ivec2 imgSize = imageSize(outputImage);
-	uint xLoc = pixelIdx % imgSize.x;
-	uint yLoc = pixelIdx / imgSize.x;
+	uvec3 pixelOffset = gl_WorkGroupID * gl_WorkGroupSize;
+	uvec3 totalInvocations = gl_NumWorkGroups * gl_WorkGroupSize;
+	uint xPixel = gl_LocalInvocationID.x + pixelOffset.x;
+	uint yPixel = gl_LocalInvocationID.y + pixelOffset.y;
+	uint pixelIdx = xPixel + (yPixel * totalInvocations.x);
 
 	float invSamples = 1.0 / frameState.totalSamples;
 	imageStore(
 		outputImage,
-		ivec2(xLoc, yLoc),
+		ivec2(xPixel, yPixel),
 		accumulator[pixelIdx] * invSamples
 	);
 }

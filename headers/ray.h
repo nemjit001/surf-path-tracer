@@ -18,8 +18,8 @@ struct GPURay
 	Float3 origin;
 	Float3 direction;
 	F32 depth;
+	Float3 transmission;
 	U32 pixelIdx;
-	U32 instanceIdx;
 	U32 primitiveIdx;
 	Float2 hitCoords;
 };
