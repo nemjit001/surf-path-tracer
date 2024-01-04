@@ -56,7 +56,7 @@ bool triangleIntersect(Triangle tri, inout Ray ray)
 		return false;
 
 	float depth = f * dot(e2, q);
-	if (!rayDepthInBounds(ray, depth))
+	if (!depthInBounds(depth, ray.depth))
 		return false;
 
 	ray.depth = depth;

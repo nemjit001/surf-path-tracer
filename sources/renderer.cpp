@@ -378,23 +378,26 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 ray.inMedium = !wasInMedium;
 
                 if (randomF32(seed) > Fresnel)
+                {
                     transmission *= material->albedo * rrScale * mediumScale;
+                    continue;
+                }
             }
-            else
-            {
-                Float3 newDirection = reflect(ray.direction, normal);
-                Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
-                bool wasInMedium = ray.inMedium;
-                ray = Ray(newOrigin, newDirection);
-                ray.inMedium = wasInMedium;
-                transmission *= material->albedo * rrScale * mediumScale;
-            }
+
+            Float3 newDirection = reflect(ray.direction, normal);
+            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            bool wasInMedium = ray.inMedium;
+            ray = Ray(newOrigin, newDirection);
+            ray.inMedium = wasInMedium;
+            transmission *= material->albedo * rrScale * mediumScale;
         }
         else
         {
             Float3 newDirection = randomOnHemisphereCosineWeighted(seed, normal);
             Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            bool wasInMedium = ray.inMedium;
             ray = Ray(newOrigin, newDirection);
+            ray.inMedium = wasInMedium;
 
             F32 cosTheta = newDirection.dot(normal);
             F32 invCosTheta = 1.0f / cosTheta;

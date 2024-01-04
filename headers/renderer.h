@@ -164,7 +164,7 @@ private:
     Image m_frameImage = Image(
         m_context.device,
         m_context.allocator,
-        VkFormat::VK_FORMAT_R8G8B8A8_SRGB,                      // Standard RGBA format
+        VkFormat::VK_FORMAT_R8G8B8A8_UNORM,                     // Standard RGBA format
         m_resultBuffer.width, m_resultBuffer.height,
         VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
         | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture
@@ -365,7 +365,7 @@ private:
     Image m_frameImage = Image(
         m_context.device,
         m_context.allocator,
-        VkFormat::VK_FORMAT_R8G8B8A8_SNORM,                     // Standard RGBA format (Scaled normalized)
+        VkFormat::VK_FORMAT_R8G8B8A8_UNORM,                     // Standard RGBA format (Scaled normalized)
         m_renderResolution.width, m_renderResolution.height,
         VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT        // Used as storage for wavefront compute shaders
         | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT      // Used in present shader as sampled screen texture

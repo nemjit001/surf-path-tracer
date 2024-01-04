@@ -52,15 +52,7 @@ void main()
 	vec3 origin = camera.position;
 	vec3 direction = generateRayDirection(aaSampleX, aaSampleY);
 
-	Ray ray = Ray(
-		origin,
-		direction,
-		F32_FAR_AWAY,
-		vec3(1),
-		pixelIdx,
-		UNSET_IDX,
-		vec2(0, 0)
-	);
+	Ray ray = newRay(origin, direction);
 
 	rayBuffer.rays[pixelIdx] = ray;
 	rayBuffer.count = 0;// int(totalInvocations.x * totalInvocations.y * totalInvocations.z);

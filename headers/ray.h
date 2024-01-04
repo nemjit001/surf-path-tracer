@@ -18,6 +18,7 @@ struct GPURay
 	Float3 origin;
 	Float3 direction;
 	F32 depth;
+	bool inMedium;
 	Float3 transmission;
 	U32 pixelIdx;
 	U32 primitiveIdx;

@@ -76,53 +76,110 @@ void main()
 		vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
 		vec3 direction = normalize(planePos - origin);
 
-		Ray ray = Ray(
-			origin,
-			direction,
-			F32_FAR_AWAY,
-			vec3(1),
-			pixelIdx,
-			UNSET_IDX,
-			vec2(0, 0)
-		);
+		Ray activeRay = newRay(origin, direction);
 
 		vec3 energy = vec3(0);
+		vec3 transmission = vec3(1);
 		while(true)
 		{
 			// TODO: actual scene intersect with BVH TLAS / BLAS
-			if (!sphereIntersect(ray))
+			if (!sceneIntersect(activeRay))
 			{
-				energy = ray.transmission * sampleSkyColor(ray, sceneData.background);
+				energy += transmission * sampleSkyColor(activeRay, sceneData.background);
 				break;
 			}
 
-			vec3 I = rayHitPosition(ray);
-			vec3 N = sphereNormal(rayHitPosition(ray));
+			vec3 I = rayHitPosition(activeRay);
+			vec3 N = sceneNormal(activeRay);
 			vec2 texCoords = vec2(0, 0);
-
-			if (dot(ray.direction, N) > 0.0f)
-				N *= -1;
-
-			// TODO: add randomized reflectivity & refractivity
-
-			// calculate BRDF and new direction
-			vec3 newDirection = diffuseReflect(pixelSeed, N);
-			vec3 newOrigin = I + F32_EPSILON * newDirection;
-			ray = Ray(
-				newOrigin,
-				newDirection,
-				F32_FAR_AWAY,
-				ray.transmission,
-				pixelIdx,
-				UNSET_IDX,
-				vec2(0, 0)
+			Material material = Material(
+				vec3(0, 0, 0), 0.0,		// Emission color & strength
+				vec3(0.2, 0.2, 0.2),	// Albedo
+				vec3(0),				// Absorption
+				0.0, 0.0,				// Reflectivity & Refractivity
+				1.05					// IOR
 			);
 
-			float cosTheta = dot(newDirection, N);
-			vec3 brdf = albedo * F32_INV_PI;
-			float inversePdf = F32_2PI;
+			if (materialIsLight(material))
+			{
+				energy += transmission * materialEmittance(material);
+				break;
+			}
 
-			ray.transmission *= emittance + inversePdf * cosTheta * brdf;
+			if (dot(activeRay.direction, N) > 0.0f)
+			{
+				N *= -1;
+			}
+
+			float r = randomF32(pixelSeed);
+			if (r < material.reflectivity)
+			{
+				vec3 newDirection = reflect(activeRay.direction, N);
+				vec3 newOrigin = I + F32_EPSILON * newDirection;
+				Ray reflectRay = newRay(newOrigin, newDirection);
+
+				transmission *= material.albedo;
+				reflectRay.pixelIdx = activeRay.pixelIdx;
+				reflectRay.inMedium = activeRay.inMedium;
+				activeRay = reflectRay;
+			}
+			else if (r < (material.reflectivity + material.refractivity))
+			{
+				float n1 = activeRay.inMedium ? material.indexOfRefraction : 1.0f;
+				float n2 = activeRay.inMedium ? 1.0f : material.indexOfRefraction;
+				float iorRatio = n1 / n2;
+
+				float cosI = dot(-activeRay.direction, N);
+				float cosTheta2 = 1.0f - iorRatio * iorRatio * (1.0f - cosI * cosI);
+				float Fresnel = 1.0f;
+				if (cosTheta2 > 0.0f)
+				{
+					float a = n1 - n2;
+					float b = n1 + n2;
+					float r0 = (a * a) / (b * b);
+					float c = 1.0f - cosI;
+					float Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+
+					vec3 newDirection = iorRatio * activeRay.direction + ((iorRatio * cosI - sqrt(abs(cosTheta2))) * N);
+					vec3 newOrigin = I + F32_EPSILON * newDirection;
+					Ray transmitRay = newRay(newOrigin, newDirection);
+
+					if (randomF32(pixelSeed) > Fresnel)
+					{
+						transmission *= material.albedo;
+
+						transmitRay.pixelIdx = activeRay.pixelIdx;
+						transmitRay.inMedium = !activeRay.inMedium;
+						activeRay = transmitRay;
+						continue;
+					}
+				}
+
+				vec3 newDirection = reflect(activeRay.direction, N);
+				vec3 newOrigin = I + F32_EPSILON * newDirection;
+				Ray reflectRay = newRay(newOrigin, newDirection);
+
+				transmission *= material.albedo;
+				reflectRay.pixelIdx = activeRay.pixelIdx;
+				reflectRay.inMedium = activeRay.inMedium;
+				activeRay = reflectRay;
+			}
+			else
+			{
+				// handle diffuse BRDF
+				vec3 newDirection = diffuseReflect(pixelSeed, N);
+				vec3 newOrigin = I + F32_EPSILON * newDirection;
+				Ray bounceRay = newRay(newOrigin, newDirection);
+
+				float cosTheta = dot(newDirection, N);
+				vec3 brdf = material.albedo * F32_INV_PI;
+				float inversePdf = F32_2PI;
+
+				transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf;
+				bounceRay.pixelIdx = activeRay.pixelIdx;
+				bounceRay.inMedium = activeRay.inMedium;
+				activeRay = bounceRay;
+			}
 		}
 
 		accumulator[pixelIdx] += vec4(energy, 1);

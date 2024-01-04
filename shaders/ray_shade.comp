@@ -18,56 +18,7 @@ layout(set = 1, binding = 0) buffer RayBuffer
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
-const vec3 SKY_COLOR_A	= vec3(1.0, 1.0, 1.0);
-const vec3 SKY_COLOR_B	= vec3(0.2, 0.7, 0.9);
-
-const vec3 albedo		= vec3(1, 0, 0);
-const vec3 emittance	= vec3(0, 0, 0);
-
 void main()
 {
-	uint rayIdx = 0;
-
-	if (rayIdx <= 0)
-		return;
-
-	uint seed = initSeed((gl_GlobalInvocationID.x + gl_GlobalInvocationID.y) * 1799);
-	Ray ray = rayBuffer.rays[rayIdx];
-
-	if (ray.depth == F32_FAR_AWAY)
-	{
-		float alpha = 0.5 * (1.0 + ray.direction.y);
-		vec3 skyColor = alpha * SKY_COLOR_B + (1.0 - alpha) * SKY_COLOR_A;
-
-		// TODO: set in connect kernel
-		vec3 energy = ray.transmission * skyColor;
-		accumulator[ray.pixelIdx] += vec4(energy, 1);
-		return;
-	}
-
-	vec3 I = rayHitPosition(ray);
-	vec3 N = sphereNormal(I);
-
-	// Calculate diffuse bounce
-	vec3 newDirection = diffuseReflect(seed, N);
-	vec3 newOrigin = I + F32_EPSILON * newDirection;
-
-	// Simple red BRDF
-	float inversePdf = F32_2PI;
-	vec3 brdf = albedo * F32_INV_PI;
-	float cosTheta = dot(newDirection, N);
-
-	// Update ray transmission
-	ray.transmission *= emittance + inversePdf * cosTheta * brdf;
-	
-	// Generate new extension ray
-	rayBuffer.rays[rayIdx] = Ray(
-		newOrigin,
-		newDirection,
-		F32_FAR_AWAY,
-		ray.transmission,
-		ray.pixelIdx,
-		UNSET_IDX,
-		vec2(0, 0)
-	);
+	//
 }
