@@ -246,8 +246,21 @@ int main()
 		1	// Samples per frame
 	};
 
-	Renderer renderer(std::move(renderContext), rendererConfig, resultBuffer, worldCam, scene);
+	Renderer renderer(&renderContext, rendererConfig, resultBuffer, worldCam, scene);
 #else
+	GPUMesh susanneGPUMesh(&renderContext, susanneMesh);
+	GPUMesh cubeGPUMesh(&renderContext, cubeMesh);
+	GPUMesh lensGPUMesh(&renderContext, lensMesh);
+	GPUMesh planeGPUMesh(&renderContext, planeMesh);
+
+	// TODO:
+	// - Load all hsot visible GPU buffers into single (per scene?) device local buffer
+	// - Load BLAS data into GPU device local buffer
+	// - Load instance data into GPU device local buffer (extra index offset into mesh & bvh buffer for start of per instance data)
+	// - Load TLAS data into GPU device local buffer
+	//
+	// Above managed by GPUScene on loading of TLAS
+
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces
 		1	// Samples per frame
@@ -258,7 +271,7 @@ int main()
 		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
 	};
 
-	WaveFrontRenderer renderer(std::move(renderContext), rendererConfig, renderResolution, worldCam, scene);
+	WaveFrontRenderer renderer(&renderContext, rendererConfig, renderResolution, worldCam, scene);
 #endif
 
 	// Create frame timer

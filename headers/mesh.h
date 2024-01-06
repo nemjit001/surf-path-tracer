@@ -4,8 +4,10 @@
 #include <vector>
 
 #include "ray.h"
+#include "render_context.h"
 #include "surf_math.h"
 #include "types.h"
+#include "vk_layer/buffer.h"
 
 struct Triangle
 {
@@ -40,9 +42,18 @@ public:
 
 public:
 	std::vector<Triangle> triangles;
+	std::vector<TriExtension> triExtensions;
+};
 
-private:
-	std::vector<TriExtension> m_triExtensions;
+class GPUMesh
+{
+public:
+	GPUMesh(RenderContext* renderContext, Mesh mesh);
+
+public:
+	Mesh mesh;
+	Buffer triBuffer;
+	Buffer triExBuffer;
 };
 
 Float3 Mesh::normal(SizeType primitiveIndex) const
@@ -54,13 +65,13 @@ Float3 Mesh::normal(SizeType primitiveIndex) const
 Float3 Mesh::normal(SizeType primitiveIndex, const Float2& barycentric) const
 {
 	assert(primitiveIndex < triangles.size());
-	const TriExtension& ext = m_triExtensions[primitiveIndex];
+	const TriExtension& ext = triExtensions[primitiveIndex];
 	return barycentric.u * ext.n0 + barycentric.v * ext.n2 + (1.0f - barycentric.u - barycentric.v) * ext.n1;
 }
 
 Float2 Mesh::textureCoordinate(SizeType primitiveIndex, const Float2& barycentric) const
 {
 	assert(primitiveIndex < triangles.size());
-	const TriExtension& ext = m_triExtensions[primitiveIndex];
+	const TriExtension& ext = triExtensions[primitiveIndex];
 	return barycentric.u * ext.uv0 + barycentric.v * ext.uv2 + (1.0f - barycentric.u - barycentric.v) * ext.uv1;
 }

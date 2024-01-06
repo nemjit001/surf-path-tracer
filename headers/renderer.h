@@ -99,7 +99,7 @@ class Renderer
     : public IRenderer
 {
 public:
-    Renderer(RenderContext renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
+    Renderer(RenderContext* renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
 
     ~Renderer();
 
@@ -126,7 +126,7 @@ private:
     );
 
 private:
-    RenderContext m_context;
+    RenderContext* m_context;
     DescriptorPool m_descriptorPool;
     FramebufferSize m_framebufferSize;
     RendererConfig m_config;
@@ -148,12 +148,12 @@ private:
     FrameData m_frames[FRAMES_IN_FLIGHT] = {};
 
     // Default render pass w/ framebuffers
-    RenderPass m_presentPass = RenderPass(m_context.device, m_context.swapchain.image_format);
+    RenderPass m_presentPass = RenderPass(m_context->device, m_context->swapchain.image_format);
     std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
 
     // Rendered frame staging buffer & target image
     Buffer m_frameStagingBuffer = Buffer(
-        m_context.allocator,
+        m_context->allocator,
         m_resultBuffer.width * m_resultBuffer.height * sizeof(U32),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT,            // Used as staging bufer for GPU uploads
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT       // Needs to be visible from the CPU
@@ -162,8 +162,8 @@ private:
     );
 
     Image m_frameImage = Image(
-        m_context.device,
-        m_context.allocator,
+        m_context->device,
+        m_context->allocator,
         VkFormat::VK_FORMAT_R8G8B8A8_UNORM,                     // Standard RGBA format
         m_resultBuffer.width, m_resultBuffer.height,
         VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT   // Used as transfer destination for CPU staging buffer
@@ -171,19 +171,19 @@ private:
     );
 
     // Custom sampler, shader pipeline & layout for use during render pass
-    Sampler m_frameImageSampler = Sampler(m_context.device);
+    Sampler m_frameImageSampler = Sampler(m_context->device);
 
-    PipelineLayout m_presentPipelineLayout = PipelineLayout(m_context.device, std::vector{
+    PipelineLayout m_presentPipelineLayout = PipelineLayout(m_context->device, std::vector{
         DescriptorSetLayout{
             std::vector{ DescriptorSetBinding{ 0, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER } }
         }
     });
 
-    Shader m_presentVertShader = Shader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
-    Shader m_presentFragShader = Shader(m_context.device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
+    Shader m_presentVertShader = Shader(m_context->device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
+    Shader m_presentFragShader = Shader(m_context->device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
 
     GraphicsPipeline m_presentPipeline = GraphicsPipeline(
-        m_context.device, Viewport{ 0, 0, m_framebufferSize.width, m_framebufferSize.height, 0.0f, 1.0f },
+        m_context->device, Viewport{ 0, 0, m_framebufferSize.width, m_framebufferSize.height, 0.0f, 1.0f },
         m_descriptorPool, m_presentPass, m_presentPipelineLayout,
         std::vector{ &m_presentVertShader, &m_presentFragShader }
     );
@@ -193,7 +193,7 @@ class WaveFrontRenderer
     : public IRenderer
 {
 public:
-    WaveFrontRenderer(RenderContext renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, Scene& scene);
+    WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, Scene& scene);
 
     ~WaveFrontRenderer();
 
@@ -227,7 +227,7 @@ private:
     );
 
 private:
-    RenderContext m_context;
+    RenderContext* m_context;
     RendererConfig m_config;
     Camera& m_camera;
     Scene& m_scene;
@@ -239,21 +239,21 @@ private:
 
     // Frame management
     SizeType m_currentFrame = 0;
-    FramebufferSize m_framebufferSize = m_context.getFramebufferSize();
+    FramebufferSize m_framebufferSize = m_context->getFramebufferSize();
     FrameData m_frames[FRAMES_IN_FLIGHT] = {};
 
     // Compute setup
     WavefrontCompute m_wavefrontCompute = {};
 
     // Default render pass w/ framebuffers
-    RenderPass m_presentPass = RenderPass(m_context.device, m_context.swapchain.image_format);
+    RenderPass m_presentPass = RenderPass(m_context->device, m_context->swapchain.image_format);
     std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
 
     // Default descriptor pool
-    DescriptorPool m_descriptorPool = DescriptorPool(m_context.device);
+    DescriptorPool m_descriptorPool = DescriptorPool(m_context->device);
 
 #if GPU_MEGAKERNEL == 1
-    Shader m_megakernel = Shader(m_context.device, ShaderType::Compute, "shaders/megakernel.comp.spv");
+    Shader m_megakernel = Shader(m_context->device, ShaderType::Compute, "shaders/megakernel.comp.spv");
 #else
     // Wavefront kernels
     Shader m_rayGeneration  = Shader(m_context.device, ShaderType::Compute, "shaders/ray_generation.comp.spv");
@@ -263,7 +263,7 @@ private:
 #endif
 
     // Wavefront layout & pipelines
-    PipelineLayout m_wavefrontLayout = PipelineLayout(m_context.device, std::vector{
+    PipelineLayout m_wavefrontLayout = PipelineLayout(m_context->device, std::vector{
         DescriptorSetLayout{    // Per frame data uniforms (camera, frame state, accumulator, output image)
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
@@ -289,7 +289,7 @@ private:
     });
 
 #if GPU_MEGAKERNEL == 1
-    ComputePipeline m_megakernelPipeline = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_megakernel);
+    ComputePipeline m_megakernelPipeline = ComputePipeline(m_context->device, m_descriptorPool, m_wavefrontLayout, &m_megakernel);
 #else
     ComputePipeline m_rayGenPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
     ComputePipeline m_rayExtPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
@@ -299,7 +299,7 @@ private:
 
     // Compute descriptors
     Buffer m_cameraUBO = Buffer(
-        m_context.allocator, sizeof(CameraUBO),
+        m_context->allocator, sizeof(CameraUBO),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -307,7 +307,7 @@ private:
     );
 
     Buffer m_frameStateUBO = Buffer(
-        m_context.allocator, sizeof(FrameStateUBO),
+        m_context->allocator, sizeof(FrameStateUBO),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -315,7 +315,7 @@ private:
     );
 
     Buffer m_accumulatorSSBO = Buffer(
-        m_context.allocator, m_renderResolution.width * m_renderResolution.height * sizeof(Float4),
+        m_context->allocator, m_renderResolution.width * m_renderResolution.height * sizeof(Float4),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -323,7 +323,7 @@ private:
     );
 
     Buffer m_sceneDataUBO = Buffer(
-        m_context.allocator, sizeof(SceneBackground),
+        m_context->allocator, sizeof(SceneBackground),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
         | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -342,11 +342,11 @@ private:
 #endif
 
     // Present shaders
-    Shader m_presentVert    = Shader(m_context.device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
-    Shader m_presentFrag    = Shader(m_context.device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
+    Shader m_presentVert    = Shader(m_context->device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
+    Shader m_presentFrag    = Shader(m_context->device, ShaderType::Fragment, "shaders/fs_quad.frag.spv");
 
     // Present layout & pipeline
-    PipelineLayout m_presentLayout = PipelineLayout(m_context.device, std::vector{
+    PipelineLayout m_presentLayout = PipelineLayout(m_context->device, std::vector{
         DescriptorSetLayout{
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_FRAGMENT_BIT, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER }
@@ -355,16 +355,16 @@ private:
     });
 
     GraphicsPipeline m_presentPipeline  = GraphicsPipeline(
-        m_context.device, Viewport{ 0, 0, m_framebufferSize.width, m_framebufferSize.height, 0.0f, 1.0f },
+        m_context->device, Viewport{ 0, 0, m_framebufferSize.width, m_framebufferSize.height, 0.0f, 1.0f },
         m_descriptorPool, m_presentPass, m_presentLayout,
         { &m_presentVert, &m_presentFrag }
     );
 
     // Present descriptors
-    Sampler m_frameImageSampler = Sampler(m_context.device);
+    Sampler m_frameImageSampler = Sampler(m_context->device);
     Image m_frameImage = Image(
-        m_context.device,
-        m_context.allocator,
+        m_context->device,
+        m_context->allocator,
         VkFormat::VK_FORMAT_R8G8B8A8_UNORM,                     // Standard RGBA format (Scaled normalized)
         m_renderResolution.width, m_renderResolution.height,
         VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT        // Used as storage for wavefront compute shaders

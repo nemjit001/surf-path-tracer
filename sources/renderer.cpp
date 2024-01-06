@@ -38,11 +38,11 @@ AccumulatorState::~AccumulatorState()
     FREE64(buffer);
 }
 
-Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
+Renderer::Renderer(RenderContext* renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
     :
-    m_context(std::move(renderContext)),
-    m_descriptorPool(m_context.device),
-    m_framebufferSize(m_context.getFramebufferSize()),
+    m_context(renderContext),
+    m_descriptorPool(m_context->device),
+    m_framebufferSize(m_context->getFramebufferSize()),
     m_config(config),
     m_camera(camera),
     m_scene(scene),
@@ -51,51 +51,51 @@ Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuff
     // Set up oneshot command pool, fence & copy buffer
     VkFenceCreateInfo copyFinishedCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     copyFinishedCreateInfo.flags = 0;
-    VK_CHECK(vkCreateFence(m_context.device, &copyFinishedCreateInfo, nullptr, &m_copyFinishedFence));
+    VK_CHECK(vkCreateFence(m_context->device, &copyFinishedCreateInfo, nullptr, &m_copyFinishedFence));
 
     VkCommandPoolCreateInfo copyPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     copyPoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    copyPoolInfo.queueFamilyIndex = m_context.queues.graphicsQueue.familyIndex;
-    VK_CHECK(vkCreateCommandPool(m_context.device, &copyPoolInfo, nullptr, &m_copyPool));
+    copyPoolInfo.queueFamilyIndex = m_context->queues.graphicsQueue.familyIndex;
+    VK_CHECK(vkCreateCommandPool(m_context->device, &copyPoolInfo, nullptr, &m_copyPool));
 
     VkCommandBufferAllocateInfo oneshotCopyAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     oneshotCopyAllocateInfo.commandPool = m_copyPool;
     oneshotCopyAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     oneshotCopyAllocateInfo.commandBufferCount = 1;
 
-    VK_CHECK(vkAllocateCommandBuffers(m_context.device, &oneshotCopyAllocateInfo, &m_oneshotCopyBuffer));
+    VK_CHECK(vkAllocateCommandBuffers(m_context->device, &oneshotCopyAllocateInfo, &m_oneshotCopyBuffer));
 
     // Set up per frame structures
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
         VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
         poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolCreateInfo.queueFamilyIndex = m_context.queues.graphicsQueue.familyIndex;
+        poolCreateInfo.queueFamilyIndex = m_context->queues.graphicsQueue.familyIndex;
 
-        VK_CHECK(vkCreateCommandPool(m_context.device, &poolCreateInfo, nullptr, &m_frames[i].pool));
+        VK_CHECK(vkCreateCommandPool(m_context->device, &poolCreateInfo, nullptr, &m_frames[i].pool));
 
         VkCommandBufferAllocateInfo bufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
         bufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         bufferAllocateInfo.commandPool = m_frames[i].pool;
         bufferAllocateInfo.commandBufferCount = 1;
 
-        VK_CHECK(vkAllocateCommandBuffers(m_context.device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
+        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
 
         VkFenceCreateInfo frameReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         frameReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-        VK_CHECK(vkCreateFence(m_context.device, &frameReadyCreateInfo, nullptr, &m_frames[i].frameReady));
+        VK_CHECK(vkCreateFence(m_context->device, &frameReadyCreateInfo, nullptr, &m_frames[i].frameReady));
 
         VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-        VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
-        VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
+        VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
+        VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
     }
 
     // Create framebuffers for swapchain images
-    m_framebuffers.reserve(m_context.swapchain.image_count);
-    for (const auto& imageView : m_context.swapImageViews)
+    m_framebuffers.reserve(m_context->swapchain.image_count);
+    for (const auto& imageView : m_context->swapImageViews)
     {
-        Framebuffer swapFramebuffer(m_context.device, m_presentPass, { imageView }, m_framebufferSize.width, m_framebufferSize.height);
+        Framebuffer swapFramebuffer(m_context->device, m_presentPass, { imageView }, m_framebufferSize.width, m_framebufferSize.height);
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 
@@ -114,19 +114,19 @@ Renderer::Renderer(RenderContext renderContext, RendererConfig config, PixelBuff
 
 Renderer::~Renderer()
 {
-    vkDeviceWaitIdle(m_context.device);
+    vkDeviceWaitIdle(m_context->device);
 
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
-        VK_CHECK(vkWaitForFences(m_context.device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
-        vkDestroyCommandPool(m_context.device, m_frames[i].pool, nullptr);
-        vkDestroyFence(m_context.device, m_frames[i].frameReady, nullptr);
-        vkDestroySemaphore(m_context.device, m_frames[i].swapImageAvailable, nullptr);
-        vkDestroySemaphore(m_context.device, m_frames[i].renderingFinished, nullptr);
+        VK_CHECK(vkWaitForFences(m_context->device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
+        vkDestroyCommandPool(m_context->device, m_frames[i].pool, nullptr);
+        vkDestroyFence(m_context->device, m_frames[i].frameReady, nullptr);
+        vkDestroySemaphore(m_context->device, m_frames[i].swapImageAvailable, nullptr);
+        vkDestroySemaphore(m_context->device, m_frames[i].renderingFinished, nullptr);
     }
 
-    vkDestroyCommandPool(m_context.device, m_copyPool, nullptr);
-    vkDestroyFence(m_context.device, m_copyFinishedFence, nullptr);
+    vkDestroyCommandPool(m_context->device, m_copyPool, nullptr);
+    vkDestroyFence(m_context->device, m_copyFinishedFence, nullptr);
 }
 
 void Renderer::clearAccumulator()
@@ -140,10 +140,10 @@ void Renderer::render(F32 deltaTime)
     const FrameData& activeFrame = m_frames[m_currentFrame];
 
     U32 availableSwapImage = 0;
-    VK_CHECK(vkAcquireNextImageKHR(m_context.device, m_context.swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &availableSwapImage));
+    VK_CHECK(vkAcquireNextImageKHR(m_context->device, m_context->swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &availableSwapImage));
 
-    VK_CHECK(vkWaitForFences(m_context.device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(m_context.device, 1, &activeFrame.frameReady));
+    VK_CHECK(vkWaitForFences(m_context->device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context->device, 1, &activeFrame.frameReady));
     VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
 
     // Start CPU ray tracing loop
@@ -209,17 +209,17 @@ void Renderer::render(F32 deltaTime)
     presentPassSubmit.signalSemaphoreCount = 1;
     presentPassSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
 
-    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &presentPassSubmit, activeFrame.frameReady));
+    VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 1, &presentPassSubmit, activeFrame.frameReady));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &m_context.swapchain.swapchain;
+    presentInfo.pSwapchains = &m_context->swapchain.swapchain;
     presentInfo.pImageIndices = &availableSwapImage;
     presentInfo.pResults = nullptr;
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
 
-    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue.handle, &presentInfo));
+    VK_CHECK(vkQueuePresentKHR(m_context->queues.presentQueue.handle, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }
 
@@ -502,9 +502,9 @@ void Renderer::copyBufferToImage(
     oneshotSubmit.signalSemaphoreCount = 0;
     oneshotSubmit.pSignalSemaphores = nullptr;
     
-    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &oneshotSubmit, m_copyFinishedFence));
-    VK_CHECK(vkWaitForFences(m_context.device, 1, &m_copyFinishedFence, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(m_context.device, 1, &m_copyFinishedFence));
+    VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 1, &oneshotSubmit, m_copyFinishedFence));
+    VK_CHECK(vkWaitForFences(m_context->device, 1, &m_copyFinishedFence, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context->device, 1, &m_copyFinishedFence));
 }
 
 void Renderer::recordFrame(
@@ -550,9 +550,9 @@ void Renderer::recordFrame(
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, Scene& scene)
+WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, Scene& scene)
     :
-    m_context(std::move(renderContext)),
+    m_context(renderContext),
     m_config(config),
     m_camera(camera),
     m_scene(scene),
@@ -563,38 +563,38 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
     {
         VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
         poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolCreateInfo.queueFamilyIndex = m_context.queues.graphicsQueue.familyIndex;
+        poolCreateInfo.queueFamilyIndex = m_context->queues.graphicsQueue.familyIndex;
 
-        VK_CHECK(vkCreateCommandPool(m_context.device, &poolCreateInfo, nullptr, &m_frames[i].pool));
+        VK_CHECK(vkCreateCommandPool(m_context->device, &poolCreateInfo, nullptr, &m_frames[i].pool));
 
         VkCommandBufferAllocateInfo bufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
         bufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         bufferAllocateInfo.commandPool = m_frames[i].pool;
         bufferAllocateInfo.commandBufferCount = 1;
 
-        VK_CHECK(vkAllocateCommandBuffers(m_context.device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
+        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
 
         VkFenceCreateInfo frameReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         frameReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-        VK_CHECK(vkCreateFence(m_context.device, &frameReadyCreateInfo, nullptr, &m_frames[i].frameReady));
+        VK_CHECK(vkCreateFence(m_context->device, &frameReadyCreateInfo, nullptr, &m_frames[i].frameReady));
 
         VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-        VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
-        VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
+        VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
+        VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
     }
 
     // Set up wavefront compute structures
     VkCommandPoolCreateInfo wfPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     wfPoolCreateInfo.flags = 0;
-    wfPoolCreateInfo.queueFamilyIndex = m_context.queues.computeQueue.familyIndex;
-    VK_CHECK(vkCreateCommandPool(m_context.device, &wfPoolCreateInfo, nullptr, &m_wavefrontCompute.pool));
+    wfPoolCreateInfo.queueFamilyIndex = m_context->queues.computeQueue.familyIndex;
+    VK_CHECK(vkCreateCommandPool(m_context->device, &wfPoolCreateInfo, nullptr, &m_wavefrontCompute.pool));
 
 #if GPU_MEGAKERNEL == 1
     VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     computeBufferAllocateInfo.commandPool = m_wavefrontCompute.pool;
     computeBufferAllocateInfo.commandBufferCount = 1;
-    VK_CHECK(vkAllocateCommandBuffers(m_context.device, &computeBufferAllocateInfo, &m_wavefrontCompute.commandBuffer));
+    VK_CHECK(vkAllocateCommandBuffers(m_context->device, &computeBufferAllocateInfo, &m_wavefrontCompute.commandBuffer));
 #else
     VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -605,16 +605,16 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
 
     VkFenceCreateInfo computeReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     computeReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    VK_CHECK(vkCreateFence(m_context.device, &computeReadyCreateInfo, nullptr, &m_wavefrontCompute.computeReady));
+    VK_CHECK(vkCreateFence(m_context->device, &computeReadyCreateInfo, nullptr, &m_wavefrontCompute.computeReady));
 
     VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    VK_CHECK(vkCreateSemaphore(m_context.device, &semaphoreCreateInfo, nullptr, &m_wavefrontCompute.computeFinished));
+    VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_wavefrontCompute.computeFinished));
 
     // Create framebuffers for swapchain images
-    m_framebuffers.reserve(m_context.swapchain.image_count);
-    for (const auto& imageView : m_context.swapImageViews)
+    m_framebuffers.reserve(m_context->swapchain.image_count);
+    for (const auto& imageView : m_context->swapImageViews)
     {
-        Framebuffer swapFramebuffer(m_context.device, m_presentPass, { imageView }, m_framebufferSize.width, m_framebufferSize.height);
+        Framebuffer swapFramebuffer(m_context->device, m_presentPass, { imageView }, m_framebufferSize.width, m_framebufferSize.height);
         m_framebuffers.push_back(std::move(swapFramebuffer));
     }
 
@@ -736,26 +736,26 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext renderContext, RendererConfig
 
 WaveFrontRenderer::~WaveFrontRenderer()
 {
-    vkDeviceWaitIdle(m_context.device);
+    vkDeviceWaitIdle(m_context->device);
 
     // Teardown wavefront compute setup
-    vkDestroyCommandPool(m_context.device, m_wavefrontCompute.pool, nullptr);
-    vkDestroyFence(m_context.device, m_wavefrontCompute.computeReady, nullptr);
-    vkDestroySemaphore(m_context.device, m_wavefrontCompute.computeFinished, nullptr);
+    vkDestroyCommandPool(m_context->device, m_wavefrontCompute.pool, nullptr);
+    vkDestroyFence(m_context->device, m_wavefrontCompute.computeReady, nullptr);
+    vkDestroySemaphore(m_context->device, m_wavefrontCompute.computeFinished, nullptr);
 
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
-        VK_CHECK(vkWaitForFences(m_context.device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
-        vkDestroyCommandPool(m_context.device, m_frames[i].pool, nullptr);
-        vkDestroyFence(m_context.device, m_frames[i].frameReady, nullptr);
-        vkDestroySemaphore(m_context.device, m_frames[i].swapImageAvailable, nullptr);
-        vkDestroySemaphore(m_context.device, m_frames[i].renderingFinished, nullptr);
+        VK_CHECK(vkWaitForFences(m_context->device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
+        vkDestroyCommandPool(m_context->device, m_frames[i].pool, nullptr);
+        vkDestroyFence(m_context->device, m_frames[i].frameReady, nullptr);
+        vkDestroySemaphore(m_context->device, m_frames[i].swapImageAvailable, nullptr);
+        vkDestroySemaphore(m_context->device, m_frames[i].renderingFinished, nullptr);
     }
 }
 
 void WaveFrontRenderer::clearAccumulator()
 {
-    vkDeviceWaitIdle(m_context.device);
+    vkDeviceWaitIdle(m_context->device);
 
     // clear accumulator buffer
     m_frameState.totalSamples = 0;
@@ -767,11 +767,11 @@ void WaveFrontRenderer::render(F32 deltaTime)
     const FrameData& activeFrame = m_frames[m_currentFrame];
     
     U32 swapImageIdx = 0;
-    VK_CHECK(vkAcquireNextImageKHR(m_context.device, m_context.swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &swapImageIdx));
+    VK_CHECK(vkAcquireNextImageKHR(m_context->device, m_context->swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &swapImageIdx));
 
     VkFence fences[] = { activeFrame.frameReady, m_wavefrontCompute.computeReady };
-    VK_CHECK(vkWaitForFences(m_context.device, 2, fences, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(m_context.device, 2, fences));
+    VK_CHECK(vkWaitForFences(m_context->device, 2, fences, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context->device, 2, fences));
 
     // Update cameraUBO
     CameraUBO cameraUBO = CameraUBO{
@@ -807,7 +807,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
     computeSubmit.pWaitDstStageMask = computeWaitStages;
     computeSubmit.signalSemaphoreCount = 1;
     computeSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
-    VK_CHECK(vkQueueSubmit(m_context.queues.computeQueue.handle, 1, &computeSubmit, m_wavefrontCompute.computeReady));
+    VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &computeSubmit, m_wavefrontCompute.computeReady));
 #else
     RayGenUBO* rayGenState = nullptr;
     m_raySSBO.persistentMap(reinterpret_cast<void**>(&rayGenState));
@@ -865,17 +865,17 @@ void WaveFrontRenderer::render(F32 deltaTime)
     renderSubmit.pWaitDstStageMask = gfxWaitStages;
     renderSubmit.signalSemaphoreCount = 1;
     renderSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
-    VK_CHECK(vkQueueSubmit(m_context.queues.graphicsQueue.handle, 1, &renderSubmit, activeFrame.frameReady));
+    VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 1, &renderSubmit, activeFrame.frameReady));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.swapchainCount = 1;
     presentInfo.pImageIndices = &swapImageIdx;
-    presentInfo.pSwapchains = &m_context.swapchain.swapchain;
+    presentInfo.pSwapchains = &m_context->swapchain.swapchain;
     presentInfo.pResults = nullptr;
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
 
-    VK_CHECK(vkQueuePresentKHR(m_context.queues.presentQueue.handle, &presentInfo));
+    VK_CHECK(vkQueuePresentKHR(m_context->queues.presentQueue.handle, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }
 

@@ -69,7 +69,7 @@ Float3 Triangle::normal() const
 Mesh::Mesh(const std::string& path)
 	:
 	triangles(),
-	m_triExtensions()
+	triExtensions()
 {
 	tinyobj::ObjReaderConfig config;
 	config.triangulate = true;
@@ -120,7 +120,7 @@ Mesh::Mesh(const std::string& path)
 				)
 			));
 
-			m_triExtensions.push_back(TriExtension{
+			triExtensions.push_back(TriExtension{
 				Float3(
 					attributes.normals[3 * index0.normal_index + 0],
 					attributes.normals[3 * index0.normal_index + 1],
@@ -151,4 +151,26 @@ Mesh::Mesh(const std::string& path)
 			});
 		}
 	}
+}
+
+GPUMesh::GPUMesh(RenderContext* renderContext, Mesh mesh)
+	:
+	mesh(mesh),
+	triBuffer(
+		renderContext->allocator, mesh.triangles.size() * sizeof(Triangle),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+		| VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+	),
+	triExBuffer(
+		renderContext->allocator, mesh.triExtensions.size() * sizeof(TriExtension),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+		| VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+	)
+{
+	triBuffer.copyToBuffer(mesh.triangles.size() * sizeof(Triangle), mesh.triangles.data());
+	triExBuffer.copyToBuffer(mesh.triExtensions.size() * sizeof(TriExtension), mesh.triExtensions.data());
 }
