@@ -79,13 +79,12 @@ void main()
 		Ray activeRay = newRay(origin, direction);
 
 		vec3 energy = vec3(0);
-		vec3 transmission = vec3(1);
 		while(true)
 		{
 			// TODO: actual scene intersect with BVH TLAS / BLAS
 			if (!sceneIntersect(activeRay))
 			{
-				energy += transmission * sampleSkyColor(activeRay, sceneData.background);
+				energy += activeRay.transmission * sampleSkyColor(activeRay, sceneData.background);
 				break;
 			}
 
@@ -95,22 +94,29 @@ void main()
 			Material material = Material(
 				vec3(0, 0, 0), 0.0,		// Emission color & strength
 				vec3(0.2, 0.2, 0.2),	// Albedo
-				vec3(0),				// Absorption
+				vec3(0.02, 0.02, 0.02),	// Absorption
 				0.0, 0.0,				// Reflectivity & Refractivity
 				1.05					// IOR
 			);
 
 			if (materialIsLight(material))
 			{
-				energy += transmission * materialEmittance(material);
+				energy += activeRay.transmission * materialEmittance(material);
 				break;
 			}
 
-			if (dot(activeRay.direction, N) > 0.0f)
-			{
-				N *= -1;
-			}
+			float p = clamp(max(activeRay.transmission.r, max(activeRay.transmission.g, activeRay.transmission.b)), 0.0f, 1.0f);
+			if (p < randomF32(pixelSeed))
+				break;
 
+			if (dot(activeRay.direction, N) > 0.0f)
+				N *= -1;
+
+			vec3 mediumScale = vec3(1.0);
+			if (activeRay.inMedium)
+				mediumScale = exp(material.absorption * -activeRay.depth);
+
+			float rrScale = 1.0 / p;
 			float r = randomF32(pixelSeed);
 			if (r < material.reflectivity)
 			{
@@ -118,9 +124,10 @@ void main()
 				vec3 newOrigin = I + F32_EPSILON * newDirection;
 				Ray reflectRay = newRay(newOrigin, newDirection);
 
-				transmission *= material.albedo;
+				activeRay.transmission *= material.albedo * mediumScale * rrScale;
 				reflectRay.pixelIdx = activeRay.pixelIdx;
 				reflectRay.inMedium = activeRay.inMedium;
+				reflectRay.transmission = activeRay.transmission;
 				activeRay = reflectRay;
 			}
 			else if (r < (material.reflectivity + material.refractivity))
@@ -146,10 +153,10 @@ void main()
 
 					if (randomF32(pixelSeed) > Fresnel)
 					{
-						transmission *= material.albedo;
-
+						activeRay.transmission *= material.albedo * mediumScale * rrScale;
 						transmitRay.pixelIdx = activeRay.pixelIdx;
 						transmitRay.inMedium = !activeRay.inMedium;
+						transmitRay.transmission = activeRay.transmission;
 						activeRay = transmitRay;
 						continue;
 					}
@@ -159,9 +166,10 @@ void main()
 				vec3 newOrigin = I + F32_EPSILON * newDirection;
 				Ray reflectRay = newRay(newOrigin, newDirection);
 
-				transmission *= material.albedo;
+				activeRay.transmission *= material.albedo * mediumScale * rrScale;
 				reflectRay.pixelIdx = activeRay.pixelIdx;
 				reflectRay.inMedium = activeRay.inMedium;
+				reflectRay.transmission = activeRay.transmission;
 				activeRay = reflectRay;
 			}
 			else
@@ -175,9 +183,10 @@ void main()
 				vec3 brdf = material.albedo * F32_INV_PI;
 				float inversePdf = F32_2PI;
 
-				transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf;
+				activeRay.transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf * mediumScale * rrScale;
 				bounceRay.pixelIdx = activeRay.pixelIdx;
 				bounceRay.inMedium = activeRay.inMedium;
+				bounceRay.transmission = activeRay.transmission;
 				activeRay = bounceRay;
 			}
 		}
