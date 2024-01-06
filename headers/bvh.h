@@ -86,6 +86,17 @@ private:
 	BvhNode* m_nodePool;
 };
 
+struct GPUInstance
+{
+	U32 bvhNodeStart;		// Index offset into BVH GPU node array
+	U32 bvhNodeCount;		// Length of BVH Node array from start idx
+	U32 bvhIdxStart;		// Index offset into BVH GPU index array
+	U32 bvhIdxCount;		// Length of BVH index array from start idx
+	U32 materialIdx;		// Index of material in GPU array
+	Mat4 transform;
+	Mat4 invTransform;
+};
+
 class Instance
 {
 public:
@@ -96,6 +107,8 @@ public:
 	Float3 normal(U32 primitiveIndex, const Float2& barycentric) const;
 
 	inline const Mat4& transform() const { return m_transform; }
+
+	inline GPUInstance toGPUInstance() const;
 
 	void setTransform(const Mat4& transform);
 
@@ -159,6 +172,16 @@ const Mesh* BvhBLAS::mesh() const
 const AABB& BvhBLAS::bounds() const
 {
 	return m_nodePool[BVH_ROOT_INDEX].boundingBox;
+}
+
+inline GPUInstance Instance::toGPUInstance() const
+{
+	return GPUInstance{
+		UNSET_INDEX, 0, // Node stuff
+		UNSET_INDEX, 0, // Idx stuff
+		UNSET_INDEX,	// Material index
+		m_transform, m_invTransform
+	};
 }
 
 Instance& BvhTLAS::instance(SizeType index)

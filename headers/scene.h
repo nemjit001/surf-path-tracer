@@ -4,7 +4,9 @@
 
 #include "bvh.h"
 #include "ray.h"
+#include "render_context.h"
 #include "surf_math.h"
+#include "vk_layer/buffer.h"
 
 enum class BackgroundType
 {
@@ -34,9 +36,24 @@ public:
 
 	void update(F32 deltaTime);
 
-private:
+protected:
 	SceneBackground m_background;
 	BvhTLAS m_sceneTlas;
+};
+
+class GPUScene
+	: public Scene
+{
+public:
+	GPUScene(RenderContext* renderContext, SceneBackground background, std::vector<Instance> instances);
+
+public:
+	Buffer BLASGlobalIndexBuffer;	// All BLASses will be stored in 1 buffer,
+	Buffer BLASGlobalNodeBuffer;	// with nodes & indices stored in 2 SSBOs.
+	Buffer materialBuffer;			// Materials are stored in a single SSBO.
+	Buffer instanceBuffer;			// The Instance buffer contains GPUInstances with offsets into global BLAS buffers.
+	Buffer TLASIndexBuffer;			// The TLAS index buffer containes indices into the instance buffer.
+	Buffer TLASNodeBuffer;			// The TLAS Node buffer contains TLAS BVH nodes.
 };
 
 bool Scene::intersect(Ray& ray) const
