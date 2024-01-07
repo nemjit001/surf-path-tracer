@@ -48,12 +48,14 @@ public:
 	GPUScene(RenderContext* renderContext, SceneBackground background, std::vector<Instance> instances);
 
 public:
-	Buffer BLASGlobalIndexBuffer;	// All BLASses will be stored in 1 buffer,
-	Buffer BLASGlobalNodeBuffer;	// with nodes & indices stored in 2 SSBOs.
-	Buffer materialBuffer;			// Materials are stored in a single SSBO.
-	Buffer instanceBuffer;			// The Instance buffer contains GPUInstances with offsets into global BLAS buffers.
-	Buffer TLASIndexBuffer;			// The TLAS index buffer containes indices into the instance buffer.
-	Buffer TLASNodeBuffer;			// The TLAS Node buffer contains TLAS BVH nodes.
+	Buffer* GlobalTriBuffer;		// Global mesh triangle buffer.
+	Buffer* GlobalTriExBuffer;		// Global mesh tri extension data buffer.
+	Buffer* BLASGlobalIndexBuffer;	// All BLASses will be stored in 1 buffer,
+	Buffer* BLASGlobalNodeBuffer;	// with nodes & indices stored in 2 SSBOs.
+	Buffer* materialBuffer;			// Materials are stored in a single SSBO.
+	Buffer* instanceBuffer;			// The Instance buffer contains GPUInstances with offsets into global BLAS buffers.
+	Buffer* TLASIndexBuffer;		// The TLAS index buffer containes indices into the instance buffer.
+	Buffer* TLASNodeBuffer;			// The TLAS Node buffer contains TLAS BVH nodes.
 };
 
 bool Scene::intersect(Ray& ray) const

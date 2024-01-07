@@ -35,6 +35,8 @@ public:
 
     VkBuffer handle() const;
 
+    inline SizeType size() const { return m_allocationInfo.size; }
+
 private:
     void release();
 

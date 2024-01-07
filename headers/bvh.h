@@ -63,9 +63,13 @@ public:
 
 	void refit();
 
-	inline const Mesh* mesh() const;
+	inline const Mesh* mesh() const { return m_mesh; }
+	inline const SizeType triCount() const { return m_triCount; }
+	inline const U32* indices() const { return m_indices; }
+	inline const U32 nodesUsed() const { return m_nodesUsed; }
+	inline const BvhNode* nodePool() const { return m_nodePool; }
 
-	inline const AABB& bounds() const;
+	inline const AABB& bounds() const { return m_nodePool[BVH_ROOT_INDEX].boundingBox; }
 
 private:
 	F32 calculateNodeCost(const BvhNode& node) const;
@@ -142,9 +146,12 @@ public:
 
 	void refit();
 
-	inline Instance& instance(SizeType index);
+	inline Instance& instance(SizeType index) ;
 
-	inline const std::vector<Instance>& instances() const;
+	inline const std::vector<Instance>& instances() const { return m_instances; }
+	inline const U32* indices() const { return m_indices; }
+	inline const U32 nodesUsed() const { return m_nodesUsed; }
+	inline const BvhNode* nodePool() const { return m_nodePool; }
 
 private:
 	F32 calculateNodeCost(const BvhNode& node) const;
@@ -164,16 +171,6 @@ private:
 	BvhNode* m_nodePool;
 };
 
-const Mesh* BvhBLAS::mesh() const
-{
-	return m_mesh;
-}
-
-const AABB& BvhBLAS::bounds() const
-{
-	return m_nodePool[BVH_ROOT_INDEX].boundingBox;
-}
-
 inline GPUInstance Instance::toGPUInstance() const
 {
 	return GPUInstance{
@@ -188,9 +185,4 @@ Instance& BvhTLAS::instance(SizeType index)
 {
 	assert(index < m_instances.size());
 	return m_instances[index];
-}
-
-const std::vector<Instance>& BvhTLAS::instances() const
-{
-	return m_instances;
 }

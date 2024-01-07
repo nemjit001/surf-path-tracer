@@ -236,11 +236,11 @@ int main()
 	background.gradient.colorA = RgbColor(1.0f, 1.0f, 1.0f);
 	background.gradient.colorB = RgbColor(0.2f, 0.7f, 0.9f);
 
-	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
-
 	// -- END Scene setup
 
 #if WAVEFRONT_PATHTRACING == 0
+	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
+
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces
 		1	// Samples per frame
@@ -248,10 +248,7 @@ int main()
 
 	Renderer renderer(&renderContext, rendererConfig, resultBuffer, worldCam, scene);
 #else
-	GPUMesh susanneGPUMesh(&renderContext, susanneMesh);
-	GPUMesh cubeGPUMesh(&renderContext, cubeMesh);
-	GPUMesh lensGPUMesh(&renderContext, lensMesh);
-	GPUMesh planeGPUMesh(&renderContext, planeMesh);
+	GPUScene scene(&renderContext, background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
 
 	// TODO:
 	// - Load all hsot visible GPU buffers into single (per scene?) device local buffer
