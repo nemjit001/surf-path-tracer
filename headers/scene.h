@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <vulkan/vulkan.h>
 
 #include "bvh.h"
 #include "ray.h"
@@ -26,6 +27,8 @@ class Scene
 public:
 	Scene(SceneBackground background, std::vector<Instance> instances);
 
+	virtual ~Scene() = default;
+
 	inline bool intersect(Ray& ray) const;
 
 	inline const Instance& hitInstance(SizeType instanceIndex);
@@ -34,7 +37,7 @@ public:
 
 	RgbColor sampleBackground(const Ray& ray) const;
 
-	void update(F32 deltaTime);
+	virtual void update(F32 deltaTime);
 
 protected:
 	SceneBackground m_background;
@@ -63,8 +66,20 @@ class GPUScene
 public:
 	GPUScene(RenderContext* renderContext, SceneBackground background, std::vector<Instance> instances);
 
+	virtual ~GPUScene();
+
+	virtual void update(F32 deltaTime) override;
+
+private:
+	void uploadToGPU(const void* data, SizeType size, Buffer& target);
+
+private:
+	RenderContext* m_renderContext;
+	VkCommandPool m_uploadOneshotPool = VK_NULL_HANDLE;
+	VkFence m_uploadFinishedFence 	= VK_NULL_HANDLE;
+	GPUBatchInfo m_batchInfo;
+
 public:
-	GPUBatchInfo batchInfo;			// Batching data for instanes
 	Buffer globalTriBuffer;			// Global mesh triangle buffer.
 	Buffer globalTriExtBuffer;		// Global mesh tri extension data buffer.
 	Buffer BLASGlobalIndexBuffer;	// All BLASses will be stored in 1 buffer,

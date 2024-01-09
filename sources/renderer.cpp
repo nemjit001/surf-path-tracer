@@ -812,6 +812,8 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfi
     bakeWavePass(m_wavefrontCompute.waveBuffer);
     bakeFinalizePass(m_wavefrontCompute.finalizeBuffer);
 #endif
+
+    clearAccumulator();
 }
 
 WaveFrontRenderer::~WaveFrontRenderer()
