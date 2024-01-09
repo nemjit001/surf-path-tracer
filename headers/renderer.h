@@ -274,16 +274,20 @@ private:
         },
         DescriptorSetLayout{    // Compute SSBOs (rays)
             std::vector{
-                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
-        DescriptorSetLayout{    // Scene UBOs & SSBOs (bg data, tris, blasses, instances, tlasses)
+        DescriptorSetLayout{    // Scene UBOs & SSBOs (scene data & instance, bvh, mesh buffers)
             std::vector{
-                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
-                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
-                 DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
-                 DescriptorSetBinding{ 4, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
-                 DescriptorSetBinding{ 5, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
+                DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 4, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 5, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 6, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 7, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 8, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
     });

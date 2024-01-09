@@ -1,6 +1,7 @@
 #include "scene.h"
 
 #include <cassert>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -39,60 +40,150 @@ void Scene::update(F32 deltaTime)
 	m_sceneTlas.refit();
 }
 
+const GPUBatchInfo GPUBatcher::createBatchInfo(const std::vector<Instance>& instances)
+{
+	GPUBatchInfo batchInfo = {};
+
+	std::map<const Mesh*, SizeType> sceneMeshes;
+	std::map<const BvhBLAS*, SizeType> sceneBVHIndices;
+	std::map<const BvhBLAS*, SizeType> sceneBVHNodes;
+	std::set<const Material*> sceneMaterials;
+
+	for (auto const& instance : instances)
+	{
+		const Mesh* mesh = instance.bvh->mesh();
+		assert(mesh->triangles.size() == mesh->triExtensions.size());
+		sceneMeshes.insert(std::make_pair(mesh, mesh->triangles.size()));
+		sceneBVHIndices.insert(std::make_pair(instance.bvh, mesh->triangles.size()));
+		sceneBVHNodes.insert(std::make_pair(instance.bvh, static_cast<SizeType>(instance.bvh->nodesUsed())));
+		sceneMaterials.insert(instance.material);
+	}
+
+	for (auto const& [ mesh, size ] : sceneMeshes)
+	{
+		batchInfo.triBuffer.insert(
+			batchInfo.triBuffer.end(),
+			mesh->triangles.begin(),
+			mesh->triangles.end()
+		);
+
+		batchInfo.triExtBuffer.insert(
+			batchInfo.triExtBuffer.end(),
+			mesh->triExtensions.begin(),
+			mesh->triExtensions.end()
+		);
+	}
+
+	for (auto const& [ bvh, size ] : sceneBVHIndices)
+	{
+		batchInfo.BLASIndices.insert(
+			batchInfo.BLASIndices.end(),
+			bvh->indices(),
+			bvh->indices() + size
+		);
+	}
+
+	for (auto const& [ bvh, size ] : sceneBVHNodes)
+	{
+		batchInfo.BLASNodes.insert(
+			batchInfo.BLASNodes.end(),
+			bvh->nodePool(),
+			bvh->nodePool() + size
+		);
+	}
+
+	for (auto const& material : sceneMaterials)
+	{
+		batchInfo.materials.push_back(*material);
+	}
+
+	for (auto const& instance : instances)
+	{
+		GPUInstance gpuInstance = instance.toGPUInstance();
+		for (auto const& [ mesh, size ] : sceneMeshes)
+		{
+			if (mesh == instance.bvh->mesh()) break;
+			gpuInstance.triOffset += size;
+		}
+
+		for (auto const& [ bvh, size ] : sceneBVHIndices)
+		{
+			if (bvh == instance.bvh) break;
+			gpuInstance.bvhIdxOffset += size;
+		}
+
+		for (auto const& [ bvh, size ] : sceneBVHNodes)
+		{
+			if (bvh == instance.bvh) break;
+			gpuInstance.bvhNodeOffset += size;
+		}
+
+		for (auto const& material : sceneMaterials)
+		{
+			if (material == instance.material) break;
+			gpuInstance.materialOffset++;
+		}
+
+		batchInfo.gpuInstances.push_back(gpuInstance);
+	}
+
+	return batchInfo;
+}
+
 GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std::vector<Instance> instances)
 	:
-	Scene(background, instances)
+	Scene(background, instances),
+	batchInfo(GPUBatcher::createBatchInfo(instances)),
+	globalTriBuffer(
+		renderContext->allocator, batchInfo.triBuffer.size() * sizeof(Triangle),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	),
+	globalTriExtBuffer(
+		renderContext->allocator, batchInfo.triExtBuffer.size() * sizeof(TriExtension),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	),
+	BLASGlobalIndexBuffer(
+		renderContext->allocator, batchInfo.BLASIndices.size() * sizeof(U32),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	),
+	BLASGlobalNodeBuffer(
+		renderContext->allocator, batchInfo.BLASNodes.size() * sizeof(BvhNode),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	),
+	materialBuffer(
+		renderContext->allocator, batchInfo.materials.size() * sizeof(Material),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	),
+	instanceBuffer(
+		renderContext->allocator, batchInfo.gpuInstances.size() * sizeof(GPUInstance),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	),
+	TLASIndexBuffer(
+		renderContext->allocator, instances.size() * sizeof(U32),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	),
+	TLASNodeBuffer(
+		renderContext->allocator, m_sceneTlas.nodesUsed() * sizeof(BvhNode),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
+	)
 {
 	assert(renderContext != nullptr);
 
-	SizeType triBufferSize = 0;
-	SizeType triExBufferSize = 0;
-	SizeType TLASIdxBufferSize = instances.size() * sizeof(U32);
-	SizeType TLASNodeBufferSize = m_sceneTlas.nodesUsed() * sizeof(BvhNode);
-
-	// GPU mesh list
-	std::vector<GPUMesh> gpuMeshes;
-	std::vector<U32> globalBLASIndices;
-	std::vector<BvhNode> globalBLASNodes;
-	std::vector<Material> materialList;
-	std::vector<GPUInstance> gpuInstances;
-
-	// Handle unique meshes & materials
-	{
-		std::set<const Mesh*> meshes;
-		std::set<const BvhBLAS*> blasses;
-		std::set<const Material*> materials;
-
-		for (auto const& instance : instances)
-		{
-			meshes.insert(instance.bvh->mesh());
-			blasses.insert(instance.bvh);
-			materials.insert(instance.material);
-		}
-
-		// Create GPU meshes & calculate total buffer size
-		for (auto const& mesh : meshes)
-		{
-			gpuMeshes.push_back(GPUMesh(renderContext, *mesh));
-			triBufferSize += gpuMeshes.back().triBuffer.size();
-			triExBufferSize += gpuMeshes.back().triBuffer.size();
-		}
-
-		// Gather blas nodes & indices
-		for (auto const& blas : blasses)
-		{
-			globalBLASIndices.insert(globalBLASIndices.end(), blas->indices(), blas->indices() + blas->triCount());
-			globalBLASNodes.insert(globalBLASNodes.end(), blas->nodePool(), blas->nodePool() + blas->nodesUsed());
-		}
-
-		// Gather materials
-		for (auto const& material : materials)
-		{
-			materialList.push_back(*material);
-		}
-
-		// TODO: For every GPU instance -> calculate global tri offset, bvh idx + node start & count, material idx
-	}
-
-	// TODO: allocate buffers & upload data to GPU
+	// TODO: upload GPU data using staging buffer
 }

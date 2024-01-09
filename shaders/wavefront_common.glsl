@@ -34,6 +34,13 @@ struct Material
 	float indexOfRefraction;
 };
 
+struct RayHit
+{
+	uint instanceIdx;
+	uint primitiveIdx;
+	vec2 hitCoords;
+};
+
 struct Ray
 {
 	vec3 origin;
@@ -42,8 +49,7 @@ struct Ray
 	bool inMedium;
 	vec3 transmission;
 	uint pixelIdx;		// Pixel index for ray into out buffer
-	uint primitiveIdx;	// Index into TLAS/BLAS primitive list
-	vec2 hitCoords;		// Barycentric hit coordinates
+	RayHit hit;
 };
 
 uint WangHash(uint seed)
@@ -101,6 +107,12 @@ vec3 diffuseReflect(inout uint seed, vec3 normal)
 	return normalize(direction);
 }
 
+vec3 diffuseReflectCosineWeighted(inout uint seed, vec3 normal)
+{
+	// FIXME: implement this
+	return diffuseReflect(seed, normal);
+}
+
 vec3 sampleSkyColor(Ray ray, SceneBackground background)
 {
 	if (background.type == SCENE_BG_TYPE_SOLID)
@@ -137,8 +149,7 @@ Ray newRay(vec3 origin, vec3 direction)
 		false,
 		vec3(1),
 		UNSET_IDX,
-		UNSET_IDX,
-		vec2(0, 0)
+		RayHit(UNSET_IDX, UNSET_IDX, vec2(0))
 	);
 }
 
@@ -150,70 +161,6 @@ bool depthInBounds(float depth, float maxDepth)
 vec3 rayHitPosition(Ray ray)
 {
 	return ray.origin + ray.depth * ray.direction;
-}
-
-// XXX: Temp sphere stuff for test scene
-struct Sphere
-{
-	vec3 position;
-	float radius;
-};
-
-Sphere sphereList[3] = Sphere[](
-	Sphere(vec3(0, -101, 0), 100),
-	Sphere(vec3(-2, 0, 0), 1.0),
-	Sphere(vec3(2, 0, 0), 1.0)
-);
-
-vec3 sphereNormal(Sphere s, vec3 hitPosition)
-{
-	return (hitPosition - s.position) / s.radius;
-}
-
-bool sphereIntersect(Sphere s, inout Ray ray)
-{
-	vec3 oc = ray.origin - s.position;
-	float a = dot(ray.direction, ray.direction);
-	float halfB = dot(oc, ray.direction);
-	float c = dot(oc, oc) - (s.radius * s.radius);
-
-	float d = (halfB * halfB) - (a * c);
-	if (d < 0.0)
-		return false;
-
-	float depth = (-halfB - sqrt(d)) / a;
-	if (!depthInBounds(depth, ray.depth))
-	{
-		depth = (-halfB + sqrt(d)) / a;
-		if (!depthInBounds(depth, ray.depth))
-		{
-			return false;
-		}
-	}
-
-	ray.depth = depth;
-	return true;
-}
-
-bool sceneIntersect(inout Ray ray)
-{
-	bool hit = false;
-
-	for (uint i = 0; i < sphereList.length(); i++)
-	{
-		if (sphereIntersect(sphereList[i], ray))
-		{
-			ray.primitiveIdx = i;
-			hit = true;
-		}
-	}
-
-	return hit;
-}
-
-vec3 sceneNormal(Ray ray)
-{
-	return sphereNormal(sphereList[ray.primitiveIdx], rayHitPosition(ray));
 }
 
 #endif

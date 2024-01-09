@@ -30,8 +30,8 @@
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
-#define FRAMEDATA_OUTPUT		1
-#define WAVEFRONT_PATHTRACING	1
+#define FRAMEDATA_OUTPUT		0
+#define GPU_PATH_TRACING		1
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
@@ -127,7 +127,7 @@ int main()
 	RenderContext renderContext(window);
 	FramebufferSize resolution = renderContext.getFramebufferSize();
 
-#if WAVEFRONT_PATHTRACING == 0
+#if GPU_PATH_TRACING == 0
 	PixelBuffer resultBuffer(
 		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
 		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
@@ -238,7 +238,7 @@ int main()
 
 	// -- END Scene setup
 
-#if WAVEFRONT_PATHTRACING == 0
+#if GPU_PATH_TRACING == 0
 	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
 
 	RendererConfig rendererConfig = RendererConfig{
@@ -249,14 +249,6 @@ int main()
 	Renderer renderer(&renderContext, rendererConfig, resultBuffer, worldCam, scene);
 #else
 	GPUScene scene(&renderContext, background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
-
-	// TODO:
-	// - Load all hsot visible GPU buffers into single (per scene?) device local buffer
-	// - Load BLAS data into GPU device local buffer
-	// - Load instance data into GPU device local buffer (extra index offset into mesh & bvh buffer for start of per instance data)
-	// - Load TLAS data into GPU device local buffer
-	//
-	// Above managed by GPUScene on loading of TLAS
 
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces

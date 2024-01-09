@@ -21,8 +21,13 @@ struct GPURay
 	bool inMedium;
 	Float3 transmission;
 	U32 pixelIdx;
-	U32 primitiveIdx;
-	Float2 hitCoords;
+
+	struct GPURayHit
+	{
+		U32 instanceIdx;
+		U32 primitiveIdx;
+		Float2 hitCoords;
+	};
 };
 
 struct Ray

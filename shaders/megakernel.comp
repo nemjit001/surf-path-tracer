@@ -4,6 +4,9 @@
 #include "bvh.glsl"
 #include "wavefront_common.glsl"
 
+#define TLAS_ROOT_IDX			0
+#define TRAVERSAL_STACK_SIZE 	64
+
 layout(set = 0, binding = 0) uniform CameraData
 {
 	vec3 position;
@@ -19,43 +22,173 @@ layout(set = 0, binding = 1) uniform FrameState
 	uint totalSamples;
 } frameState;
 
-layout(set = 0, binding = 2) buffer AccumulatorBuffer
-{
-	vec4 accumulator[];
-};
-
+layout(set = 0, binding = 2) buffer AccumulatorBuffer { vec4 accumulator[]; };
 layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
-layout(set = 2, binding = 0) uniform SceneData
-{
-	SceneBackground background;
-} sceneData;
-
-layout(set = 2, binding = 1) buffer TriangleBuffer
-{
-	Triangle triangles[];
-} tris;
-
-layout(set = 2, binding = 2) buffer BLASBuffer
-{
-	BvhNode nodes[];
-} blas;
-
-layout(set = 2, binding = 3) buffer InstanceBuffer
-{
-	Instance instances[];
-} instances;
-
-layout(set = 2, binding = 4) buffer TLASBuffer
-{
-	uint nodesUsed;
-	BvhNode nodes[];
-} tlas;
+layout(set = 2, binding = 0) uniform SceneData 		{ SceneBackground background; } sceneData;
+layout(set = 2, binding = 1) buffer TriBuffer 		{ Triangle triangles[]; };
+layout(set = 2, binding = 2) buffer TriExtBuffer 	{ TriExtension triExtensions[]; };
+layout(set = 2, binding = 3) buffer BLASIndexBuffer { uint blasIndices[]; };
+layout(set = 2, binding = 4) buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
+layout(set = 2, binding = 5) buffer MaterialBuffer 	{ Material materials[]; };
+layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
+layout(set = 2, binding = 7) buffer TLASIndexBuffer { uint tlasIndices[]; };
+layout(set = 2, binding = 8) buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
-const vec3 albedo		= vec3(1, 0, 0);
-const vec3 emittance	= vec3(0, 0, 0);
+bool intersectBLAS(Instance instance, inout Ray ray)
+{
+	BvhNode node = blasNodes[instance.nodeOffset];
+	uint stack[TRAVERSAL_STACK_SIZE];
+	uint stackptr = 0;
+	bool intersected = false;
+
+	while(true)
+	{
+		if (bvhNodeIsLeaf(node))
+		{
+			for (uint i = 0; i < node.count; i++)
+			{
+				uint primIdx = blasIndices[instance.idxOffset + node.leftFirst + i];
+				if (triangleIntersect(triangles[instance.triOffset + primIdx], ray))
+				{
+					ray.hit.primitiveIdx = primIdx;
+					intersected = true;
+				}
+			}
+
+			if (stackptr == 0)
+				break;
+
+			node = blasNodes[stack[stackptr - 1]];
+			stackptr--;
+			continue;
+		}
+
+		uint childNearIdx = instance.nodeOffset + node.leftFirst;
+		uint childFarIdx = childNearIdx + 1;
+		float distNear = aabbIntersect(blasNodes[childNearIdx], ray);
+		float distFar = aabbIntersect(blasNodes[childFarIdx], ray);
+
+		if (distNear > distFar)
+		{
+			uint ti = childNearIdx; childNearIdx = childFarIdx; childFarIdx = ti;
+			float td = distNear; distNear = distFar; distFar = td;
+		}
+
+		if (distNear == F32_FAR_AWAY)
+		{
+			if (stackptr == 0)
+				break;
+			
+			node = blasNodes[stack[stackptr - 1]];
+			stackptr--;
+		}
+		else
+		{
+			node = blasNodes[childNearIdx];
+			if (distFar != F32_FAR_AWAY)
+			{
+				stack[stackptr] = childFarIdx;
+				stackptr++;
+			}
+		}
+	}
+
+	return intersected;
+}
+
+bool intersectInstance(Instance instance, inout Ray ray)
+{
+	Ray oldRay = ray;
+
+	vec4 tPos = instance.invTransform * vec4(ray.origin, 1);
+	vec4 tDir = instance.invTransform * vec4(ray.direction, 0);
+
+	ray.origin = tPos.xyz / tPos.w;
+	ray.direction = tDir.xyz;
+
+	bool intersected = intersectBLAS(instance, ray);
+	ray.origin = oldRay.origin;
+	ray.direction = oldRay.direction;
+
+	return intersected;
+}
+
+bool intersectTLAS(inout Ray ray)
+{
+	BvhNode node = tlasNodes[TLAS_ROOT_IDX];
+	uint stack[TRAVERSAL_STACK_SIZE];
+	uint stackptr = 0;
+	bool intersected = false;
+
+	while(true)
+	{
+		if (bvhNodeIsLeaf(node))
+		{
+			for (uint i = 0; i < node.count; i++)
+			{
+				uint instanceIdx = tlasIndices[node.leftFirst + i];
+				if (intersectInstance(instances[instanceIdx], ray))
+				{
+					ray.hit.instanceIdx = instanceIdx;
+					intersected = true;
+				}
+			}
+
+			if (stackptr == 0)
+				break;
+
+			node = tlasNodes[stack[stackptr - 1]];
+			stackptr--;
+			continue;
+		}
+
+		uint childNearIdx = node.leftFirst;
+		uint childFarIdx = childNearIdx + 1;
+		float distNear = aabbIntersect(tlasNodes[childNearIdx], ray);
+		float distFar = aabbIntersect(tlasNodes[childFarIdx], ray);
+
+		if (distNear > distFar)
+		{
+			uint ti = childNearIdx; childNearIdx = childFarIdx; childFarIdx = ti;
+			float td = distNear; distNear = distFar; distFar = td;
+		}
+
+		if (distNear == F32_FAR_AWAY)
+		{
+			if (stackptr == 0)
+				break;
+			
+			node = tlasNodes[stack[stackptr - 1]];
+			stackptr--;
+		}
+		else
+		{
+			node = tlasNodes[childNearIdx];
+			if (distFar != F32_FAR_AWAY)
+			{
+				stack[stackptr] = childFarIdx;
+				stackptr++;
+			}
+		}
+	}
+
+	return intersected;
+}
+
+vec3 sceneNormal(Ray ray)
+{
+	Instance instance = instances[ray.hit.instanceIdx];
+	return scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray);
+}
+
+Material sceneMaterial(Ray ray)
+{
+	Instance hitInstance = instances[ray.hit.instanceIdx];
+	return materials[hitInstance.materialOffset];
+}
 
 void main()
 {
@@ -81,8 +214,7 @@ void main()
 		vec3 energy = vec3(0);
 		for (uint bounceCount = 0;;bounceCount++)
 		{
-			// TODO: actual scene intersect with BVH TLAS / BLAS
-			if (!sceneIntersect(activeRay))
+			if (!intersectTLAS(activeRay))
 			{
 				energy += activeRay.transmission * sampleSkyColor(activeRay, sceneData.background);
 				break;
@@ -90,14 +222,7 @@ void main()
 
 			vec3 I = rayHitPosition(activeRay);
 			vec3 N = sceneNormal(activeRay);
-			vec2 texCoords = vec2(0, 0);
-			Material material = Material(
-				vec3(0, 0, 0), 0.0,		// Emission color & strength
-				vec3(0.2, 0.2, 0.2),	// Albedo
-				vec3(0.02, 0.02, 0.02),	// Absorption
-				0.0, 0.0,				// Reflectivity & Refractivity
-				1.05					// IOR
-			);
+			Material material = sceneMaterial(activeRay);
 
 			if (materialIsLight(material))
 			{

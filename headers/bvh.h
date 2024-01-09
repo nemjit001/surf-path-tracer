@@ -92,11 +92,10 @@ private:
 
 struct GPUInstance
 {
-	U32 bvhNodeStart;		// Index offset into BVH GPU node array
-	U32 bvhNodeCount;		// Length of BVH Node array from start idx
-	U32 bvhIdxStart;		// Index offset into BVH GPU index array
-	U32 bvhIdxCount;		// Length of BVH index array from start idx
-	U32 materialIdx;		// Index of material in GPU array
+	U32 triOffset;			// Index offset into triangle array
+	U32 bvhIdxOffset;		// Index offset into BVH GPU index array
+	U32 bvhNodeOffset;		// Index offset into BVH GPU node array
+	U32 materialOffset;		// Index offset into material GPU array
 	Mat4 transform;
 	Mat4 invTransform;
 };
@@ -174,9 +173,8 @@ private:
 inline GPUInstance Instance::toGPUInstance() const
 {
 	return GPUInstance{
-		UNSET_INDEX, 0, // Node stuff
-		UNSET_INDEX, 0, // Idx stuff
-		UNSET_INDEX,	// Material index
+		0, 0,
+		0, 0,
 		m_transform, m_invTransform
 	};
 }

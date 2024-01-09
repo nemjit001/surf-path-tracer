@@ -9,5 +9,6 @@ layout(binding = 0, set = 0) uniform sampler2D renderResult;
 
 void main()
 {
-	fragColor = texture(renderResult, screenCoords);
+	vec4 linearColor = texture(renderResult, screenCoords);	// output is in linear color space
+	fragColor = sqrt(linearColor);	// approximate L^(1/gamma) w/ gamma = 2.2 by assuming gamma = 2
 }

@@ -8,6 +8,13 @@ struct Triangle
 	vec3 v0;
 	vec3 v1;
 	vec3 v2;
+	vec3 triCentroid;
+};
+
+struct TriExtension
+{
+	vec3 n0, n1, n2;
+	vec2 uv0, uv1, uv2;
 };
 
 struct BvhNode
@@ -20,8 +27,10 @@ struct BvhNode
 
 struct Instance
 {
-	uint blasStart;
-	uint blasNodeCount;
+	uint triOffset;
+	uint idxOffset;
+	uint nodeOffset;
+	uint materialOffset;
 	mat4 transform;
 	mat4 invTransform;
 };
@@ -29,6 +38,12 @@ struct Instance
 bool bvhNodeIsLeaf(BvhNode node)
 {
 	return node.count != 0;
+}
+
+vec3 scaleNormalBarycentric(TriExtension ext, Ray ray)
+{
+	vec2 uv = ray.hit.hitCoords;
+	return uv.x * ext.n0 + uv.y * ext.n2 + (1.0 - uv.x - uv.y) * ext.n1;
 }
 
 bool triangleIntersect(Triangle tri, inout Ray ray)
@@ -60,7 +75,7 @@ bool triangleIntersect(Triangle tri, inout Ray ray)
 		return false;
 
 	ray.depth = depth;
-	ray.hitCoords = vec2(u, v);
+	ray.hit.hitCoords = vec2(u, v);
 	return true;
 }
 
