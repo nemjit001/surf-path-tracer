@@ -550,7 +550,7 @@ void Renderer::recordFrame(
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, Scene& scene)
+WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, GPUScene& scene)
     :
     m_context(renderContext),
     m_config(config),
@@ -668,6 +668,78 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfi
         0, VK_WHOLE_SIZE
     };
 
+    WriteDescriptorSet triBufWriteset = {};
+    triBufWriteset.set = 2;
+    triBufWriteset.binding = 1;
+    triBufWriteset.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    triBufWriteset.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.globalTriBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet triExtBufWriteset = {};
+    triExtBufWriteset.set = 2;
+    triExtBufWriteset.binding = 2;
+    triExtBufWriteset.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    triExtBufWriteset.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.globalTriExtBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet blasIdxWriteSet = {};
+    blasIdxWriteSet.set = 2;
+    blasIdxWriteSet.binding = 3;
+    blasIdxWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    blasIdxWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.BLASGlobalIndexBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet blasNodeWriteSet = {};
+    blasNodeWriteSet.set = 2;
+    blasNodeWriteSet.binding = 4;
+    blasNodeWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    blasNodeWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.BLASGlobalNodeBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet materialWriteSet = {};
+    materialWriteSet.set = 2;
+    materialWriteSet.binding = 5;
+    materialWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    materialWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.materialBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet instanceWriteSet = {};
+    instanceWriteSet.set = 2;
+    instanceWriteSet.binding = 6;
+    instanceWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    instanceWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.instanceBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet tlasIdxWriteSet = {};
+    tlasIdxWriteSet.set = 2;
+    tlasIdxWriteSet.binding = 7;
+    tlasIdxWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    tlasIdxWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.TLASIndexBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
+    WriteDescriptorSet tlasNodeWriteSet = {};
+    tlasNodeWriteSet.set = 2;
+    tlasNodeWriteSet.binding = 8;
+    tlasNodeWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    tlasNodeWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.TLASNodeBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
 #if GPU_MEGAKERNEL == 1
     m_megakernelPipeline.updateDescriptorSets({
         cameraWriteSet,
@@ -675,6 +747,14 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfi
         accumulatorWriteSet,
         outputImageWriteSet,
         sceneDataWriteSet,
+        triBufWriteset,
+        triExtBufWriteset,
+        blasIdxWriteSet,
+        blasNodeWriteSet,
+        materialWriteSet,
+        instanceWriteSet,
+        tlasIdxWriteSet,
+        tlasNodeWriteSet
     });
 #else
     WriteDescriptorSet raySSBOWriteSet = {};

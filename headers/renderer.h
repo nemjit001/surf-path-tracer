@@ -193,7 +193,7 @@ class WaveFrontRenderer
     : public IRenderer
 {
 public:
-    WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, Scene& scene);
+    WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, GPUScene& scene);
 
     ~WaveFrontRenderer();
 
@@ -230,7 +230,7 @@ private:
     RenderContext* m_context;
     RendererConfig m_config;
     Camera& m_camera;
-    Scene& m_scene;
+    GPUScene& m_scene;
 
     // Frame data
     FramebufferSize m_renderResolution;
