@@ -79,7 +79,7 @@ void main()
 		Ray activeRay = newRay(origin, direction);
 
 		vec3 energy = vec3(0);
-		while(true)
+		for (uint bounceCount = 0;;bounceCount++)
 		{
 			// TODO: actual scene intersect with BVH TLAS / BLAS
 			if (!sceneIntersect(activeRay))
@@ -106,6 +106,9 @@ void main()
 			}
 
 			float p = clamp(max(activeRay.transmission.r, max(activeRay.transmission.g, activeRay.transmission.b)), 0.0f, 1.0f);
+			if (bounceCount <= 2)	// Don't RR on first 2 bounces
+				p = 1.0;
+
 			if (p < randomF32(pixelSeed))
 				break;
 
