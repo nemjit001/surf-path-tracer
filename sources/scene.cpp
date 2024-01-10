@@ -7,6 +7,7 @@
 #include <vulkan/vulkan.h>
 
 #include "bvh.h"
+#include "camera.h"
 #include "ray.h"
 #include "render_context.h"
 #include "surf_math.h"
@@ -41,6 +42,9 @@ RgbColor Scene::sampleBackground(const Ray& ray) const
 
 void Scene::update(F32 deltaTime)
 {
+	Instance& instance = m_sceneTlas.instance(3);
+	instance.setTransform(glm::rotate(instance.transform(), 1.0f * deltaTime, static_cast<glm::vec3>(WORLD_UP)));
+
 	m_sceneTlas.refit();
 }
 
@@ -234,10 +238,17 @@ GPUScene::~GPUScene()
 
 void GPUScene::update(F32 deltaTime)
 {
-	m_sceneTlas.refit();
+	Instance& instance = m_sceneTlas.instance(3);
+	instance.setTransform(glm::rotate(instance.transform(), 1.0f * deltaTime, static_cast<glm::vec3>(WORLD_UP)));
 
+	m_sceneTlas.refit();
+	m_batchInfo = GPUBatcher::createBatchInfo(m_sceneTlas.instances());	// FIXME: is rebatching fast enough for realtime use with larger scenes?
+
+	SizeType instanceBufSize = m_batchInfo.gpuInstances.size() * sizeof(GPUInstance);
 	SizeType tlasIndexBufSize = m_batchInfo.gpuInstances.size() * sizeof(U32);
 	SizeType tlasNodeBufSize = m_sceneTlas.nodesUsed() * sizeof(BvhNode);
+
+	uploadToGPU(m_batchInfo.gpuInstances.data(), instanceBufSize, instanceBuffer);
 	uploadToGPU(m_sceneTlas.indices(), tlasIndexBufSize, TLASIndexBuffer);
 	uploadToGPU(m_sceneTlas.nodePool(), tlasNodeBufSize, TLASNodeBuffer);
 }

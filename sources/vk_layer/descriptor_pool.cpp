@@ -18,7 +18,7 @@ DescriptorPool::DescriptorPool(VkDevice device)
     };
 
     VkDescriptorPoolCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-    createInfo.flags = 0;
+    createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     createInfo.maxSets = MAX_DESCRIPTOR_SETS;
     createInfo.poolSizeCount = sizeof(poolSizes) / sizeof(poolSizes[0]);
     createInfo.pPoolSizes = poolSizes;

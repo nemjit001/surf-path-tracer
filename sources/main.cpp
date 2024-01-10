@@ -32,7 +32,7 @@
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
 #define FRAMEDATA_OUTPUT		1
-#define GPU_PATH_TRACING		0
+#define GPU_PATH_TRACING		1
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
@@ -156,7 +156,7 @@ int main()
 		1
 	};
 	
-	UIManager uiManager(&renderContext);
+	UIManager uiManager(&renderContext, UIStyle::DarkMode);
 
 	// -- BEGIN Scene setup
 
@@ -307,7 +307,7 @@ int main()
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
 
-		if (cameraUpdated || uiState.updated)
+		if (cameraUpdated || uiState.updated || uiState.animate)
 		{
 			worldCam.focalLength = uiState.focalLength;
 			worldCam.defocusAngle = uiState.defocusAngle;

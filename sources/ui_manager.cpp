@@ -77,21 +77,37 @@ void UIManager::drawUI(F32 deltaTime, UIState& uiState)
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	ImGui::Begin("Settings");
-	ImGui::SetWindowSize(ImVec2(400.0f, 200.0f));
+	if (ImGui::Begin("Settings"))
+	{
+		ImGui::SetWindowSize(ImVec2(400.0f, 150.0f), ImGuiCond_FirstUseEver);
 
-	// Debug stats
-	ImGui::Text("Stats: %8.1f FPS\t%8.2f ms", 1.0f / deltaTime, deltaTime);
+		// Debug stats
+		if (ImGui::TreeNode("Stats"))
+		{
+			ImGui::Text("FPS: %8.1f FPS", 1.0f / deltaTime);
+			ImGui::Text("Frame delta: %8.2 ms", deltaTime);
+			ImGui::TreePop();
+		}
 
-	// Camera condig
-	uiState.updated |= ImGui::SliderFloat("Focal Length", &uiState.focalLength, 0.1f, 25.0f);
-	uiState.updated |= ImGui::SliderFloat("Defocus Angle", &uiState.defocusAngle, 0.0f, 10.0f);
+		// Camera config
+		if (ImGui::TreeNode("Camera"))
+		{
+			uiState.updated |= ImGui::SliderFloat("Focal Length", &uiState.focalLength, 0.1f, 25.0f);
+			uiState.updated |= ImGui::SliderFloat("Defocus Angle", &uiState.defocusAngle, 0.0f, 10.0f);
+			ImGui::TreePop();
+		}
 
-	// Renderer config
-	uiState.updated |= ImGui::Checkbox("Animate Scene", &uiState.animate);
-	uiState.updated |= ImGui::SliderInt("Samples Per Pass", reinterpret_cast<I32*>(&uiState.spp), 1, 24);
+		// Renderer config
+		if (ImGui::TreeNode("Renderer"))
+		{
+			uiState.updated |= ImGui::Checkbox("Animate Scene", &uiState.animate);
+			uiState.updated |= ImGui::SliderInt("Samples Per Pass", reinterpret_cast<I32*>(&uiState.spp), 1, 24);
+			ImGui::TreePop();
+		}
 
-	ImGui::End();
+		ImGui::End();
+	}
+
 	ImGui::Render();
 }
 
