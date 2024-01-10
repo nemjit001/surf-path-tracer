@@ -45,17 +45,6 @@ public:
 	std::vector<TriExtension> triExtensions;
 };
 
-class GPUMesh
-{
-public:
-	GPUMesh(RenderContext* renderContext, Mesh mesh);
-
-public:
-	Mesh mesh;
-	Buffer triBuffer;
-	Buffer triExBuffer;
-};
-
 Float3 Mesh::normal(SizeType primitiveIndex) const
 {
 	assert(primitiveIndex < triangles.size());

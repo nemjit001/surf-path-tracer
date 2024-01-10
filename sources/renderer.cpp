@@ -603,31 +603,34 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     }
 
     // Set up wavefront compute structures
-    VkCommandPoolCreateInfo wfPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    wfPoolCreateInfo.flags = 0;
-    wfPoolCreateInfo.queueFamilyIndex = m_context->queues.computeQueue.familyIndex;
-    VK_CHECK(vkCreateCommandPool(m_context->device, &wfPoolCreateInfo, nullptr, &m_wavefrontCompute.pool));
+    for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
+        VkCommandPoolCreateInfo wfPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+        wfPoolCreateInfo.flags = 0;
+        wfPoolCreateInfo.queueFamilyIndex = m_context->queues.computeQueue.familyIndex;
+        VK_CHECK(vkCreateCommandPool(m_context->device, &wfPoolCreateInfo, nullptr, &m_wavefrontCompute[i].pool));
 
 #if GPU_MEGAKERNEL == 1
-    VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    computeBufferAllocateInfo.commandPool = m_wavefrontCompute.pool;
-    computeBufferAllocateInfo.commandBufferCount = 1;
-    VK_CHECK(vkAllocateCommandBuffers(m_context->device, &computeBufferAllocateInfo, &m_wavefrontCompute.commandBuffer));
+        VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        computeBufferAllocateInfo.commandPool = m_wavefrontCompute[i].pool;
+        computeBufferAllocateInfo.commandBufferCount = 1;
+        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &computeBufferAllocateInfo, &m_wavefrontCompute[i].commandBuffer));
 #else
-    VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    computeBufferAllocateInfo.commandPool = m_wavefrontCompute.pool;
-    computeBufferAllocateInfo.commandBufferCount = 3;
-    VK_CHECK(vkAllocateCommandBuffers(m_context.device, &computeBufferAllocateInfo, m_wavefrontCompute.wavefrontBuffers));
+        VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        computeBufferAllocateInfo.commandPool = m_wavefrontCompute[i].pool;
+        computeBufferAllocateInfo.commandBufferCount = 3;
+        VK_CHECK(vkAllocateCommandBuffers(m_context.device, &computeBufferAllocateInfo, m_wavefrontCompute[i].wavefrontBuffers));
 #endif
 
-    VkFenceCreateInfo computeReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-    computeReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    VK_CHECK(vkCreateFence(m_context->device, &computeReadyCreateInfo, nullptr, &m_wavefrontCompute.computeReady));
+        VkFenceCreateInfo computeReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+        computeReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        VK_CHECK(vkCreateFence(m_context->device, &computeReadyCreateInfo, nullptr, &m_wavefrontCompute[i].computeReady));
 
-    VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_wavefrontCompute.computeFinished));
+        VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+        VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_wavefrontCompute[i].computeFinished));
+    }
 
     // Create framebuffers for swapchain images
     m_framebuffers.reserve(m_context->swapchain.image_count);
@@ -824,13 +827,16 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         frameImageSamplerSet
     });
 
+    for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
+    {
 #if GPU_MEGAKERNEL == 1
-    bakeMegakernelPass(m_wavefrontCompute.commandBuffer);
+        bakeMegakernelPass(m_wavefrontCompute[i].commandBuffer);
 #else
-    bakeRayGenPass(m_wavefrontCompute.rayGenBuffer);
-    bakeWavePass(m_wavefrontCompute.waveBuffer);
-    bakeFinalizePass(m_wavefrontCompute.finalizeBuffer);
+        bakeRayGenPass(m_wavefrontCompute[i].rayGenBuffer);
+        bakeWavePass(m_wavefrontCompute[i].waveBuffer);
+        bakeFinalizePass(m_wavefrontCompute[i].finalizeBuffer);
 #endif
+    }
 
     clearAccumulator();
 }
@@ -839,13 +845,13 @@ WaveFrontRenderer::~WaveFrontRenderer()
 {
     vkDeviceWaitIdle(m_context->device);
 
-    // Teardown wavefront compute setup
-    vkDestroyCommandPool(m_context->device, m_wavefrontCompute.pool, nullptr);
-    vkDestroyFence(m_context->device, m_wavefrontCompute.computeReady, nullptr);
-    vkDestroySemaphore(m_context->device, m_wavefrontCompute.computeFinished, nullptr);
-
     for (SizeType i = 0; i < FRAMES_IN_FLIGHT; i++)
     {
+        VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute[i].computeReady, VK_TRUE, UINT64_MAX));
+        vkDestroyCommandPool(m_context->device, m_wavefrontCompute[i].pool, nullptr);
+        vkDestroyFence(m_context->device, m_wavefrontCompute[i].computeReady, nullptr);
+        vkDestroySemaphore(m_context->device, m_wavefrontCompute[i].computeFinished, nullptr);
+
         VK_CHECK(vkWaitForFences(m_context->device, 1, &m_frames[i].frameReady, VK_TRUE, UINT64_MAX));
         vkDestroyCommandPool(m_context->device, m_frames[i].pool, nullptr);
         vkDestroyFence(m_context->device, m_frames[i].frameReady, nullptr);
@@ -867,11 +873,12 @@ void WaveFrontRenderer::clearAccumulator()
 void WaveFrontRenderer::render(F32 deltaTime)
 {
     const FrameData& activeFrame = m_frames[m_currentFrame];
+    const WavefrontCompute& activeCompute = m_wavefrontCompute[m_currentFrame];
     
     U32 swapImageIdx = 0;
     VK_CHECK(vkAcquireNextImageKHR(m_context->device, m_context->swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &swapImageIdx));
 
-    VkFence fences[] = { activeFrame.frameReady, m_wavefrontCompute.computeReady };
+    VkFence fences[] = { activeFrame.frameReady, activeCompute.computeReady };
     VK_CHECK(vkWaitForFences(m_context->device, 2, fences, VK_TRUE, UINT64_MAX));
     VK_CHECK(vkResetFences(m_context->device, 2, fences));
 
@@ -905,13 +912,13 @@ void WaveFrontRenderer::render(F32 deltaTime)
     // Submit baked megakernel pass
     VkSubmitInfo computeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     computeSubmit.commandBufferCount = 1;
-    computeSubmit.pCommandBuffers = &m_wavefrontCompute.commandBuffer;
+    computeSubmit.pCommandBuffers = &activeCompute.commandBuffer;
     computeSubmit.waitSemaphoreCount = 1;
     computeSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
     computeSubmit.pWaitDstStageMask = computeWaitStages;
     computeSubmit.signalSemaphoreCount = 1;
-    computeSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
-    VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &computeSubmit, m_wavefrontCompute.computeReady));
+    computeSubmit.pSignalSemaphores = &activeCompute.computeFinished;
+    VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &computeSubmit, activeCompute.computeReady));
 #else
     RayGenUBO* rayGenState = nullptr;
     m_raySSBO.persistentMap(reinterpret_cast<void**>(&rayGenState));
@@ -965,7 +972,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
     presentSubmit.commandBufferCount = 1;
     presentSubmit.pCommandBuffers = &activeFrame.presentCommandBuffer;
     presentSubmit.waitSemaphoreCount = 1;
-    presentSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
+    presentSubmit.pWaitSemaphores = &activeCompute.computeFinished;
     presentSubmit.pWaitDstStageMask = gfxWaitStages;
     presentSubmit.signalSemaphoreCount = 1;
     presentSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
@@ -1042,6 +1049,40 @@ void WaveFrontRenderer::bakeMegakernelPass(VkCommandBuffer commandBuffer)
     );
     vkCmdBindPipeline(commandBuffer, m_megakernelPipeline.bindPoint(), m_megakernelPipeline.handle());
     vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32), (m_renderResolution.height / 32) + 1, 1);
+
+    // Ensure coherent accumulator & image access
+    VkBufferMemoryBarrier accumulatorBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
+    accumulatorBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    accumulatorBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    accumulatorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    accumulatorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    accumulatorBarrier.offset = 0;
+    accumulatorBarrier.size = VK_WHOLE_SIZE;
+    accumulatorBarrier.buffer = m_accumulatorSSBO.handle();
+
+    VkImageMemoryBarrier outImageBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    outImageBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outImageBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outImageBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outImageBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outImageBarrier.image = m_frameImage.handle();
+    outImageBarrier.subresourceRange = VkImageSubresourceRange{
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        0, 1,
+        0, 1
+    };
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0,
+        0, nullptr,
+        1, &accumulatorBarrier,
+        1, &outImageBarrier
+    );
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }

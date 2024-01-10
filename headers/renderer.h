@@ -19,7 +19,7 @@
 #include "vk_layer/render_pass.h"
 #include "vk_layer/sampler.h"
 
-#define FRAMES_IN_FLIGHT    2
+#define FRAMES_IN_FLIGHT    3
 #define GPU_MEGAKERNEL      1
 
 struct RendererConfig
@@ -262,9 +262,7 @@ private:
     SizeType m_currentFrame = 0;
     FramebufferSize m_framebufferSize = m_context->getFramebufferSize();
     FrameData m_frames[FRAMES_IN_FLIGHT] = {};
-
-    // Compute setup
-    WavefrontCompute m_wavefrontCompute = {};
+    WavefrontCompute m_wavefrontCompute[FRAMES_IN_FLIGHT] = {};
 
     // Default render pass w/ framebuffers
     RenderPass m_presentPass = RenderPass(
