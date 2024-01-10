@@ -7,7 +7,9 @@
 #include <vulkan/vulkan.h>
 
 #include "render_context.h"
+#include "vk_layer/framebuffer.h"
 #include "vk_layer/render_pass.h"
+#include "vk_layer/image.h"
 #include "vk_layer/descriptor_pool.h"
 
 enum class UIStyle
@@ -25,11 +27,18 @@ public:
 
 	void drawUI(F32 deltaTime, bool& updated);
 
-	void recordGUIPass(VkCommandBuffer cmdBuffer);
+	void recordGUIPass(VkCommandBuffer cmdBuffer, U32 frameIndex);
 
 private:
 	RenderContext* m_renderContext		= nullptr;
-	DescriptorPool m_guiDescriptorPool	= DescriptorPool(m_renderContext->device);
-	RenderPass m_guiRenderPass			= RenderPass(m_renderContext->device, m_renderContext->swapchain.image_format);
 	ImGuiContext* m_guiContext			= nullptr;
+	DescriptorPool m_guiDescriptorPool	= DescriptorPool(m_renderContext->device);
+
+	// GUI render pass & render targets
+	RenderPass m_guiRenderPass			= RenderPass(
+		m_renderContext->device,
+		VK_FORMAT_R8G8B8A8_SRGB
+	);
+
+	std::vector<Framebuffer> m_framebuffers;
 };

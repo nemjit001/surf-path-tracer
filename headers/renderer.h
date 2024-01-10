@@ -4,12 +4,13 @@
 #include <vulkan/vulkan.h>
 
 #include "camera.h"
+#include "pixel_buffer.h"
 #include "ray.h"
 #include "render_context.h"
 #include "scene.h"
 #include "surf_math.h"
 #include "types.h"
-#include "pixel_buffer.h"
+#include "ui_manager.h"
 #include "vk_layer/buffer.h"
 #include "vk_layer/descriptor_pool.h"
 #include "vk_layer/framebuffer.h"
@@ -61,9 +62,11 @@ struct RayGenUBO
 struct FrameData
 {
     VkCommandPool pool;
-    VkCommandBuffer commandBuffer;
+    VkCommandBuffer presentCommandBuffer;
+    VkCommandBuffer uiCommandBuffer;
     VkFence frameReady;
     VkSemaphore swapImageAvailable;
+    VkSemaphore uiPassFinished;
     VkSemaphore renderingFinished;
 };
 
@@ -99,7 +102,7 @@ class Renderer
     : public IRenderer
 {
 public:
-    Renderer(RenderContext* renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
+    Renderer(RenderContext* renderContext, UIManager* uiManager, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene);
 
     ~Renderer();
 
@@ -127,6 +130,7 @@ private:
 
 private:
     RenderContext* m_context;
+    UIManager* m_uiManager;
     DescriptorPool m_descriptorPool;
     FramebufferSize m_framebufferSize;
     RendererConfig m_config;
@@ -193,7 +197,7 @@ class WaveFrontRenderer
     : public IRenderer
 {
 public:
-    WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, GPUScene& scene);
+    WaveFrontRenderer(RenderContext* renderContext, UIManager* uiManager, RendererConfig config, FramebufferSize renderResolution, Camera& camera, GPUScene& scene);
 
     ~WaveFrontRenderer();
 
@@ -231,6 +235,7 @@ private:
 
 private:
     RenderContext* m_context;
+    UIManager* m_uiManager;
     RendererConfig m_config;
     Camera& m_camera;
     GPUScene& m_scene;

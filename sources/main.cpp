@@ -250,7 +250,7 @@ int main()
 		1	// Samples per frame
 	};
 
-	Renderer renderer(&renderContext, rendererConfig, resultBuffer, worldCam, scene);
+	Renderer renderer(&renderContext, &uiManager, rendererConfig, resultBuffer, worldCam, scene);
 #else
 	GPUScene scene(&renderContext, background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
 
@@ -264,7 +264,7 @@ int main()
 		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
 	};
 
-	WaveFrontRenderer renderer(&renderContext, rendererConfig, renderResolution, worldCam, scene);
+	WaveFrontRenderer renderer(&renderContext, &uiManager, rendererConfig, renderResolution, worldCam, scene);
 #endif
 
 	// Create frame timer

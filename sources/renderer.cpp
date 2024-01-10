@@ -38,9 +38,10 @@ AccumulatorState::~AccumulatorState()
     FREE64(buffer);
 }
 
-Renderer::Renderer(RenderContext* renderContext, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
+Renderer::Renderer(RenderContext* renderContext, UIManager* uiManager, RendererConfig config, PixelBuffer resultBuffer, Camera& camera, Scene& scene)
     :
     m_context(renderContext),
+    m_uiManager(uiManager),
     m_descriptorPool(m_context->device),
     m_framebufferSize(m_context->getFramebufferSize()),
     m_config(config),
@@ -78,8 +79,8 @@ Renderer::Renderer(RenderContext* renderContext, RendererConfig config, PixelBuf
         bufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         bufferAllocateInfo.commandPool = m_frames[i].pool;
         bufferAllocateInfo.commandBufferCount = 1;
-
-        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
+        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].presentCommandBuffer));
+        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].uiCommandBuffer));
 
         VkFenceCreateInfo frameReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         frameReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -89,6 +90,7 @@ Renderer::Renderer(RenderContext* renderContext, RendererConfig config, PixelBuf
         VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
         VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
         VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
+        VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].uiPassFinished));
     }
 
     // Create framebuffers for swapchain images
@@ -123,6 +125,7 @@ Renderer::~Renderer()
         vkDestroyFence(m_context->device, m_frames[i].frameReady, nullptr);
         vkDestroySemaphore(m_context->device, m_frames[i].swapImageAvailable, nullptr);
         vkDestroySemaphore(m_context->device, m_frames[i].renderingFinished, nullptr);
+        vkDestroySemaphore(m_context->device, m_frames[i].uiPassFinished, nullptr);
     }
 
     vkDestroyCommandPool(m_context->device, m_copyPool, nullptr);
@@ -144,7 +147,8 @@ void Renderer::render(F32 deltaTime)
 
     VK_CHECK(vkWaitForFences(m_context->device, 1, &activeFrame.frameReady, VK_TRUE, UINT64_MAX));
     VK_CHECK(vkResetFences(m_context->device, 1, &activeFrame.frameReady));
-    VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* Empty reset flags */ 0));
+    VK_CHECK(vkResetCommandBuffer(activeFrame.uiCommandBuffer, /* Empty reset flags */ 0));
+    VK_CHECK(vkResetCommandBuffer(activeFrame.presentCommandBuffer, /* Empty reset flags */ 0));
 
     // Start CPU ray tracing loop
     const F32 invSamples = 1.0f / static_cast<F32>(m_accumulator.totalSamples + m_config.samplesPerFrame);
@@ -194,8 +198,10 @@ void Renderer::render(F32 deltaTime)
     m_frameStagingBuffer.copyToBuffer(m_resultBuffer.width * m_resultBuffer.height * sizeof(U32), m_resultBuffer.pixels);
     copyBufferToImage(m_frameStagingBuffer, m_frameImage);
 
+    // Record UI & present passes
     const Framebuffer& activeFramebuffer = m_framebuffers[availableSwapImage];
-    recordFrame(activeFrame.commandBuffer, activeFramebuffer, m_presentPass);
+    recordFrame(activeFrame.presentCommandBuffer, activeFramebuffer, m_presentPass);
+    m_uiManager->recordGUIPass(activeFrame.uiCommandBuffer, availableSwapImage);
 
     VkPipelineStageFlags waitStages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
@@ -203,14 +209,24 @@ void Renderer::render(F32 deltaTime)
 
     VkSubmitInfo presentPassSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     presentPassSubmit.commandBufferCount = 1;
-    presentPassSubmit.pCommandBuffers = &activeFrame.commandBuffer;
+    presentPassSubmit.pCommandBuffers = &activeFrame.presentCommandBuffer;
     presentPassSubmit.waitSemaphoreCount = 1;
     presentPassSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
     presentPassSubmit.pWaitDstStageMask = waitStages;
     presentPassSubmit.signalSemaphoreCount = 1;
     presentPassSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
 
-    VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 1, &presentPassSubmit, activeFrame.frameReady));
+    VkSubmitInfo uiPassSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    uiPassSubmit.commandBufferCount = 1;
+    uiPassSubmit.pCommandBuffers = &activeFrame.uiCommandBuffer;
+    uiPassSubmit.waitSemaphoreCount = 1;
+    uiPassSubmit.pWaitSemaphores = &activeFrame.renderingFinished;
+    uiPassSubmit.pWaitDstStageMask = waitStages;
+    uiPassSubmit.signalSemaphoreCount = 1;
+    uiPassSubmit.pSignalSemaphores = &activeFrame.uiPassFinished;
+
+    VkSubmitInfo renderPassSubmits[] = { presentPassSubmit, uiPassSubmit };
+    VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 2, renderPassSubmits, activeFrame.frameReady));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.swapchainCount = 1;
@@ -218,7 +234,7 @@ void Renderer::render(F32 deltaTime)
     presentInfo.pImageIndices = &availableSwapImage;
     presentInfo.pResults = nullptr;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
+    presentInfo.pWaitSemaphores = &activeFrame.uiPassFinished;
 
     VK_CHECK(vkQueuePresentKHR(m_context->queues.presentQueue.handle, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
@@ -551,9 +567,10 @@ void Renderer::recordFrame(
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfig config, FramebufferSize renderResolution, Camera& camera, GPUScene& scene)
+WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* uiManager, RendererConfig config, FramebufferSize renderResolution, Camera& camera, GPUScene& scene)
     :
     m_context(renderContext),
+    m_uiManager(uiManager),
     m_config(config),
     m_camera(camera),
     m_scene(scene),
@@ -572,8 +589,8 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfi
         bufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         bufferAllocateInfo.commandPool = m_frames[i].pool;
         bufferAllocateInfo.commandBufferCount = 1;
-
-        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].commandBuffer));
+        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].presentCommandBuffer));
+        VK_CHECK(vkAllocateCommandBuffers(m_context->device, &bufferAllocateInfo, &m_frames[i].uiCommandBuffer));
 
         VkFenceCreateInfo frameReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         frameReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -582,6 +599,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, RendererConfi
         VkSemaphoreCreateInfo semaphoreCreateInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
         VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].swapImageAvailable));
         VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].renderingFinished));
+        VK_CHECK(vkCreateSemaphore(m_context->device, &semaphoreCreateInfo, nullptr, &m_frames[i].uiPassFinished));
     }
 
     // Set up wavefront compute structures
@@ -833,6 +851,7 @@ WaveFrontRenderer::~WaveFrontRenderer()
         vkDestroyFence(m_context->device, m_frames[i].frameReady, nullptr);
         vkDestroySemaphore(m_context->device, m_frames[i].swapImageAvailable, nullptr);
         vkDestroySemaphore(m_context->device, m_frames[i].renderingFinished, nullptr);
+        vkDestroySemaphore(m_context->device, m_frames[i].uiPassFinished, nullptr);
     }
 }
 
@@ -871,10 +890,12 @@ void WaveFrontRenderer::render(F32 deltaTime)
     m_frameState.totalSamples += m_frameState.samplesPerFrame;
     m_frameStateUBO.copyToBuffer(sizeof(FrameStateUBO), &m_frameState);
 
-    // Record present pass
+    // Record UI & present pass
     const Framebuffer& activeFramebuffer = m_framebuffers[swapImageIdx];
-    VK_CHECK(vkResetCommandBuffer(activeFrame.commandBuffer, /* reset flags */ 0));
-    recordPresentPass(activeFrame.commandBuffer, activeFramebuffer);
+    VK_CHECK(vkResetCommandBuffer(activeFrame.presentCommandBuffer, /* reset flags */ 0));
+    VK_CHECK(vkResetCommandBuffer(activeFrame.uiCommandBuffer, /* reset flags */ 0));
+    recordPresentPass(activeFrame.presentCommandBuffer, activeFramebuffer);
+    m_uiManager->recordGUIPass(activeFrame.uiCommandBuffer, swapImageIdx);
 
     VkPipelineStageFlags computeWaitStages[] = {
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT    // Wait until compute passes have completed
@@ -940,15 +961,26 @@ void WaveFrontRenderer::render(F32 deltaTime)
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
     };
 
-    VkSubmitInfo renderSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    renderSubmit.commandBufferCount = 1;
-    renderSubmit.pCommandBuffers = &activeFrame.commandBuffer;
-    renderSubmit.waitSemaphoreCount = 1;
-    renderSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
-    renderSubmit.pWaitDstStageMask = gfxWaitStages;
-    renderSubmit.signalSemaphoreCount = 1;
-    renderSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
-    VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 1, &renderSubmit, activeFrame.frameReady));
+    VkSubmitInfo presentSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    presentSubmit.commandBufferCount = 1;
+    presentSubmit.pCommandBuffers = &activeFrame.presentCommandBuffer;
+    presentSubmit.waitSemaphoreCount = 1;
+    presentSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
+    presentSubmit.pWaitDstStageMask = gfxWaitStages;
+    presentSubmit.signalSemaphoreCount = 1;
+    presentSubmit.pSignalSemaphores = &activeFrame.renderingFinished;
+
+    VkSubmitInfo uiSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    uiSubmit.commandBufferCount = 1;
+    uiSubmit.pCommandBuffers = &activeFrame.uiCommandBuffer;
+    uiSubmit.waitSemaphoreCount = 1;
+    uiSubmit.pWaitSemaphores = &activeFrame.renderingFinished;
+    uiSubmit.pWaitDstStageMask = gfxWaitStages;
+    uiSubmit.signalSemaphoreCount = 1;
+    uiSubmit.pSignalSemaphores = &activeFrame.uiPassFinished;
+
+    VkSubmitInfo renderSubmits[] = { uiSubmit, presentSubmit };
+    VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 2, renderSubmits, activeFrame.frameReady));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.swapchainCount = 1;

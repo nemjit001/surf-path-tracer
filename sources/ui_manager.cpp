@@ -51,6 +51,12 @@ UIManager::UIManager(RenderContext* renderContext, UIStyle style)
 	initInfo.ImageCount = m_renderContext->swapchain.image_count;
 	initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 	ImGui_ImplVulkan_Init(&initInfo, m_guiRenderPass.handle());
+
+	FramebufferSize framebufferSize = m_renderContext->getFramebufferSize();
+	for (auto const& swapImg : m_renderContext->swapImageViews)
+	{
+		m_framebuffers.push_back(Framebuffer(m_renderContext->device, m_guiRenderPass, { swapImg }, framebufferSize.width, framebufferSize.height));
+	}
 }
 
 UIManager::~UIManager()
@@ -68,25 +74,28 @@ void UIManager::drawUI(F32 deltaTime, bool& updated)
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// TODO: setup virtual window
+	// TODO: show actual UI
+	ImGui::ShowDemoWindow();
 
 	ImGui::Render();
 }
 
-void UIManager::recordGUIPass(VkCommandBuffer cmdBuffer)
+void UIManager::recordGUIPass(VkCommandBuffer cmdBuffer, U32 frameIndex)
 {
+	assert(frameIndex < m_framebuffers.size());
+
 	VkCommandBufferBeginInfo cmdBegin = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	cmdBegin.flags = 0;
 	cmdBegin.pInheritanceInfo = nullptr;
 	VK_CHECK(vkBeginCommandBuffer(cmdBuffer, &cmdBegin));
 
-	// TODO: create images & framebuffers for UI pass
-	// TODO: update main render pass to take into account rendered UI layer (read as sampled image from shader?)
+	VkClearValue clearValue = VkClearValue{{ 0.0f, 0.0f, 0.0f, 0.0f }};
+
 	VkRenderPassBeginInfo uiPassBegin = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-	uiPassBegin.clearValueCount = 0;
-	uiPassBegin.pClearValues = nullptr;
-	uiPassBegin.framebuffer = VK_NULL_HANDLE;
-	uiPassBegin.renderArea = VkRect2D{};
+	uiPassBegin.clearValueCount = 1;
+	uiPassBegin.pClearValues = &clearValue;
+	uiPassBegin.framebuffer = m_framebuffers[frameIndex].handle();
+	uiPassBegin.renderArea = VkRect2D{ 0, 0, 1280, 720 };
 	uiPassBegin.renderPass = m_guiRenderPass.handle();
 	vkCmdBeginRenderPass(cmdBuffer, &uiPassBegin, VK_SUBPASS_CONTENTS_INLINE);
 
