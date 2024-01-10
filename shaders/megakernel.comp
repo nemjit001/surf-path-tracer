@@ -22,7 +22,7 @@ layout(set = 0, binding = 1) uniform FrameState
 	uint totalSamples;
 } frameState;
 
-layout(set = 0, binding = 2) buffer AccumulatorBuffer { vec4 accumulator[]; };
+layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
 layout(set = 2, binding = 0) uniform SceneData 		{ SceneBackground background; } sceneData;
@@ -303,14 +303,14 @@ void main()
 			else
 			{
 				// handle diffuse BRDF
-				vec3 newDirection = diffuseReflect(pixelSeed, N);
+				vec3 newDirection = diffuseReflectCosineWeighted(pixelSeed, N);
 				vec3 newOrigin = I + F32_EPSILON * newDirection;
 				Ray bounceRay = newRay(newOrigin, newDirection);
 
 				float cosTheta = dot(newDirection, N);
-				// float invCosTheta = 1.0 / cosTheta;
+				float invCosTheta = 1.0 / cosTheta;
 				vec3 brdf = material.albedo * F32_INV_PI;
-				float inversePdf = F32_2PI;
+				float inversePdf = F32_PI * invCosTheta;
 
 				activeRay.transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf * mediumScale * rrScale;
 				bounceRay.pixelIdx = activeRay.pixelIdx;
@@ -324,9 +324,11 @@ void main()
 	}
 
 	float invSamples = 1.0 / frameState.totalSamples;
+	vec4 outColor = accumulator[pixelIdx] * invSamples;
+
 	imageStore(
 		outputImage,
 		ivec2(xPixel, yPixel),
-		accumulator[pixelIdx] * invSamples
+		outColor
 	);
 }

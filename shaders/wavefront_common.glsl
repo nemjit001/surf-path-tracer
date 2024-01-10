@@ -29,11 +29,11 @@ struct SceneBackground
 
 struct Material
 {
-	vec3 emissionColor;
+	float emissionStrength;
 	float reflectivity;
 	float refractivity;
 	float indexOfRefraction;
-	float emissionStrength;
+	vec3 emissionColor;
 	vec3 albedo;
 	vec3 absorption;
 };

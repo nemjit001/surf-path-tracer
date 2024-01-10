@@ -107,19 +107,19 @@ const GPUBatchInfo GPUBatcher::createBatchInfo(const std::vector<Instance>& inst
 		for (auto const& [ mesh, size ] : sceneMeshes)
 		{
 			if (mesh == instance.bvh->mesh()) break;
-			gpuInstance.triOffset += size;
+			gpuInstance.triOffset += static_cast<U32>(size);
 		}
 
 		for (auto const& [ bvh, size ] : sceneBVHIndices)
 		{
 			if (bvh == instance.bvh) break;
-			gpuInstance.bvhIdxOffset += size;
+			gpuInstance.bvhIdxOffset += static_cast<U32>(size);
 		}
 
 		for (auto const& [ bvh, size ] : sceneBVHNodes)
 		{
 			if (bvh == instance.bvh) break;
-			gpuInstance.bvhNodeOffset += size;
+			gpuInstance.bvhNodeOffset += static_cast<U32>(size);
 		}
 
 		for (auto const& material : sceneMaterials)
@@ -206,14 +206,23 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 	VkFenceCreateInfo upFenceCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
 	VK_CHECK(vkCreateFence(m_renderContext->device, &upFenceCreateInfo, nullptr, &m_uploadFinishedFence));
 
-	uploadToGPU(m_batchInfo.triBuffer.data(), globalTriBuffer.size(), globalTriBuffer);
-	uploadToGPU(m_batchInfo.triExtBuffer.data(), globalTriExtBuffer.size(), globalTriExtBuffer);
-	uploadToGPU(m_batchInfo.BLASIndices.data(), BLASGlobalIndexBuffer.size(), BLASGlobalIndexBuffer);
-	uploadToGPU(m_batchInfo.BLASNodes.data(), BLASGlobalNodeBuffer.size(), BLASGlobalNodeBuffer);
-	uploadToGPU(m_batchInfo.materials.data(), materialBuffer.size(), materialBuffer);
-	uploadToGPU(m_batchInfo.gpuInstances.data(), instanceBuffer.size(), instanceBuffer);
-	uploadToGPU(m_sceneTlas.indices(), TLASIndexBuffer.size(), TLASIndexBuffer);
-	uploadToGPU(m_sceneTlas.nodePool(), TLASNodeBuffer.size(), TLASNodeBuffer);
+	SizeType triBufSize = m_batchInfo.triBuffer.size() * sizeof(Triangle);
+	SizeType triExtBufSize = m_batchInfo.triExtBuffer.size() * sizeof(TriExtension);
+	SizeType blasIndexBufSize = m_batchInfo.BLASIndices.size() * sizeof(U32);
+	SizeType blasNodeBufSize = m_batchInfo.BLASNodes.size() * sizeof(BvhNode);
+	SizeType materialBufSize = m_batchInfo.materials.size() * sizeof(Material);
+	SizeType instanceBufSize = m_batchInfo.gpuInstances.size() * sizeof(GPUInstance);
+	SizeType tlasIndexBufSize = m_batchInfo.gpuInstances.size() * sizeof(U32);
+	SizeType tlasNodeBufSize = m_sceneTlas.nodesUsed() * sizeof(BvhNode);
+
+	uploadToGPU(m_batchInfo.triBuffer.data(), triBufSize, globalTriBuffer);
+	uploadToGPU(m_batchInfo.triExtBuffer.data(), triExtBufSize, globalTriExtBuffer);
+	uploadToGPU(m_batchInfo.BLASIndices.data(), blasIndexBufSize, BLASGlobalIndexBuffer);
+	uploadToGPU(m_batchInfo.BLASNodes.data(), blasNodeBufSize, BLASGlobalNodeBuffer);
+	uploadToGPU(m_batchInfo.materials.data(), materialBufSize, materialBuffer);
+	uploadToGPU(m_batchInfo.gpuInstances.data(), instanceBufSize, instanceBuffer);
+	uploadToGPU(m_sceneTlas.indices(), tlasIndexBufSize, TLASIndexBuffer);
+	uploadToGPU(m_sceneTlas.nodePool(), tlasNodeBufSize, TLASNodeBuffer);
 }
 
 GPUScene::~GPUScene()
@@ -226,8 +235,11 @@ GPUScene::~GPUScene()
 void GPUScene::update(F32 deltaTime)
 {
 	m_sceneTlas.refit();
-	uploadToGPU(m_sceneTlas.indices(), TLASIndexBuffer.size(), TLASIndexBuffer);
-	uploadToGPU(m_sceneTlas.nodePool(), TLASNodeBuffer.size(), TLASNodeBuffer);
+
+	SizeType tlasIndexBufSize = m_batchInfo.gpuInstances.size() * sizeof(U32);
+	SizeType tlasNodeBufSize = m_sceneTlas.nodesUsed() * sizeof(BvhNode);
+	uploadToGPU(m_sceneTlas.indices(), tlasIndexBufSize, TLASIndexBuffer);
+	uploadToGPU(m_sceneTlas.nodePool(), tlasNodeBufSize, TLASNodeBuffer);
 }
 
 void GPUScene::uploadToGPU(const void* data, SizeType size, Buffer& target)
@@ -242,8 +254,7 @@ void GPUScene::uploadToGPU(const void* data, SizeType size, Buffer& target)
 
 	Buffer cpuBuffer = Buffer(
 		m_renderContext->allocator, size,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-		| VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
 		| VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,

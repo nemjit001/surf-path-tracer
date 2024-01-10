@@ -203,8 +203,11 @@ public:
 
     virtual inline RendererConfig& config() override { return m_config; }
 
-    virtual inline const FrameInstrumentationData& frameInfo() override {
+    virtual const FrameInstrumentationData& frameInfo() override
+    {
         m_frameInstrumentationData.totalSamples = m_frameState.totalSamples;
+        m_frameInstrumentationData.energy = 0.0f;   // reading energy back from GPU is very slow -> don't do it
+
         return m_frameInstrumentationData;
     }
 

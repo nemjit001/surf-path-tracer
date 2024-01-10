@@ -1163,9 +1163,9 @@ void WaveFrontRenderer::recordPresentPass(VkCommandBuffer commandBuffer, const F
     VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
 
     VkImageMemoryBarrier shaderReadBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    shaderReadBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    shaderReadBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     shaderReadBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    shaderReadBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    shaderReadBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     shaderReadBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     shaderReadBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     shaderReadBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
