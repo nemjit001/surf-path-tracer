@@ -44,6 +44,19 @@ private:
 	DescriptorPool m_guiDescriptorPool	= DescriptorPool(m_renderContext->device);
 
 	// GUI render pass & render targets
-	RenderPass m_guiRenderPass			= RenderPass(m_renderContext->device, m_renderContext->swapchain.image_format);
+	RenderPass m_guiRenderPass			= RenderPass(
+		m_renderContext->device,
+		std::vector{
+			ImageAttachment{
+				m_renderContext->swapchain.image_format, VK_SAMPLE_COUNT_1_BIT,
+				ImageOps{ VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE },
+				ImageOps{ VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE },
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+			},
+		},
+		std::vector{
+			AttachmentReference{ AttachmentType::Color, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
+		}
+	);
 	std::vector<Framebuffer> m_framebuffers;
 };

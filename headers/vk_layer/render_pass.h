@@ -4,10 +4,46 @@
 
 #include "render_context.h"
 
+enum class AttachmentType
+{
+    Color,
+    Resolve,
+    DepthStencil,
+    Input,
+    Preserve
+};
+
+struct ImageOps
+{
+    VkAttachmentLoadOp load;
+    VkAttachmentStoreOp store;
+};
+
+struct ImageAttachment
+{
+    VkFormat format;
+    VkSampleCountFlagBits sampleCount;
+    ImageOps imageOps;
+    ImageOps stencilOps;
+    VkImageLayout initialLayout;
+    VkImageLayout finalLayout;
+};
+
+struct AttachmentReference
+{
+    AttachmentType type;
+    U32 attachment;
+    VkImageLayout layout;
+};
+
 class RenderPass
 {
 public:
-    RenderPass(VkDevice device, VkFormat colorFormat);
+    RenderPass(
+        VkDevice device,
+        std::vector<ImageAttachment> attachments,
+        std::vector<AttachmentReference> attachmentRefs
+    );
 
     ~RenderPass();
 

@@ -152,7 +152,20 @@ private:
     FrameData m_frames[FRAMES_IN_FLIGHT] = {};
 
     // Default render pass w/ framebuffers
-    RenderPass m_presentPass = RenderPass(m_context->device, m_context->swapchain.image_format);
+    RenderPass m_presentPass = RenderPass(
+        m_context->device,
+        std::vector{
+            ImageAttachment{
+                m_context->swapchain.image_format, VK_SAMPLE_COUNT_1_BIT,
+                ImageOps{ VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE },
+                ImageOps{ VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE },
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            },
+        },
+        std::vector{
+            AttachmentReference{ AttachmentType::Color, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
+        }
+    );
     std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
 
     // Rendered frame staging buffer & target image
@@ -254,7 +267,20 @@ private:
     WavefrontCompute m_wavefrontCompute = {};
 
     // Default render pass w/ framebuffers
-    RenderPass m_presentPass = RenderPass(m_context->device, m_context->swapchain.image_format);
+    RenderPass m_presentPass = RenderPass(
+        m_context->device,
+        std::vector{
+            ImageAttachment{
+                m_context->swapchain.image_format, VK_SAMPLE_COUNT_1_BIT,
+                ImageOps{ VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE },
+                ImageOps{ VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE },
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            },
+        },
+        std::vector{
+            AttachmentReference{ AttachmentType::Color, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
+        }
+    );
     std::vector<Framebuffer> m_framebuffers = std::vector<Framebuffer>();
 
     // Default descriptor pool
