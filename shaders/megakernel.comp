@@ -308,6 +308,7 @@ void main()
 				Ray bounceRay = newRay(newOrigin, newDirection);
 
 				float cosTheta = dot(newDirection, N);
+				// float invCosTheta = 1.0 / cosTheta;
 				vec3 brdf = material.albedo * F32_INV_PI;
 				float inversePdf = F32_2PI;
 

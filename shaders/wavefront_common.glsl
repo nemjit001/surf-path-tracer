@@ -11,6 +11,10 @@
 
 #define UNSET_IDX		~0
 
+#define WORLD_FORWARD	vec3(0, 0, 1)
+#define WORLD_RIGHT		vec3(-1, 0, 0)
+#define WORLD_UP 		vec3(0, 1, 0)
+
 // Background type enum vals in scene UBO
 #define SCENE_BG_TYPE_SOLID		0
 #define SCENE_BG_TYPE_GRADIENT	1
@@ -109,8 +113,23 @@ vec3 diffuseReflect(inout uint seed, vec3 normal)
 
 vec3 diffuseReflectCosineWeighted(inout uint seed, vec3 normal)
 {
-	// FIXME: implement this
-	return diffuseReflect(seed, normal);
+	vec3 outDirection = vec3(0);
+
+	do
+	{
+		float r0 = randomF32(seed);
+		float r1 = randomF32(seed);
+		float r = sqrt(r0);
+		float theta = F32_2PI * r1;
+		vec3 direction = vec3(r * cos(theta), r * sin(theta), sqrt(1.0 - r0));
+
+		vec3 tmp = (abs(normal.x) > 0.99) ? WORLD_UP : WORLD_RIGHT;
+		vec3 B = normalize(cross(normal, tmp));
+		vec3 T = cross(B, normal);
+		outDirection = direction.x * T + direction.y * B + direction.z * normal;
+	} while (dot(outDirection, normal) == 0.0);
+
+	return outDirection;
 }
 
 vec3 sampleSkyColor(Ray ray, SceneBackground background)
