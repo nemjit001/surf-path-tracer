@@ -10,6 +10,10 @@
 
 #include "types.h"
 
+#ifndef NDEBUG
+#define SURF_DEBUG_REPORT
+#endif
+
 struct FramebufferSize
 {
     U32 width;
@@ -55,13 +59,11 @@ private:
 
     void release();
 
-private:
-    GLFWwindow* m_window;
-    vkb::Instance m_instance;
-    VkSurfaceKHR m_renderSurface;
-    vkb::PhysicalDevice m_gpu;  
-
 public:
+    GLFWwindow* window;
+    vkb::Instance instance;
+    VkSurfaceKHR renderSurface;
+    vkb::PhysicalDevice gpu;
     vkb::Device device;
     vkb::Swapchain swapchain;
     std::vector<VkImageView> swapImageViews;

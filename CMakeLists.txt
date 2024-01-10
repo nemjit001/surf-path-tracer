@@ -29,6 +29,23 @@ option(VK_BOOTSTRAP_WERROR OFF)
 option(VK_BOOTSTRAP_TEST OFF)
 add_subdirectory(dependencies/vk-bootstrap/)
 
+# ImGUI
+file(GLOB IMGUI_SOURCES "dependencies/imgui/*.cpp")
+file(GLOB IMGUI_HEADERS "dependencies/imgui/*.h")
+
+set (IMGUI_SOURCES
+	${IMGUI_SOURCES}
+	"dependencies/imgui/backends/imgui_impl_glfw.cpp"
+	"dependencies/imgui/backends/imgui_impl_vulkan.cpp"
+)
+
+set (IMGUI_HEADERS
+	${IMGUI_SOURCES}
+	"dependencies/imgui/backends/imgui_impl_glfw.h"
+	"dependencies/imgui/backends/imgui_impl_vulkan.h"
+)
+
+# Surf setup
 file(GLOB PROJECT_SHADERS "shaders/*.vert" "shaders/*.frag" "shaders/*.comp")
 file(GLOB PROJECT_HEADERS "headers/*.h" "headers/**/*.h")
 file(GLOB PROJECT_SOURCES "sources/*.cpp" "sources/**/*.cpp")
@@ -46,6 +63,8 @@ add_executable(${TARGET_NAME}
 	${PROJECT_SHADERS}
 	${PROJECT_HEADERS}
 	${PROJECT_SOURCES}
+	${IMGUI_HEADERS}
+	${IMGUI_SOURCES}
 )
 
 target_include_directories(${TARGET_NAME} PUBLIC
@@ -55,6 +74,8 @@ target_include_directories(${TARGET_NAME} PUBLIC
 	"dependencies/VulkanMemoryAllocator/include/"
 	"dependencies/vk-bootstrap/src/"
 	"dependencies/glm/"
+	"dependencies/imgui/"
+	"dependencies/imgui/backends/"
 )
 
 target_link_libraries(${TARGET_NAME}

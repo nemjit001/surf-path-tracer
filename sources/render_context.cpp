@@ -14,10 +14,10 @@
 
 RenderContext::RenderContext(GLFWwindow* window)
 	:
-	m_window(window),
-	m_instance(),
-	m_renderSurface(VK_NULL_HANDLE),
-	m_gpu(),
+	window(window),
+	instance(),
+	renderSurface(VK_NULL_HANDLE),
+	gpu(),
 	device(),
 	swapchain(),
 	swapImageViews(),
@@ -25,7 +25,7 @@ RenderContext::RenderContext(GLFWwindow* window)
     queues{}
 {
     assert(window != nullptr);
-    m_window = window;
+    window = window;
 
     // Set up Vulkan extensions
     std::vector<const char*> extensions = {
@@ -47,7 +47,7 @@ RenderContext::RenderContext(GLFWwindow* window)
         .set_engine_name("NO ENGINE")
         .set_engine_version(0)
         .enable_extensions(extensions)
-#ifndef NDEBUG // Debug only config for instance
+#ifdef SURF_DEBUG_REPORT // Debug only config for instance
         .request_validation_layers(true)
         .set_debug_messenger_severity(
             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
@@ -65,14 +65,14 @@ RenderContext::RenderContext(GLFWwindow* window)
 #endif
         .build();
 
-    m_instance = instanceResult.value();
+    instance = instanceResult.value();
 
-    VK_CHECK(glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_renderSurface));
+    VK_CHECK(glfwCreateWindowSurface(instance, window, nullptr, &renderSurface));
 
     // Choose a GPU that supports the required features
-    vkb::PhysicalDeviceSelector gpuSelector(m_instance);
+    vkb::PhysicalDeviceSelector gpuSelector(instance);
     vkb::Result<vkb::PhysicalDevice> gpuResult = gpuSelector
-        .set_surface(m_renderSurface)
+        .set_surface(renderSurface)
         .set_minimum_version(1, 3)
         .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
         .require_present(true)
@@ -81,10 +81,10 @@ RenderContext::RenderContext(GLFWwindow* window)
             })
         .select();
 
-    m_gpu = gpuResult.value();
+    gpu = gpuResult.value();
 
     // Create a logical device based on the chosen GPU
-    vkb::DeviceBuilder deviceBuilder(m_gpu);
+    vkb::DeviceBuilder deviceBuilder(gpu);
     vkb::Result<vkb::Device> deviceResult = deviceBuilder
         .build();
 
@@ -109,8 +109,8 @@ RenderContext::RenderContext(GLFWwindow* window)
     // Create an allocator for Vulkan resources
     VmaAllocatorCreateInfo allocatorCreateInfo = {};
     allocatorCreateInfo.flags = 0;
-    allocatorCreateInfo.instance = m_instance;
-    allocatorCreateInfo.physicalDevice = m_gpu;
+    allocatorCreateInfo.instance = instance;
+    allocatorCreateInfo.physicalDevice = gpu;
     allocatorCreateInfo.device = device;
     allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
 
@@ -155,19 +155,19 @@ RenderContext::~RenderContext()
 
 RenderContext::RenderContext(RenderContext&& other) noexcept
     :
-    m_window(other.m_window),
-    m_instance(other.m_instance),
-    m_renderSurface(other.m_renderSurface),
-    m_gpu(other.m_gpu),
+    window(other.window),
+    instance(other.instance),
+    renderSurface(other.renderSurface),
+    gpu(other.gpu),
     device(other.device),
     swapchain(other.swapchain),
     swapImageViews(other.swapImageViews),
     allocator(other.allocator),
     queues(other.queues)
 {
-    other.m_instance = vkb::Instance();
-    other.m_renderSurface = VK_NULL_HANDLE;
-    other.m_gpu = vkb::PhysicalDevice();
+    other.instance = vkb::Instance();
+    other.renderSurface = VK_NULL_HANDLE;
+    other.gpu = vkb::PhysicalDevice();
     other.device = vkb::Device();
     other.swapchain = vkb::Swapchain();
     other.swapImageViews.clear();
@@ -183,10 +183,10 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept
     }
 
     this->release();
-    m_window = other.m_window;
-    m_instance = other.m_instance;
-    m_renderSurface = other.m_renderSurface;
-    m_gpu = other.m_gpu;
+    window = other.window;
+    instance = other.instance;
+    renderSurface = other.renderSurface;
+    gpu = other.gpu;
     device = other.device;
     swapchain = other.swapchain;
     swapImageViews = other.swapImageViews;
@@ -199,7 +199,7 @@ RenderContext& RenderContext::operator=(RenderContext&& other) noexcept
 FramebufferSize RenderContext::getFramebufferSize()
 {
     int glfwWidth = 0, glfwHeight = 0;
-    glfwGetFramebufferSize(m_window, &glfwWidth, &glfwHeight);
+    glfwGetFramebufferSize(window, &glfwWidth, &glfwHeight);
 
     return FramebufferSize{
         static_cast<U32>(glfwWidth),
@@ -220,7 +220,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL RenderContext::debugCallback(
 
 void RenderContext::release()
 {
-    if (m_instance.instance == VK_NULL_HANDLE)
+    if (instance.instance == VK_NULL_HANDLE)
     {
         // Resources have been released by move
         return;
@@ -235,6 +235,6 @@ void RenderContext::release()
 
     vkb::destroy_swapchain(swapchain);
     vkb::destroy_device(device);
-    vkb::destroy_surface(m_instance, m_renderSurface);
-    vkb::destroy_instance(m_instance);
+    vkb::destroy_surface(instance, renderSurface);
+    vkb::destroy_instance(instance);
 }

@@ -13,6 +13,7 @@
 #include "pixel_buffer.h"
 #include "timer.h"
 #include "types.h"
+#include "ui_manager.h"
 #include "window_manager.h"
 
 #ifdef _WIN32
@@ -31,7 +32,7 @@
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
 #define FRAMEDATA_OUTPUT		1
-#define GPU_PATH_TRACING		0
+#define GPU_PATH_TRACING		1
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
@@ -125,6 +126,7 @@ int main()
 	GLFWwindow* window = windowManager.createWindow(PROGRAM_NAME, SCR_WIDTH, SCR_HEIGHT);
 
 	RenderContext renderContext(window);
+	UIManager uiManager(&renderContext);
 	FramebufferSize resolution = renderContext.getFramebufferSize();
 
 #if GPU_PATH_TRACING == 0
@@ -283,6 +285,7 @@ int main()
 
 		// Render frame
 		RendererConfig& config = renderer.config();	// Used only for debug info now -> can be updated using UI
+		uiManager.draw(deltaTime);
 		renderer.render(deltaTime);
 
 		// Handle input
