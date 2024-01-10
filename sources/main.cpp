@@ -121,20 +121,23 @@ int main()
 #endif
 #endif
 
+	// Set up window manager & create window
 	WindowManager windowManager;
 	GLFWwindow* window = windowManager.createWindow(PROGRAM_NAME, SCR_WIDTH, SCR_HEIGHT);
 
+	// Set up render context & fetch resolution
 	RenderContext renderContext(window);
-	UIManager uiManager(&renderContext);
 	FramebufferSize resolution = renderContext.getFramebufferSize();
 
 #if GPU_PATH_TRACING == 0
+	// Create an output pixel buffer for CPU path tracing
 	PixelBuffer resultBuffer(
 		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
 		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
 	);
 #endif
 
+	// Create a new camera
 	Camera worldCam(
 		Float3(0.0f, 0.0f, -7.0f),
 		Float3(0.0f, 0.0f, 0.0f),
@@ -144,6 +147,16 @@ int main()
 		7.0f,	// Focal length
 		0.5f	// Defocus angle
 	);
+
+	// Set up UI state & manager
+	UIState uiState = UIState{
+		worldCam.focalLength,
+		worldCam.defocusAngle,
+		false,
+		1
+	};
+	
+	UIManager uiManager(&renderContext);
 
 	// -- BEGIN Scene setup
 
@@ -247,7 +260,7 @@ int main()
 
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces
-		1	// Samples per frame
+		uiState.spp
 	};
 
 	Renderer renderer(&renderContext, &uiManager, rendererConfig, resultBuffer, worldCam, scene);
@@ -256,7 +269,7 @@ int main()
 
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces
-		1	// Samples per frame
+		uiState.spp
 	};
 
 	FramebufferSize renderResolution = FramebufferSize{
@@ -280,12 +293,12 @@ int main()
 		static F32 ALPHA = 1.0f;
 
 		// Update scene state
-		scene.update(deltaTime);
+		if (uiState.animate)
+			scene.update(deltaTime);
 
 		// Render frame
-		bool uiUpdated = false;
 		RendererConfig& config = renderer.config();	// Used only for debug info now -> can be updated using UI
-		uiManager.drawUI(deltaTime, uiUpdated);
+		uiManager.drawUI(deltaTime, uiState);
 		renderer.render(deltaTime);
 
 		// Handle input
@@ -294,9 +307,13 @@ int main()
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
 
-		if (cameraUpdated || uiUpdated)
+		if (cameraUpdated || uiState.updated)
 		{
-			// TODO: check if updating of config / camera / etc. is needed
+			worldCam.focalLength = uiState.focalLength;
+			worldCam.defocusAngle = uiState.defocusAngle;
+			config.samplesPerFrame = uiState.spp;
+
+
 			renderer.clearAccumulator();
 			worldCam.generateViewPlane();
 		}

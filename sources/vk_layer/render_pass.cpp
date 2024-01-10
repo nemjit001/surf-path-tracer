@@ -16,7 +16,7 @@ RenderPass::RenderPass(VkDevice device, VkFormat colorFormat)
     swapAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     swapAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     swapAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    swapAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    swapAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     swapAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     swapAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     swapAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;

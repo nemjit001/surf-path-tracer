@@ -979,7 +979,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
     uiSubmit.signalSemaphoreCount = 1;
     uiSubmit.pSignalSemaphores = &activeFrame.uiPassFinished;
 
-    VkSubmitInfo renderSubmits[] = { uiSubmit, presentSubmit };
+    VkSubmitInfo renderSubmits[] = { presentSubmit, uiSubmit };
     VK_CHECK(vkQueueSubmit(m_context->queues.graphicsQueue.handle, 2, renderSubmits, activeFrame.frameReady));
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
@@ -988,7 +988,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
     presentInfo.pSwapchains = &m_context->swapchain.swapchain;
     presentInfo.pResults = nullptr;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &activeFrame.renderingFinished;
+    presentInfo.pWaitSemaphores = &activeFrame.uiPassFinished;
 
     VK_CHECK(vkQueuePresentKHR(m_context->queues.presentQueue.handle, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;

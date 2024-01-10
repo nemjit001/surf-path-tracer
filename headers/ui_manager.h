@@ -18,6 +18,15 @@ enum class UIStyle
 	LightMode
 };
 
+struct UIState
+{
+	F32 focalLength = 0.0f;
+	F32 defocusAngle = 0.0f;
+	bool animate = false;
+	U32 spp = 1;
+	bool updated = false;
+};
+
 class UIManager
 {
 public:
@@ -25,7 +34,7 @@ public:
 
 	~UIManager();
 
-	void drawUI(F32 deltaTime, bool& updated);
+	void drawUI(F32 deltaTime, UIState& state);
 
 	void recordGUIPass(VkCommandBuffer cmdBuffer, U32 frameIndex);
 
@@ -35,10 +44,6 @@ private:
 	DescriptorPool m_guiDescriptorPool	= DescriptorPool(m_renderContext->device);
 
 	// GUI render pass & render targets
-	RenderPass m_guiRenderPass			= RenderPass(
-		m_renderContext->device,
-		VK_FORMAT_R8G8B8A8_SRGB
-	);
-
+	RenderPass m_guiRenderPass			= RenderPass(m_renderContext->device, m_renderContext->swapchain.image_format);
 	std::vector<Framebuffer> m_framebuffers;
 };

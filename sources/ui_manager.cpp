@@ -6,6 +6,8 @@
 #include <vulkan/vulkan.h>
 
 #include "render_context.h"
+#include "surf.h"
+#include "types.h"
 #include "vk_layer/render_pass.h"
 #include "vk_layer/descriptor_pool.h"
 #include "vk_layer/vk_check.h"
@@ -21,6 +23,7 @@ UIManager::UIManager(RenderContext* renderContext, UIStyle style)
 
 	// Setup control listeners
 	ImGuiIO& io = ImGui::GetIO();
+	io.IniFilename = nullptr;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
 	// Setup UI Style
@@ -66,17 +69,29 @@ UIManager::~UIManager()
 	ImGui::DestroyContext(m_guiContext);
 }
 
-void UIManager::drawUI(F32 deltaTime, bool& updated)
+void UIManager::drawUI(F32 deltaTime, UIState& uiState)
 {
-	updated = false;
+	uiState.updated = false;
 
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// TODO: show actual UI
-	ImGui::ShowDemoWindow();
+	ImGui::Begin("Settings");
+	ImGui::SetWindowSize(ImVec2(400.0f, 200.0f));
 
+	// Debug stats
+	ImGui::Text("Stats: %8.1f FPS\t%8.2f ms", 1.0f / deltaTime, deltaTime);
+
+	// Camera condig
+	uiState.updated |= ImGui::SliderFloat("Focal Length", &uiState.focalLength, 0.1f, 25.0f);
+	uiState.updated |= ImGui::SliderFloat("Defocus Angle", &uiState.defocusAngle, 0.0f, 10.0f);
+
+	// Renderer config
+	uiState.updated |= ImGui::Checkbox("Animate Scene", &uiState.animate);
+	uiState.updated |= ImGui::SliderInt("Samples Per Pass", reinterpret_cast<I32*>(&uiState.spp), 1, 24);
+
+	ImGui::End();
 	ImGui::Render();
 }
 
