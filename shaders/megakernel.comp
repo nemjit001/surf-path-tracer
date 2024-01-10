@@ -10,10 +10,15 @@
 layout(set = 0, binding = 0) uniform CameraData
 {
 	vec3 position;
+	vec3 up;
+	vec3 fwd;
+	vec3 right;
 	vec3 firstPixel;
 	vec3 uVector;
 	vec3 vVector;
 	vec2 resolution;
+	float focalLength;
+	float defocusAngle;
 } camera;
 
 layout(set = 0, binding = 1) uniform FrameState
@@ -190,6 +195,24 @@ Material sceneMaterial(Ray ray)
 	return materials[hitInstance.materialOffset];
 }
 
+vec3 sampleDefocusDisk(inout uint seed)
+{
+	const float radius = camera.focalLength * tan(radians(camera.defocusAngle / 2.0));
+	const vec3 u = camera.right * radius;
+	const vec3 v = -camera.up * radius;
+
+	vec2 diskSample = vec2(0);
+	do 
+	{
+		diskSample = vec2(
+			randomRange(seed, -1.0, 1.0),
+			randomRange(seed, -1.0, 1.0)
+		);
+	} while(dot(diskSample, diskSample) > 1.0);
+
+	return diskSample.x * u + diskSample.y * v;
+}
+
 void main()
 {
 	uint xPixel = gl_LocalInvocationID.x + (gl_WorkGroupID.x * gl_WorkGroupSize.x);
@@ -205,7 +228,7 @@ void main()
 		float u = xAA / camera.resolution.x;
 		float v = yAA / camera.resolution.y;
 
-		vec3 origin = camera.position;
+		vec3 origin = camera.position + sampleDefocusDisk(pixelSeed);
 		vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
 		vec3 direction = normalize(planePos - origin);
 

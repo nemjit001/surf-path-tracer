@@ -160,6 +160,7 @@ void Renderer::render(F32 deltaTime)
             for (SizeType sample = 0; sample < m_config.samplesPerFrame; sample++)
             {
                 Ray primaryRay = m_camera.getPrimaryRay(
+                    pixelSeed,
                     static_cast<F32>(x) + randomRange(pixelSeed, -0.5f, 0.5f),
                     static_cast<F32>(y) + randomRange(pixelSeed, -0.5f, 0.5f)
                 );
@@ -858,10 +859,10 @@ void WaveFrontRenderer::render(F32 deltaTime)
     // Update cameraUBO
     CameraUBO cameraUBO = CameraUBO{
         m_camera.position,
-        m_camera.viewPlane.firstPixel,
-        m_camera.viewPlane.uVector,
-        m_camera.viewPlane.vVector,
-        Float2(m_camera.screenWidth, m_camera.screenHeight)
+        m_camera.up, m_camera.forward, m_camera.right(),
+        m_camera.viewPlane.firstPixel, m_camera.viewPlane.uVector, m_camera.viewPlane.vVector,
+        Float2(m_camera.screenWidth, m_camera.screenHeight),
+        m_camera.focalLength, m_camera.defocusAngle
     };
     m_cameraUBO.copyToBuffer(sizeof(CameraUBO), &cameraUBO);
 

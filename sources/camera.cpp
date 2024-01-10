@@ -6,14 +6,16 @@
 
 #define VIEWPORT_HEIGHT	2.0f
 
-Camera::Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight, F32 focalLength)
+Camera::Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight, F32 fovY, F32 focalLength, F32 defocusAngle)
 	:
 	position(position),
 	forward(0.0f),
 	up(0.0f),
 	screenWidth(static_cast<F32>(screenWidth)),
 	screenHeight(static_cast<F32>(screenHeight)),
+	fovY(fovY),
 	focalLength(focalLength),
+	defocusAngle(defocusAngle),
 	viewPlane{}
 {
 	forward = (target - position).normalize();
@@ -25,11 +27,14 @@ Camera::Camera(Float3 position, Float3 target, U32 screenWidth, U32 screenHeight
 
 void Camera::generateViewPlane()
 {
+	const F32 heightScale = tanf(radians(fovY) / 2.0f);
+
 	const F32 aspectRatio = this->screenWidth / this->screenHeight;
-	const F32 viewportWidth = aspectRatio * VIEWPORT_HEIGHT;
+	const F32 viewportHeight = VIEWPORT_HEIGHT * heightScale * focalLength;
+	const F32 viewportWidth = aspectRatio * viewportHeight;
 
 	const Float3 uVector = right() * viewportWidth;
-	const Float3 vVector = -1.0f * up * VIEWPORT_HEIGHT;
+	const Float3 vVector = -1.0f * up * viewportHeight;
 
 	const Float3 uDelta = uVector / screenWidth;
 	const Float3 vDelta = vVector / screenHeight;

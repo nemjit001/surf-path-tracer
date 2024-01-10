@@ -138,7 +138,10 @@ int main()
 		Float3(0.0f, 0.0f, -7.0f),
 		Float3(0.0f, 0.0f, 0.0f),
 		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
-		static_cast<U32>(resolution.height * RESOLUTION_SCALE)
+		static_cast<U32>(resolution.height * RESOLUTION_SCALE),
+		70.0f,	// FOV
+		7.0f,	// Focal length
+		0.5f	// Defocus angle
 	);
 
 	// -- BEGIN Scene setup

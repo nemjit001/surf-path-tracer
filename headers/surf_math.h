@@ -223,3 +223,7 @@ Float3 randomOnHemisphereCosineWeighted(U32& seed, const Float3& normal);
 inline Float3 reflect(const Float3& direction, Float3& normal) { return direction - 2.0f * normal.dot(direction) * normal; }
 
 inline bool depthInBounds(F32 depth, F32 maxDepth) { return F32_EPSILON <= depth && depth < maxDepth; }
+
+inline F32 degrees(F32 rad) { return rad * (180.0f * F32_INV_PI); }
+
+inline F32 radians(F32 deg) { return (deg * F32_PI) * 0.005555555555555f; /* deg * (pi / 180) */ }
