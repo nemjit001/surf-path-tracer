@@ -32,7 +32,7 @@
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
 #define FRAMEDATA_OUTPUT		1
-#define GPU_PATH_TRACING		1
+#define GPU_PATH_TRACING		0
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
@@ -110,7 +110,6 @@ void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& 
 	camera.forward = (target - camera.position).normalize();
 	right = WORLD_UP.cross(camera.forward).normalize();
 	camera.up = camera.forward.cross(right).normalize();
-	camera.generateViewPlane();
 }
 
 int main()
@@ -284,8 +283,9 @@ int main()
 		scene.update(deltaTime);
 
 		// Render frame
+		bool uiUpdated = false;
 		RendererConfig& config = renderer.config();	// Used only for debug info now -> can be updated using UI
-		uiManager.draw(deltaTime);
+		uiManager.drawUI(deltaTime, uiUpdated);
 		renderer.render(deltaTime);
 
 		// Handle input
@@ -294,8 +294,12 @@ int main()
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
 
-		if (cameraUpdated)
+		if (cameraUpdated || uiUpdated)
+		{
+			// TODO: check if updating of config / camera / etc. is needed
 			renderer.clearAccumulator();
+			worldCam.generateViewPlane();
+		}
 
 		// Tick frame timer and update average trackers
 		frameTimer.tick();

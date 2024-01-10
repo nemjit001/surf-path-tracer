@@ -6,14 +6,14 @@
 #include <vulkan/vulkan.h>
 
 #include "render_context.h"
+#include "vk_layer/render_pass.h"
 #include "vk_layer/descriptor_pool.h"
 #include "vk_layer/vk_check.h"
 
 UIManager::UIManager(RenderContext* renderContext, UIStyle style)
 	:
 	m_renderContext(renderContext),
-	m_guiContext(nullptr),
-	m_windowData{}
+	m_guiContext(nullptr)
 {
 	assert(m_renderContext != nullptr);
 	IMGUI_CHECKVERSION();
@@ -36,8 +36,8 @@ UIManager::UIManager(RenderContext* renderContext, UIStyle style)
 
 	// Init GLFW vulkan IMGUI backend
 	ImGui_ImplGlfw_InitForVulkan(m_renderContext->window, true);
-	setupWindowData(m_windowData);
 
+	// Init IMGUI Vulkan support
 	ImGui_ImplVulkan_InitInfo initInfo = {};
 	initInfo.Instance = m_renderContext->instance;
 	initInfo.PhysicalDevice = m_renderContext->gpu;
@@ -50,8 +50,7 @@ UIManager::UIManager(RenderContext* renderContext, UIStyle style)
 	initInfo.MinImageCount = m_renderContext->swapchain.requested_min_image_count;
 	initInfo.ImageCount = m_renderContext->swapchain.image_count;
 	initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	initInfo.Allocator = nullptr;
-	ImGui_ImplVulkan_Init(&initInfo, m_windowData.RenderPass);
+	ImGui_ImplVulkan_Init(&initInfo, m_guiRenderPass.handle());
 }
 
 UIManager::~UIManager()
@@ -61,31 +60,38 @@ UIManager::~UIManager()
 	ImGui::DestroyContext(m_guiContext);
 }
 
-void UIManager::draw(F32 deltaTime)
+void UIManager::drawUI(F32 deltaTime, bool& updated)
 {
+	updated = false;
+
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
+	// TODO: setup virtual window
+
 	ImGui::Render();
 }
 
-void UIManager::setupWindowData(ImGui_ImplVulkanH_Window& wd)
+void UIManager::recordGUIPass(VkCommandBuffer cmdBuffer)
 {
-	FramebufferSize framebufferSize = m_renderContext->getFramebufferSize();
+	VkCommandBufferBeginInfo cmdBegin = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	cmdBegin.flags = 0;
+	cmdBegin.pInheritanceInfo = nullptr;
+	VK_CHECK(vkBeginCommandBuffer(cmdBuffer, &cmdBegin));
 
-	wd.Surface = m_renderContext->renderSurface;
-	wd.SurfaceFormat = VkSurfaceFormatKHR{ m_renderContext->swapchain.image_format, m_renderContext->swapchain.color_space };
-	wd.PresentMode = m_renderContext->swapchain.present_mode;
+	// TODO: create images & framebuffers for UI pass
+	// TODO: update main render pass to take into account rendered UI layer (read as sampled image from shader?)
+	VkRenderPassBeginInfo uiPassBegin = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+	uiPassBegin.clearValueCount = 0;
+	uiPassBegin.pClearValues = nullptr;
+	uiPassBegin.framebuffer = VK_NULL_HANDLE;
+	uiPassBegin.renderArea = VkRect2D{};
+	uiPassBegin.renderPass = m_guiRenderPass.handle();
+	vkCmdBeginRenderPass(cmdBuffer, &uiPassBegin, VK_SUBPASS_CONTENTS_INLINE);
 
-	ImGui_ImplVulkanH_CreateOrResizeWindow(
-		m_renderContext->instance,
-		m_renderContext->gpu,
-		m_renderContext->device,
-		&wd,
-		m_renderContext->queues.graphicsQueue.familyIndex,
-		nullptr,
-		framebufferSize.width, framebufferSize.height,
-		m_renderContext->swapchain.requested_min_image_count
-	);
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuffer);
+	vkCmdEndRenderPass(cmdBuffer);
+
+	VK_CHECK(vkEndCommandBuffer(cmdBuffer));
 }
