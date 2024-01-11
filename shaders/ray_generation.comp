@@ -3,9 +3,29 @@
 
 #include "wavefront_common.glsl"
 
+layout(set = 0, binding = 0) uniform CameraData
+{
+	vec3 position;
+	vec3 up;
+	vec3 fwd;
+	vec3 right;
+	vec3 firstPixel;
+	vec3 uVector;
+	vec3 vVector;
+	vec2 resolution;
+	float focalLength;
+	float defocusAngle;
+} camera;
+
+layout(set = 0, binding = 1) uniform FrameState
+{
+	uint samplesPerFrame;
+	uint totalSamples;
+} frameState;
+
 layout(local_size_x = 32, local_size_y = 32) in;
 
 void main()
 {
-	//
+	// TODO: generate ray per pixel per sample for ray buffer
 }

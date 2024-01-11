@@ -1,11 +1,28 @@
 #version 450
 #pragma shader_stage(compute)
 
+#include "bvh.glsl"
 #include "wavefront_common.glsl"
+
+layout(set = 2, binding = 2) buffer TriExtBuffer 	{ TriExtension triExtensions[]; };
+layout(set = 2, binding = 5) buffer MaterialBuffer 	{ Material materials[]; };
+layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
+vec3 sceneNormal(Ray ray)
+{
+	Instance instance = instances[ray.hit.instanceIdx];
+	return scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray);
+}
+
+Material sceneMaterial(Ray ray)
+{
+	Instance hitInstance = instances[ray.hit.instanceIdx];
+	return materials[hitInstance.materialOffset];
+}
+
 void main()
 {
-	//
+	// TODO: calculate new ray direction & buffer bounced ray and optional shadow ray (update accumulator here too?)
 }
