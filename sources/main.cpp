@@ -250,8 +250,8 @@ int main()
 
 	SceneBackground background = SceneBackground{};
 	background.type = BackgroundType::ColorGradient;
-	background.gradient.colorA = RgbColor(1.0f, 1.0f, 1.0f);
-	background.gradient.colorB = RgbColor(0.2f, 0.7f, 0.9f);
+	background.gradient.colorA = RgbColor(0.8f, 0.8f, 0.8f);
+	background.gradient.colorB = RgbColor(0.1f, 0.4f, 0.6f);
 
 	// -- END Scene setup
 

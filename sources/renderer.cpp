@@ -790,23 +790,36 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
 
     // Update all compute pipeline descriptor sets
     m_rayGenPipeline.updateDescriptorSets({
-        //
+        cameraWriteSet,
+        frameStateWriteSet,
     });
 
     m_rayExtPipeline.updateDescriptorSets({
-        //
+        triBufWriteset,
+        blasIdxWriteSet, blasNodeWriteSet,
+        instanceWriteSet,
+        tlasIdxWriteSet, tlasNodeWriteSet,
     });
 
     m_rayShadePipeline.updateDescriptorSets({
-        //
+        triExtBufWriteset,
+        materialWriteSet,
+        instanceWriteSet,
     });
 
     m_rayConnectPipeline.updateDescriptorSets({
-        //
+        frameStateWriteSet,
+        accumulatorWriteSet,
+        sceneDataWriteSet,
+        triExtBufWriteset,
+        materialWriteSet,
+        instanceWriteSet,
     });
 
     m_wfFinalizePipeline.updateDescriptorSets({
-        //
+        frameStateWriteSet,
+        accumulatorWriteSet,
+        outputImageWriteSet,
     });
 #endif
 

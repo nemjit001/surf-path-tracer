@@ -85,7 +85,7 @@ void UIManager::drawUI(F32 deltaTime, UIState& uiState)
 		if (ImGui::TreeNode("Stats"))
 		{
 			ImGui::Text("FPS: %8.1f FPS", 1.0f / deltaTime);
-			ImGui::Text("Frame delta: %8.2 ms", deltaTime);
+			ImGui::Text("Frame delta: %8.2f ms", deltaTime * 1'000.0f);
 			ImGui::TreePop();
 		}
 
