@@ -779,14 +779,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     });
 #else
     // Wavefront data
-    WriteDescriptorSet raySSBOWriteSet = {};
-    raySSBOWriteSet.set = 1;
-    raySSBOWriteSet.binding = 0;
-    raySSBOWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    raySSBOWriteSet.bufferInfo = VkDescriptorBufferInfo{
-        m_raySSBO.handle(),
-        0, c_raySSBOSize
-    };
+    // TODO: implement
 
     // Update all compute pipeline descriptor sets
     m_rayGenPipeline.updateDescriptorSets({
@@ -929,10 +922,6 @@ void WaveFrontRenderer::render(F32 deltaTime)
     computeSubmit.pSignalSemaphores = &activeCompute.computeFinished;
     VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &computeSubmit, activeCompute.computeReady));
 #else
-    RayGenUBO* rayGenState = nullptr;
-    m_raySSBO.persistentMap(reinterpret_cast<void**>(&rayGenState));
-    assert(rayGenState != nullptr);
-
     VkSubmitInfo rayGenSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     rayGenSubmit.commandBufferCount = 1;
     rayGenSubmit.pCommandBuffers = &m_wavefrontCompute.rayGenBuffer;
@@ -946,7 +935,8 @@ void WaveFrontRenderer::render(F32 deltaTime)
     VK_CHECK(vkWaitForFences(m_context->device, 1, &activeCompute.computeReady, VK_TRUE, UINT64_MAX));
     VK_CHECK(vkResetFences(m_context->device, 1, &activeCompute.computeReady));
 
-    while (rayGenState->count > 0)
+    // FIXME: check GPU counters to be empty
+    while (false)
     {
         VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
         waveSubmit.commandBufferCount = 1;
@@ -970,7 +960,6 @@ void WaveFrontRenderer::render(F32 deltaTime)
     finalizeSubmit.signalSemaphoreCount = 1;
     finalizeSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
     VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
-    m_raySSBO.unmap();
 #endif
 
     VkPipelineStageFlags gfxWaitStages[] = {

@@ -51,14 +51,6 @@ struct FrameStateUBO
     U32 totalSamples        = 0;
 };
 
-/// @brief The RayGenUBO maps to a GLSL SSBO, this SSBO is used as to check the kernel execution state during
-/// wavefront rendering.
-struct RayGenUBO
-{
-    I32 count;
-    GPURay rays[];
-};
-
 struct FrameData
 {
     VkCommandPool pool;
@@ -369,14 +361,7 @@ private:
     );
 
 #if GPU_MEGAKERNEL != 1
-    const SizeType c_raySSBOSize = sizeof(I32) + m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
-    Buffer m_raySSBO = Buffer(
-        m_context->allocator, c_raySSBOSize,
-        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-    );
+    // TODO: store counter SSBO, ray queues for kernels etc. here
 #endif
 
     // Present shaders
