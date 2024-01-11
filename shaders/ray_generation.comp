@@ -3,57 +3,9 @@
 
 #include "wavefront_common.glsl"
 
-layout(set = 0, binding = 0) uniform CameraData
-{
-	vec3 position;
-	vec3 firstPixel;
-	vec3 uVector;
-	vec3 vVector;
-	vec2 resolution;
-} camera;
-
-layout(set = 0, binding = 1) uniform FrameState
-{
-	uint samplesPerFrame;
-	uint totalSamples;
-} frameState;
-
-layout(set = 1, binding = 0) coherent buffer RayBuffer
-{
-	int count;
-	Ray rays[];
-} rayBuffer;
-
-layout(local_size_x = 16, local_size_y = 16) in;
-
-vec3 generateRayDirection(float xPixel, float yPixel)
-{
-	float u = xPixel / camera.resolution.x;
-	float v = yPixel / camera.resolution.y;
-
-	vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
-	return normalize(planePos - camera.position);
-}
+layout(local_size_x = 32, local_size_y = 32) in;
 
 void main()
 {
-	uint seed = initSeed((gl_GlobalInvocationID.x + gl_GlobalInvocationID.y + frameState.totalSamples) * 1799);
-
-	uvec3 pixelBaseOffset = gl_WorkGroupID * gl_WorkGroupSize;
-	uvec3 totalInvocations = gl_NumWorkGroups * gl_WorkGroupSize;
-
-	uint xPixel = gl_LocalInvocationID.x + pixelBaseOffset.x;
-	uint yPixel = gl_LocalInvocationID.y + pixelBaseOffset.y;
-	uint pixelIdx = xPixel + (yPixel * totalInvocations.x);
-
-	float aaSampleX = xPixel + randomRange(seed, -0.5, 0.5);
-	float aaSampleY = yPixel + randomRange(seed, -0.5, 0.5);
-
-	vec3 origin = camera.position;
-	vec3 direction = generateRayDirection(aaSampleX, aaSampleY);
-
-	Ray ray = newRay(origin, direction);
-
-	rayBuffer.rays[pixelIdx] = ray;
-	rayBuffer.count = 0;// int(totalInvocations.x * totalInvocations.y * totalInvocations.z);
+	//
 }

@@ -3,19 +3,6 @@
 
 #include "wavefront_common.glsl"
 
-shared int rayCount;
-
-layout(set = 0, binding = 2) buffer AccumulatorBuffer
-{
-	vec4 accumulator[];
-};
-
-layout(set = 1, binding = 0) buffer RayBuffer
-{
-	int count;
-	Ray rays[];
-} rayBuffer;
-
 layout(local_size_x = 32, local_size_y = 32) in;
 
 void main()
