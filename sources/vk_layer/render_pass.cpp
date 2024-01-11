@@ -56,14 +56,23 @@ RenderPass::RenderPass(
     subpass.preserveAttachmentCount = 0;
     subpass.pPreserveAttachments = nullptr;
 
+    VkSubpassDependency prevFrameDependency = {};
+    prevFrameDependency.dependencyFlags = 0;
+    prevFrameDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    prevFrameDependency.dstSubpass = 0;
+    prevFrameDependency.srcAccessMask = 0;
+    prevFrameDependency.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    prevFrameDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    prevFrameDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
     VkRenderPassCreateInfo createInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     createInfo.flags = 0;
     createInfo.attachmentCount = static_cast<U32>(vkAttachments.size());
     createInfo.pAttachments = vkAttachments.data();
     createInfo.subpassCount = 1;
     createInfo.pSubpasses = &subpass;
-    createInfo.dependencyCount = 0;
-    createInfo.pDependencies = nullptr;
+    createInfo.dependencyCount = 1;
+    createInfo.pDependencies = &prevFrameDependency;
 
     VK_CHECK(vkCreateRenderPass(m_device, &createInfo, nullptr, &m_renderPass));
 }

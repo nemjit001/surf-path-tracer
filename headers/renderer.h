@@ -262,7 +262,7 @@ private:
     SizeType m_currentFrame = 0;
     FramebufferSize m_framebufferSize = m_context->getFramebufferSize();
     FrameData m_frames[FRAMES_IN_FLIGHT] = {};
-    WavefrontCompute m_wavefrontCompute[FRAMES_IN_FLIGHT] = {};
+    WavefrontCompute m_wavefrontCompute = {};
 
     // Default render pass w/ framebuffers
     RenderPass m_presentPass = RenderPass(
@@ -291,6 +291,7 @@ private:
     Shader m_rayGeneration  = Shader(m_context.device, ShaderType::Compute, "shaders/ray_generation.comp.spv");
     Shader m_rayExtend      = Shader(m_context.device, ShaderType::Compute, "shaders/ray_extend.comp.spv");
     Shader m_rayShade       = Shader(m_context.device, ShaderType::Compute, "shaders/ray_shade.comp.spv");
+    Shader m_rayConnect     = Shader(m_context.device, ShaderType::Compute, "shaders/ray_connect.comp.spv");
     Shader m_wfFinalize     = Shader(m_context.device, ShaderType::Compute, "shaders/wavefront_finalize.comp.spv");
 #endif
 
@@ -330,6 +331,7 @@ private:
     ComputePipeline m_rayGenPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
     ComputePipeline m_rayExtPipeline        = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
     ComputePipeline m_rayShadePipeline      = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayShade);
+    ComputePipeline m_rayConnectPipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_rayConnect);
     ComputePipeline m_wfFinalizePipeline    = ComputePipeline(m_context.device, m_descriptorPool, m_wavefrontLayout, &m_wfFinalize);
 #endif
 

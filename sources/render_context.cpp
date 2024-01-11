@@ -34,6 +34,13 @@ RenderContext::RenderContext(GLFWwindow* window)
 #endif
     };
 
+    // Set up device features
+    VkPhysicalDeviceFeatures deviceFeatures = {};
+    VkPhysicalDeviceVulkan13Features deviceVk13Features = {};
+    deviceVk13Features.robustImageAccess = true;
+    deviceVk13Features.computeFullSubgroups = true;
+    deviceVk13Features.synchronization2 = true;
+
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
     extensions.insert(extensions.end(), glfwExtensions, glfwExtensions + glfwExtensionCount);
@@ -79,6 +86,8 @@ RenderContext::RenderContext(GLFWwindow* window)
         .add_required_extensions({
             VK_KHR_SWAPCHAIN_EXTENSION_NAME
             })
+        .set_required_features(deviceFeatures)
+        .set_required_features_13(deviceVk13Features)
         .select();
 
     gpu = gpuResult.value();
