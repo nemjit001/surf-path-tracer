@@ -20,6 +20,7 @@ struct GPURay
 	F32 depth;
 	bool inMedium;
 	Float3 transmission;
+	Float3 energy;
 	U32 pixelIdx;
 
 	struct GPURayHit

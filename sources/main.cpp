@@ -31,7 +31,7 @@
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
-#define FRAMEDATA_OUTPUT		1
+#define FRAMEDATA_OUTPUT		0
 #define GPU_PATH_TRACING		1
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
@@ -139,7 +139,7 @@ int main()
 
 	// Create a new camera
 	Camera worldCam(
-		Float3(0.0f, 0.0f, -7.0f),
+		Float3(0.0f, 0.0f, -75.0f),
 		Float3(0.0f, 0.0f, 0.0f),
 		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
 		static_cast<U32>(resolution.height * RESOLUTION_SCALE),

@@ -234,12 +234,11 @@ void main()
 
 		Ray activeRay = newRay(origin, direction);
 
-		vec3 energy = vec3(0);
 		for (uint bounceCount = 0;;bounceCount++)
 		{
 			if (!intersectTLAS(activeRay))
 			{
-				energy += activeRay.transmission * sampleSkyColor(activeRay, sceneData.background);
+				activeRay.energy += activeRay.transmission * sampleSkyColor(activeRay, sceneData.background);
 				break;
 			}
 
@@ -249,7 +248,7 @@ void main()
 
 			if (materialIsLight(material))
 			{
-				energy += activeRay.transmission * materialEmittance(material);
+				activeRay.energy += activeRay.transmission * materialEmittance(material);
 				break;
 			}
 
@@ -279,6 +278,7 @@ void main()
 				reflectRay.pixelIdx = activeRay.pixelIdx;
 				reflectRay.inMedium = activeRay.inMedium;
 				reflectRay.transmission = activeRay.transmission;
+				reflectRay.energy = activeRay.energy;
 				activeRay = reflectRay;
 			}
 			else if (r < (material.reflectivity + material.refractivity))
@@ -308,6 +308,7 @@ void main()
 						transmitRay.pixelIdx = activeRay.pixelIdx;
 						transmitRay.inMedium = !activeRay.inMedium;
 						transmitRay.transmission = activeRay.transmission;
+						transmitRay.energy = activeRay.energy;
 						activeRay = transmitRay;
 						continue;
 					}
@@ -321,6 +322,7 @@ void main()
 				reflectRay.pixelIdx = activeRay.pixelIdx;
 				reflectRay.inMedium = activeRay.inMedium;
 				reflectRay.transmission = activeRay.transmission;
+				reflectRay.energy = activeRay.energy;
 				activeRay = reflectRay;
 			}
 			else
@@ -339,11 +341,12 @@ void main()
 				bounceRay.pixelIdx = activeRay.pixelIdx;
 				bounceRay.inMedium = activeRay.inMedium;
 				bounceRay.transmission = activeRay.transmission;
+				bounceRay.energy = activeRay.energy;
 				activeRay = bounceRay;
 			}
 		}
 
-		accumulator[pixelIdx] += vec4(energy, 1);
+		accumulator[pixelIdx] += vec4(activeRay.energy, 1);
 	}
 
 	float invSamples = 1.0 / frameState.totalSamples;

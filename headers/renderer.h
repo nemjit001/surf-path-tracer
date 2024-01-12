@@ -51,6 +51,12 @@ struct FrameStateUBO
     U32 totalSamples        = 0;
 };
 
+struct RayBufferCounters
+{
+    I32 rayIn;
+    I32 rayOut;
+};
+
 struct FrameData
 {
     VkCommandPool pool;
@@ -297,9 +303,11 @@ private:
                 DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
             }
         },
-        DescriptorSetLayout{    // Compute SSBOs (rays)
+        DescriptorSetLayout{    // Wavefront compute SSBOs (GPU counters, rayBuffers 0 & 1)
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
         DescriptorSetLayout{    // Scene UBOs & SSBOs (scene data & instance, bvh, mesh buffers)
@@ -361,7 +369,29 @@ private:
     );
 
 #if GPU_MEGAKERNEL != 1
-    // TODO: store counter SSBO, ray queues for kernels etc. here
+    // Size is 2 * render resolution to ensure large enough buffers for generated rays in flight
+    const SizeType c_rayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
+    Buffer m_rayCounters = Buffer(
+        m_context->allocator, sizeof(RayBufferCounters),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+    );
+
+    Buffer m_rayBuffer0 = Buffer(
+        m_context->allocator, c_rayBufferSize,
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0
+    );
+
+    Buffer m_rayBuffer1 = Buffer(
+        m_context->allocator, c_rayBufferSize,
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0
+    );
 #endif
 
     // Present shaders

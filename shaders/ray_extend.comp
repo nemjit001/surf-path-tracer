@@ -7,6 +7,10 @@
 #define TLAS_ROOT_IDX			0
 #define TRAVERSAL_STACK_SIZE 	64
 
+layout(set = 1, binding = 0) coherent buffer RayCounters 	{ uint rayIn; uint rayOut; } rayCounters;
+layout(set = 1, binding = 1) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
+layout(set = 1, binding = 2) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
+
 layout(set = 2, binding = 1) buffer TriBuffer 		{ Triangle triangles[]; };
 layout(set = 2, binding = 3) buffer BLASIndexBuffer { uint blasIndices[]; };
 layout(set = 2, binding = 4) buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };

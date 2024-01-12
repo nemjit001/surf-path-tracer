@@ -52,6 +52,7 @@ struct Ray
 	float depth;
 	bool inMedium;
 	vec3 transmission;
+	vec3 energy;
 	uint pixelIdx;		// Pixel index for ray into out buffer
 	RayHit hit;
 };
@@ -167,6 +168,7 @@ Ray newRay(vec3 origin, vec3 direction)
 		F32_FAR_AWAY,
 		false,
 		vec3(1),
+		vec3(0),
 		UNSET_IDX,
 		RayHit(UNSET_IDX, UNSET_IDX, vec2(0))
 	);

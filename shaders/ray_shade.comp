@@ -4,6 +4,19 @@
 #include "bvh.glsl"
 #include "wavefront_common.glsl"
 
+layout(set = 0, binding = 1) uniform FrameState
+{
+	uint samplesPerFrame;
+	uint totalSamples;
+} frameState;
+
+layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
+
+// XXX: out & in are swapped to avoid updating descriptors / counters on host side
+layout(set = 1, binding = 0) coherent buffer RayCounters 	{ uint rayOut; uint rayIn; } rayCounters;
+layout(set = 1, binding = 2) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
+layout(set = 1, binding = 1) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
+
 layout(set = 2, binding = 2) buffer TriExtBuffer 	{ TriExtension triExtensions[]; };
 layout(set = 2, binding = 5) buffer MaterialBuffer 	{ Material materials[]; };
 layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };

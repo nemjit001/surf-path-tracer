@@ -779,15 +779,23 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     });
 #else
     // Wavefront data
-    // TODO: implement
+    WriteDescriptorSet rayCounterWriteSet = {};
+    rayCounterWriteSet.set = 1;
+    rayCounterWriteSet.binding = 0;
+    rayCounterWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    rayCounterWriteSet.bufferInfo.buffer = m_rayCounters.handle();
+    rayCounterWriteSet.bufferInfo.offset = 0;
+    rayCounterWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
 
     // Update all compute pipeline descriptor sets
     m_rayGenPipeline.updateDescriptorSets({
         cameraWriteSet,
         frameStateWriteSet,
+        rayCounterWriteSet,
     });
 
     m_rayExtPipeline.updateDescriptorSets({
+        rayCounterWriteSet,
         triBufWriteset,
         blasIdxWriteSet, blasNodeWriteSet,
         instanceWriteSet,
@@ -795,6 +803,9 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     });
 
     m_rayShadePipeline.updateDescriptorSets({
+        frameStateWriteSet,
+        accumulatorWriteSet,
+        rayCounterWriteSet,
         triExtBufWriteset,
         materialWriteSet,
         instanceWriteSet,
@@ -803,6 +814,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     m_rayConnectPipeline.updateDescriptorSets({
         frameStateWriteSet,
         accumulatorWriteSet,
+        rayCounterWriteSet,
         sceneDataWriteSet,
         triExtBufWriteset,
         materialWriteSet,
@@ -880,9 +892,13 @@ void WaveFrontRenderer::render(F32 deltaTime)
     U32 swapImageIdx = 0;
     VK_CHECK(vkAcquireNextImageKHR(m_context->device, m_context->swapchain, UINT64_MAX, activeFrame.swapImageAvailable, VK_NULL_HANDLE, &swapImageIdx));
 
-    VkFence fences[] = { activeFrame.frameReady, activeCompute.computeReady };
-    VK_CHECK(vkWaitForFences(m_context->device, 2, fences, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(m_context->device, 2, fences));
+    VkFence fences[] = { activeFrame.frameReady };
+    VK_CHECK(vkWaitForFences(m_context->device, 1, fences, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context->device, 1, fences));
+
+    // Wait on compute before updating uniforms
+    VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
 
     // Update cameraUBO
     CameraUBO cameraUBO = CameraUBO{
@@ -922,44 +938,102 @@ void WaveFrontRenderer::render(F32 deltaTime)
     computeSubmit.pSignalSemaphores = &activeCompute.computeFinished;
     VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &computeSubmit, activeCompute.computeReady));
 #else
-    VkSubmitInfo rayGenSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    rayGenSubmit.commandBufferCount = 1;
-    rayGenSubmit.pCommandBuffers = &m_wavefrontCompute.rayGenBuffer;
-    rayGenSubmit.waitSemaphoreCount = 1;
-    rayGenSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
-    rayGenSubmit.pWaitDstStageMask = computeWaitStages;
-    rayGenSubmit.signalSemaphoreCount = 1;
-    rayGenSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
-    VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &rayGenSubmit, activeCompute.computeReady));
+    // Map ray counters during wf pass
+    RayBufferCounters* pRayCounters = nullptr;
+    m_rayCounters.persistentMap(reinterpret_cast<void**>(&pRayCounters));
+    assert(pRayCounters != nullptr);
 
-    VK_CHECK(vkWaitForFences(m_context->device, 1, &activeCompute.computeReady, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(m_context->device, 1, &activeCompute.computeReady));
-
-    // FIXME: check GPU counters to be empty
-    while (false)
+    // Do wf compute pass for every sample
+    for (U32 sample = 0; sample < m_config.samplesPerFrame; sample++)
     {
-        VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-        waveSubmit.commandBufferCount = 1;
-        waveSubmit.pCommandBuffers = &m_wavefrontCompute.waveBuffer;
-        waveSubmit.waitSemaphoreCount = 1;
-        waveSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
-        waveSubmit.pWaitDstStageMask = computeWaitStages;
-        waveSubmit.signalSemaphoreCount = 1;
-        waveSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
-        VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &waveSubmit, m_wavefrontCompute.computeReady));
-        VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
-        VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
+        Buffer* rayInBuffer = &m_rayBuffer0;
+        Buffer* rayOutBuffer = &m_rayBuffer1;
+
+        WriteDescriptorSet inBufferWriteSet = {};
+        inBufferWriteSet.set = 1;
+        inBufferWriteSet.binding = 1;
+        inBufferWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inBufferWriteSet.bufferInfo.buffer = rayInBuffer->handle();
+        inBufferWriteSet.bufferInfo.offset = 0;
+        inBufferWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
+        WriteDescriptorSet outBufferWriteSet = {};
+        outBufferWriteSet.set = 1;
+        outBufferWriteSet.binding = 2;
+        outBufferWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        outBufferWriteSet.bufferInfo.buffer = rayOutBuffer->handle();
+        outBufferWriteSet.bufferInfo.offset = 0;
+        outBufferWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
+        m_rayGenPipeline.updateDescriptorSets({
+            inBufferWriteSet,
+            outBufferWriteSet,
+        });
+
+        VkSemaphore rayGenWaitSemaphores[] = { activeFrame.swapImageAvailable, activeCompute.computeFinished };
+        VkPipelineStageFlags rayGenWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+        VkSubmitInfo rayGenSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+        rayGenSubmit.commandBufferCount = 1;
+        rayGenSubmit.pCommandBuffers = &m_wavefrontCompute.rayGenBuffer;
+        rayGenSubmit.waitSemaphoreCount = (sample > 0) ? 2 : 1;
+        rayGenSubmit.pWaitSemaphores = rayGenWaitSemaphores;
+        rayGenSubmit.pWaitDstStageMask = rayGenWaitStages;
+        rayGenSubmit.signalSemaphoreCount = 1;
+        rayGenSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
+        VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &rayGenSubmit, activeCompute.computeReady));
+        VK_CHECK(vkWaitForFences(m_context->device, 1, &activeCompute.computeReady, VK_TRUE, UINT64_MAX));
+        VK_CHECK(vkResetFences(m_context->device, 1, &activeCompute.computeReady));
+
+        while (pRayCounters->rayIn > 0 || pRayCounters->rayOut > 0)
+        {
+            swap(rayInBuffer, rayOutBuffer);
+            swap(pRayCounters->rayIn, pRayCounters->rayOut);
+            inBufferWriteSet.bufferInfo.buffer = rayInBuffer->handle();
+            outBufferWriteSet.bufferInfo.buffer = rayOutBuffer->handle();
+
+            m_rayExtPipeline.updateDescriptorSets({
+                inBufferWriteSet,
+                outBufferWriteSet,
+            });
+
+            m_rayShadePipeline.updateDescriptorSets({
+                inBufferWriteSet,
+                outBufferWriteSet,
+            });
+
+            VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+            waveSubmit.commandBufferCount = 1;
+            waveSubmit.pCommandBuffers = &m_wavefrontCompute.waveBuffer;
+            waveSubmit.waitSemaphoreCount = 1;
+            waveSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
+            waveSubmit.pWaitDstStageMask = computeWaitStages;
+            waveSubmit.signalSemaphoreCount = 1;
+            waveSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
+            VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &waveSubmit, m_wavefrontCompute.computeReady));
+            VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
+            VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
+        }
+
+        VkSemaphore finalizeSignalSemaphores[] = { activeCompute.computeFinished, activeFrame.swapImageAvailable };
+        VkSubmitInfo finalizeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+        finalizeSubmit.commandBufferCount = 1;
+        finalizeSubmit.pCommandBuffers = &m_wavefrontCompute.finalizeBuffer;
+        finalizeSubmit.waitSemaphoreCount = 1;
+        finalizeSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
+        finalizeSubmit.pWaitDstStageMask = computeWaitStages;
+        finalizeSubmit.signalSemaphoreCount = (sample < m_config.samplesPerFrame - 1) ? 2 : 1;
+        finalizeSubmit.pSignalSemaphores = finalizeSignalSemaphores;
+        VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
+
+        // Wait for submission before continuing loop
+        if (m_config.samplesPerFrame > 1 && sample < m_config.samplesPerFrame - 1)
+        {
+            VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
+            VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
+        }
     }
 
-    VkSubmitInfo finalizeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    finalizeSubmit.commandBufferCount = 1;
-    finalizeSubmit.pCommandBuffers = &m_wavefrontCompute.finalizeBuffer;
-    finalizeSubmit.waitSemaphoreCount = 1;
-    finalizeSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
-    finalizeSubmit.pWaitDstStageMask = computeWaitStages;
-    finalizeSubmit.signalSemaphoreCount = 1;
-    finalizeSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
-    VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
+    m_rayCounters.unmap();
 #endif
 
     VkPipelineStageFlags gfxWaitStages[] = {
