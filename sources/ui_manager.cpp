@@ -69,7 +69,7 @@ UIManager::~UIManager()
 	ImGui::DestroyContext(m_guiContext);
 }
 
-void UIManager::drawUI(F32 deltaTime, UIState& uiState)
+void UIManager::drawUI(F32 deltaTimeMillis, UIState& uiState)
 {
 	uiState.updated = false;
 
@@ -84,8 +84,8 @@ void UIManager::drawUI(F32 deltaTime, UIState& uiState)
 		// Debug stats
 		if (ImGui::TreeNode("Stats"))
 		{
-			ImGui::Text("FPS: %8.1f FPS", 1.0f / deltaTime);
-			ImGui::Text("Frame delta: %8.2f ms", deltaTime * 1'000.0f);
+			ImGui::Text("FPS:\t\t\t%08.2f FPS", 1'000.0f / deltaTimeMillis);
+			ImGui::Text("Frame delta:\t%08.2f ms", deltaTimeMillis);
 			ImGui::TreePop();
 		}
 

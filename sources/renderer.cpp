@@ -970,13 +970,12 @@ void WaveFrontRenderer::render(F32 deltaTime)
             outBufferWriteSet,
         });
 
-        VkSemaphore rayGenWaitSemaphores[] = { activeFrame.swapImageAvailable, activeCompute.computeFinished };
-        VkPipelineStageFlags rayGenWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
+        VkPipelineStageFlags rayGenWaitStages[] = { VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
         VkSubmitInfo rayGenSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
         rayGenSubmit.commandBufferCount = 1;
         rayGenSubmit.pCommandBuffers = &m_wavefrontCompute.rayGenBuffer;
-        rayGenSubmit.waitSemaphoreCount = (sample > 0) ? 2 : 1;
-        rayGenSubmit.pWaitSemaphores = rayGenWaitSemaphores;
+        rayGenSubmit.waitSemaphoreCount = 1;
+        rayGenSubmit.pWaitSemaphores = (sample > 0) ? &activeCompute.computeFinished : &activeFrame.swapImageAvailable;
         rayGenSubmit.pWaitDstStageMask = rayGenWaitStages;
         rayGenSubmit.signalSemaphoreCount = 1;
         rayGenSubmit.pSignalSemaphores = &m_wavefrontCompute.computeFinished;
@@ -1013,25 +1012,17 @@ void WaveFrontRenderer::render(F32 deltaTime)
             VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
             VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
         }
-
-        VkSemaphore finalizeSignalSemaphores[] = { activeCompute.computeFinished, activeFrame.swapImageAvailable };
-        VkSubmitInfo finalizeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-        finalizeSubmit.commandBufferCount = 1;
-        finalizeSubmit.pCommandBuffers = &m_wavefrontCompute.finalizeBuffer;
-        finalizeSubmit.waitSemaphoreCount = 1;
-        finalizeSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
-        finalizeSubmit.pWaitDstStageMask = computeWaitStages;
-        finalizeSubmit.signalSemaphoreCount = (sample < m_config.samplesPerFrame - 1) ? 2 : 1;
-        finalizeSubmit.pSignalSemaphores = finalizeSignalSemaphores;
-        VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
-
-        // Wait for submission before continuing loop
-        if (m_config.samplesPerFrame > 1 && sample < m_config.samplesPerFrame - 1)
-        {
-            VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
-            VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
-        }
     }
+
+    VkSubmitInfo finalizeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    finalizeSubmit.commandBufferCount = 1;
+    finalizeSubmit.pCommandBuffers = &m_wavefrontCompute.finalizeBuffer;
+    finalizeSubmit.waitSemaphoreCount = 1;
+    finalizeSubmit.pWaitSemaphores = &m_wavefrontCompute.computeFinished;
+    finalizeSubmit.pWaitDstStageMask = computeWaitStages;
+    finalizeSubmit.signalSemaphoreCount = 1;
+    finalizeSubmit.pSignalSemaphores = &activeCompute.computeFinished;
+    VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
 
     m_rayCounters.unmap();
 #endif

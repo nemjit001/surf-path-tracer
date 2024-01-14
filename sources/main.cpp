@@ -298,7 +298,7 @@ int main()
 
 		// Render frame
 		RendererConfig& config = renderer.config();	// Used only for debug info now -> can be updated using UI
-		uiManager.drawUI(deltaTime, uiState);
+		uiManager.drawUI(AVERAGE_FRAMETIME, uiState);
 		renderer.render(deltaTime);
 
 		// Handle input
@@ -322,10 +322,10 @@ int main()
 		frameTimer.tick();
 		deltaTime = frameTimer.deltaTime();
 
-#if FRAMEDATA_OUTPUT == 1
 		AVERAGE_FRAMETIME = (1.0f - ALPHA) * AVERAGE_FRAMETIME + ALPHA * (deltaTime * 1'000.0f);
 		if (ALPHA > SMOOTH_FRAC) ALPHA *= 0.5;
 
+#if FRAMEDATA_OUTPUT == 1
 		F32 inv_avg_frametime = 1.0f / AVERAGE_FRAMETIME;
 		F32 rps = (resolution.width * RESOLUTION_SCALE * resolution.height * RESOLUTION_SCALE * config.samplesPerFrame) * inv_avg_frametime;
 		const FrameInstrumentationData& frameInfo = renderer.frameInfo();

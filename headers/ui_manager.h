@@ -34,7 +34,7 @@ public:
 
 	~UIManager();
 
-	void drawUI(F32 deltaTime, UIState& state);
+	void drawUI(F32 deltaTimeMillis, UIState& state);
 
 	void recordGUIPass(VkCommandBuffer cmdBuffer, U32 frameIndex);
 
