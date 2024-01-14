@@ -12,11 +12,11 @@ layout(set = 0, binding = 1) uniform FrameState
 
 layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
-// XXX: out & in are swapped to avoid updating descriptors / counters on host side
-layout(set = 1, binding = 0) coherent buffer RayCounters 	{ uint rayOut; uint rayIn; } rayCounters;
-layout(set = 1, binding = 2) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
-layout(set = 1, binding = 1) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
+layout(set = 1, binding = 0) coherent buffer RayCounters 	{ int rayIn; int rayOut; } rayCounters;
+layout(set = 1, binding = 1) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
+layout(set = 1, binding = 2) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
 
+layout(set = 2, binding = 0) uniform SceneData 		{ SceneBackground background; } sceneData;
 layout(set = 2, binding = 2) buffer TriExtBuffer 	{ TriExtension triExtensions[]; };
 layout(set = 2, binding = 5) buffer MaterialBuffer 	{ Material materials[]; };
 layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
@@ -36,6 +36,116 @@ Material sceneMaterial(Ray ray)
 }
 
 void main()
-{
-	// TODO: calculate new ray direction & buffer bounced ray and optional shadow ray (update accumulator here too?)
+{	
+	const uvec3 GlobalWorkGroupSize = gl_NumWorkGroups * gl_WorkGroupSize;
+	const uint WorkerSize1D = GlobalWorkGroupSize.x * GlobalWorkGroupSize.y * GlobalWorkGroupSize.z;
+	const uint InvocationIndex1D = gl_LocalInvocationIndex + \
+	(gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x);
+
+	int segmentSize = int(ceil(rayCounters.rayIn / WorkerSize1D));
+	int segmentStart = int(InvocationIndex1D * segmentSize);
+	int segmentEnd = segmentStart + segmentSize;
+
+	uint seed = initSeed(InvocationIndex1D + frameState.totalSamples * 1799);
+
+	for (int rayIdx = segmentStart; rayIdx < segmentEnd; rayIdx++)
+	{
+		Ray ray = rayIn.rays[rayIdx];
+
+		if (ray.depth == F32_FAR_AWAY)
+		{
+			ray.energy += ray.transmission * sampleSkyColor(ray, sceneData.background);
+			accumulator[ray.pixelIdx] += vec4(ray.energy, 1);
+			continue;
+		}
+
+		vec3 I = rayHitPosition(ray);
+		vec3 N = sceneNormal(ray);
+		Material material = sceneMaterial(ray);
+
+		if (materialIsLight(material))
+		{
+			ray.energy += ray.transmission * materialEmittance(material);
+			accumulator[ray.pixelIdx] += vec4(ray.energy, 1);
+			continue;
+		}
+
+		if (dot(ray.direction, N) > 0.0f)
+			N *= -1;
+
+		float r = randomF32(seed);
+		if (r < material.reflectivity)
+		{
+			vec3 newDirection = reflect(ray.direction, N);
+			vec3 newOrigin = I + F32_EPSILON * newDirection;
+			Ray reflectRay = newRay(newOrigin, newDirection);
+
+			ray.transmission *= material.albedo;
+			reflectRay.inMedium = ray.inMedium;
+
+			copyRayMetadata(reflectRay, ray);
+			rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = reflectRay;
+		}
+		else if (r < (material.reflectivity + material.refractivity))
+		{
+			float n1 = ray.inMedium ? material.indexOfRefraction : 1.0f;
+			float n2 = ray.inMedium ? 1.0f : material.indexOfRefraction;
+			float iorRatio = n1 / n2;
+
+			float cosI = dot(-ray.direction, N);
+			float cosTheta2 = 1.0f - iorRatio * iorRatio * (1.0f - cosI * cosI);
+			float Fresnel = 1.0f;
+			if (cosTheta2 > 0.0f)
+			{
+				float a = n1 - n2;
+				float b = n1 + n2;
+				float r0 = (a * a) / (b * b);
+				float c = 1.0f - cosI;
+				float Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+
+				vec3 newDirection = iorRatio * ray.direction + ((iorRatio * cosI - sqrt(abs(cosTheta2))) * N);
+				vec3 newOrigin = I + F32_EPSILON * newDirection;
+				Ray transmitRay = newRay(newOrigin, newDirection);
+
+				if (randomF32(seed) > Fresnel)
+				{
+					ray.transmission *= material.albedo;
+					transmitRay.inMedium = !ray.inMedium;
+
+					copyRayMetadata(transmitRay, ray);
+					rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = transmitRay;
+					continue;
+				}
+			}
+
+			vec3 newDirection = reflect(ray.direction, N);
+			vec3 newOrigin = I + F32_EPSILON * newDirection;
+			Ray reflectRay = newRay(newOrigin, newDirection);
+
+			ray.transmission *= material.albedo;
+			reflectRay.inMedium = ray.inMedium;
+
+			copyRayMetadata(reflectRay, ray);
+			rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = reflectRay;
+		}
+		else
+		{
+			vec3 newDirection = diffuseReflectCosineWeighted(seed, N);
+			vec3 newOrigin = I + F32_EPSILON * newDirection;
+			Ray bounceRay = newRay(newOrigin, newDirection);
+
+			float cosTheta = dot(newDirection, N);
+			float invCosTheta = 1.0 / cosTheta;
+			vec3 brdf = material.albedo * F32_INV_PI;
+			float inversePdf = F32_PI * invCosTheta;
+
+			ray.transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf;
+			bounceRay.inMedium = ray.inMedium;
+
+			copyRayMetadata(bounceRay, ray);
+			rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = bounceRay;
+		}
+	}
+
+	atomicExchange(rayCounters.rayIn, 0);
 }

@@ -174,6 +174,13 @@ Ray newRay(vec3 origin, vec3 direction)
 	);
 }
 
+void copyRayMetadata(inout Ray new, Ray old)
+{
+	new.transmission = old.transmission;
+	new.energy = old.energy;
+	new.pixelIdx = old.pixelIdx;
+}
+
 bool depthInBounds(float depth, float maxDepth)
 {
 	return F32_EPSILON <= depth && depth < maxDepth;

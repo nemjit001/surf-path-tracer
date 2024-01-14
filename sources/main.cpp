@@ -27,7 +27,7 @@
 #endif
 #endif // _WIN32
 
-#define RESOLUTION_SCALE	1.0f
+#define RESOLUTION_SCALE	0.5f
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
@@ -139,7 +139,7 @@ int main()
 
 	// Create a new camera
 	Camera worldCam(
-		Float3(0.0f, 0.0f, -75.0f),
+		Float3(0.0f, 0.0f, -7.0f),
 		Float3(0.0f, 0.0f, 0.0f),
 		static_cast<U32>(resolution.width * RESOLUTION_SCALE),
 		static_cast<U32>(resolution.height * RESOLUTION_SCALE),

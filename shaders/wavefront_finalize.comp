@@ -14,5 +14,13 @@ layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
 void main()
 {
-	// TODO: update output image with new accumulator values
+	uint pixelIdx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * (gl_NumWorkGroups.x * gl_WorkGroupSize.x);
+	float invSamples = 1.0 / frameState.totalSamples;
+	vec4 outColor = accumulator[pixelIdx] * invSamples;
+
+	imageStore(
+		outputImage,
+		ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y),
+		outColor
+	);
 }

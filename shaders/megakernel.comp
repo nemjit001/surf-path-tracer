@@ -275,10 +275,9 @@ void main()
 				Ray reflectRay = newRay(newOrigin, newDirection);
 
 				activeRay.transmission *= material.albedo * mediumScale * rrScale;
-				reflectRay.pixelIdx = activeRay.pixelIdx;
 				reflectRay.inMedium = activeRay.inMedium;
-				reflectRay.transmission = activeRay.transmission;
-				reflectRay.energy = activeRay.energy;
+
+				copyRayMetadata(reflectRay, activeRay);
 				activeRay = reflectRay;
 			}
 			else if (r < (material.reflectivity + material.refractivity))
@@ -305,10 +304,9 @@ void main()
 					if (randomF32(pixelSeed) > Fresnel)
 					{
 						activeRay.transmission *= material.albedo * mediumScale * rrScale;
-						transmitRay.pixelIdx = activeRay.pixelIdx;
 						transmitRay.inMedium = !activeRay.inMedium;
-						transmitRay.transmission = activeRay.transmission;
-						transmitRay.energy = activeRay.energy;
+
+						copyRayMetadata(transmitRay, activeRay);
 						activeRay = transmitRay;
 						continue;
 					}
@@ -319,10 +317,9 @@ void main()
 				Ray reflectRay = newRay(newOrigin, newDirection);
 
 				activeRay.transmission *= material.albedo * mediumScale * rrScale;
-				reflectRay.pixelIdx = activeRay.pixelIdx;
 				reflectRay.inMedium = activeRay.inMedium;
-				reflectRay.transmission = activeRay.transmission;
-				reflectRay.energy = activeRay.energy;
+
+				copyRayMetadata(reflectRay, activeRay);
 				activeRay = reflectRay;
 			}
 			else
@@ -338,10 +335,9 @@ void main()
 				float inversePdf = F32_PI * invCosTheta;
 
 				activeRay.transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf * mediumScale * rrScale;
-				bounceRay.pixelIdx = activeRay.pixelIdx;
 				bounceRay.inMedium = activeRay.inMedium;
-				bounceRay.transmission = activeRay.transmission;
-				bounceRay.energy = activeRay.energy;
+
+				copyRayMetadata(bounceRay, activeRay);
 				activeRay = bounceRay;
 			}
 		}

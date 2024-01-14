@@ -604,7 +604,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
 
     // Set up wavefront compute structures
     VkCommandPoolCreateInfo wfPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    wfPoolCreateInfo.flags = 0;
+    wfPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     wfPoolCreateInfo.queueFamilyIndex = m_context->queues.computeQueue.familyIndex;
     VK_CHECK(vkCreateCommandPool(m_context->device, &wfPoolCreateInfo, nullptr, &m_wavefrontCompute.pool));
 
@@ -806,6 +806,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         frameStateWriteSet,
         accumulatorWriteSet,
         rayCounterWriteSet,
+        sceneDataWriteSet,
         triExtBufWriteset,
         materialWriteSet,
         instanceWriteSet,
@@ -847,8 +848,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
 #if GPU_MEGAKERNEL == 1
     bakeMegakernelPass(m_wavefrontCompute.commandBuffer);
 #else
-    bakeRayGenPass(m_wavefrontCompute.rayGenBuffer);
-    bakeWavePass(m_wavefrontCompute.waveBuffer);
+    // Finalize uses fixed descriptors -> can be prebaked
     bakeFinalizePass(m_wavefrontCompute.finalizeBuffer);
 #endif
 
@@ -970,7 +970,8 @@ void WaveFrontRenderer::render(F32 deltaTime)
             outBufferWriteSet,
         });
 
-        VkPipelineStageFlags rayGenWaitStages[] = { VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        bakeRayGenPass(activeCompute.rayGenBuffer);
+        VkPipelineStageFlags rayGenWaitStages[] = { VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT };
         VkSubmitInfo rayGenSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
         rayGenSubmit.commandBufferCount = 1;
         rayGenSubmit.pCommandBuffers = &m_wavefrontCompute.rayGenBuffer;
@@ -982,7 +983,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
         VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &rayGenSubmit, activeCompute.computeReady));
         VK_CHECK(vkWaitForFences(m_context->device, 1, &activeCompute.computeReady, VK_TRUE, UINT64_MAX));
         VK_CHECK(vkResetFences(m_context->device, 1, &activeCompute.computeReady));
-
+        
         while (pRayCounters->rayIn > 0 || pRayCounters->rayOut > 0)
         {
             swap(rayInBuffer, rayOutBuffer);
@@ -1000,6 +1001,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
                 outBufferWriteSet,
             });
 
+            bakeWavePass(activeCompute.waveBuffer);
             VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
             waveSubmit.commandBufferCount = 1;
             waveSubmit.pCommandBuffers = &m_wavefrontCompute.waveBuffer;
@@ -1078,7 +1080,7 @@ void WaveFrontRenderer::bakeMegakernelPass(VkCommandBuffer commandBuffer)
 
     // Transition storage image to write layout
     VkImageMemoryBarrier storageTransitionBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    storageTransitionBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    storageTransitionBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     storageTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     storageTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     storageTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -1093,7 +1095,7 @@ void WaveFrontRenderer::bakeMegakernelPass(VkCommandBuffer commandBuffer)
 
     vkCmdPipelineBarrier(
         commandBuffer,
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         0,
         0, nullptr,
@@ -1150,6 +1152,39 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
 {
     assert(commandBuffer != VK_NULL_HANDLE);
 
+    VkBufferMemoryBarrier2 rayCounterBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    rayCounterBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    rayCounterBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    rayCounterBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    rayCounterBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    rayCounterBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayCounterBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    rayCounterBarrier.buffer = m_rayCounters.handle();
+    rayCounterBarrier.offset = 0;
+    rayCounterBarrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 buffer0Barrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    buffer0Barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    buffer0Barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    buffer0Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    buffer0Barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    buffer0Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    buffer0Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    buffer0Barrier.buffer = m_rayBuffer0.handle();
+    buffer0Barrier.offset = 0;
+    buffer0Barrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 buffer1Barrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    buffer1Barrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    buffer1Barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    buffer1Barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    buffer1Barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    buffer1Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    buffer1Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    buffer1Barrier.buffer = m_rayBuffer1.handle();
+    buffer1Barrier.offset = 0;
+    buffer1Barrier.size = VK_WHOLE_SIZE;
+
     VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     cmdBeginInfo.flags = 0;
     cmdBeginInfo.pInheritanceInfo = nullptr;
@@ -1170,6 +1205,17 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
         vkCmdBindPipeline(commandBuffer, m_rayExtPipeline.bindPoint(), m_rayExtPipeline.handle());
         vkCmdDispatch(commandBuffer, 1, 1, 1);
     }
+
+    VkBufferMemoryBarrier2 extendShadeBufferBarriers[] = {
+        rayCounterBarrier,
+        buffer0Barrier,
+        buffer1Barrier,
+    };
+
+    VkDependencyInfo extendShadeDependency = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    extendShadeDependency.bufferMemoryBarrierCount = 3;
+    extendShadeDependency.pBufferMemoryBarriers = extendShadeBufferBarriers;
+    vkCmdPipelineBarrier2(commandBuffer, &extendShadeDependency);
 
     // shade kernel dispatch
     {

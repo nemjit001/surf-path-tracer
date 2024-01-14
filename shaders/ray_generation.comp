@@ -23,13 +23,57 @@ layout(set = 0, binding = 1) uniform FrameState
 	uint totalSamples;
 } frameState;
 
-layout(set = 1, binding = 0) coherent buffer RayCounters 	{ uint rayIn; uint rayOut; } rayCounters;
+layout(set = 1, binding = 0) coherent buffer RayCounters 	{ int rayIn; int rayOut; } rayCounters;
 layout(set = 1, binding = 1) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
 layout(set = 1, binding = 2) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
+vec3 sampleDefocusDisk(inout uint seed)
+{
+	const float radius = camera.focalLength * tan(radians(camera.defocusAngle / 2.0));
+	const vec3 u = camera.right * radius;
+	const vec3 v = -camera.up * radius;
+
+	vec2 diskSample = vec2(0);
+	do 
+	{
+		diskSample = vec2(
+			randomRange(seed, -1.0, 1.0),
+			randomRange(seed, -1.0, 1.0)
+		);
+	} while(dot(diskSample, diskSample) > 1.0);
+
+	return diskSample.x * u + diskSample.y * v;
+}
+
+vec3 generateDirection(inout uint seed, vec3 origin, float xPixel, float yPixel)
+{
+	float xAA = xPixel + randomRange(seed, -0.5, 0.5);
+	float yAA = yPixel + randomRange(seed, -0.5, 0.5);
+
+	float u = xAA / camera.resolution.x;
+	float v = yAA / camera.resolution.y;
+	vec3 planePos = camera.firstPixel + u * camera.uVector + v * camera.vVector;
+
+	return normalize(planePos - origin);
+}
+
 void main()
 {
-	// TODO: generate ray per pixel per sample for ray buffer
+	uint xPixel = gl_GlobalInvocationID.x;
+	uint yPixel = gl_GlobalInvocationID.y;
+	uint pixelIdx = xPixel + (yPixel * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
+	uint pixelSeed = initSeed(pixelIdx + frameState.totalSamples * 1799);
+
+	// Only generate enough rays for resolution
+	if (pixelIdx >= camera.resolution.x * camera.resolution.y)
+		return;
+
+	vec3 origin = camera.position + sampleDefocusDisk(pixelSeed);
+	vec3 direction = generateDirection(pixelSeed, origin, xPixel, yPixel);
+	Ray ray = newRay(origin, direction);
+	ray.pixelIdx = pixelIdx;
+
+	rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = ray;
 }

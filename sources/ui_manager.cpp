@@ -24,7 +24,6 @@ UIManager::UIManager(RenderContext* renderContext, UIStyle style)
 	// Setup control listeners
 	ImGuiIO& io = ImGui::GetIO();
 	io.IniFilename = nullptr;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
 	// Setup UI Style
 	switch (style)
