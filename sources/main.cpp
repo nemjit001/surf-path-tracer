@@ -27,7 +27,7 @@
 #endif
 #endif // _WIN32
 
-#define RESOLUTION_SCALE	0.5f
+#define RESOLUTION_SCALE	1.0f
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
