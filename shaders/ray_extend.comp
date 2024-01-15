@@ -18,7 +18,7 @@ layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
 layout(set = 2, binding = 7) buffer TLASIndexBuffer { uint tlasIndices[]; };
 layout(set = 2, binding = 8) buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 bool intersectBLAS(Instance instance, inout Ray ray)
 {
@@ -164,7 +164,7 @@ bool intersectTLAS(inout Ray ray)
 void main()
 {
 	const uvec3 GlobalWorkGroupSize = gl_NumWorkGroups * gl_WorkGroupSize;
-	const uint WorkerSize1D = GlobalWorkGroupSize.x * GlobalWorkGroupSize.y * GlobalWorkGroupSize.z;
+	const uint WorkerSize1D = GlobalWorkGroupSize.x + GlobalWorkGroupSize.y + GlobalWorkGroupSize.z;
 	const uint InvocationIndex1D = \
 		gl_GlobalInvocationID.x + \
 		gl_GlobalInvocationID.y * GlobalWorkGroupSize.x + \
@@ -174,9 +174,10 @@ void main()
 	int segmentStart = int(InvocationIndex1D * segmentSize);
 	int segmentEnd = segmentStart + segmentSize;
 
-	if (segmentStart >= rayCounters.rayIn) return;	// no work to do for this warp
+	// no work to do for this warp
+	if (segmentStart >= rayCounters.rayIn) return;
 
-	for (int rayIdx = segmentStart; rayIdx < segmentEnd; rayIdx++)
+	for (int rayIdx = segmentStart; rayIdx < segmentEnd && rayIdx < rayCounters.rayIn; rayIdx++)
 	{
 		intersectTLAS(rayIn.rays[rayIdx]);
 	}

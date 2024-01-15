@@ -70,8 +70,9 @@ void main()
 		return;
 	}
 
-	float p = clamp(max(ray.transmission.r, max(ray.transmission.g, ray.transmission.b)), 0.0f, 1.0f);
-	float rrScale = 1.0 / p;
+	float p = clamp(max(ray.transmission.r, max(ray.transmission.g, ray.transmission.b)), 0.0, 1.0);
+	if (p < randomF32(seed))
+		return;
 
 	vec3 mediumScale = vec3(1.0);
 	if (ray.inMedium)
@@ -80,6 +81,7 @@ void main()
 	if (dot(ray.direction, N) > 0.0f)
 		N *= -1;
 
+	float rrScale = 1.0 / p;
 	float r = randomF32(seed);
 	if (r < material.reflectivity)
 	{

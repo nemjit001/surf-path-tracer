@@ -1203,7 +1203,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayExtPipeline.bindPoint(), m_rayExtPipeline.handle());
-        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32) + 1, (m_renderResolution.height / 32) + 1, 1);
+        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 8) + 1, (m_renderResolution.height / 8) + 1, 1);
     }
 
     VkBufferMemoryBarrier2 extendShadeBufferBarriers[] = {
