@@ -16,7 +16,7 @@ layout(set = 0, binding = 1) uniform FrameState
 layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
 layout(set = 1, binding = 3) coherent volatile buffer ShadowRayCounter 	{ int rayCount; } shadowRayCounter;
-layout(set = 1, binding = 4) coherent readonly buffer ShadowRayBuffer 	{ Ray rays[]; } shadowRays;
+layout(set = 1, binding = 4) coherent readonly buffer ShadowRayBuffer 	{ ShadowRay rays[]; } shadowRays;
 
 layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
 layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
@@ -178,10 +178,25 @@ void main()
 		return;
 	}
 
-	Ray shadowRay = shadowRays.rays[rayIdx];
-	if (!intersectAnyTLAS(shadowRay))
+	ShadowRay shadowRay = shadowRays.rays[rayIdx];
+	Ray iRay = newRay(shadowRay.origin, shadowRay.direction);
+	iRay.depth = shadowRay.depth;
+
+	// Light data from randomly sampled light & light buffer
+	int lightCount = 0;
+	vec3 emittance = vec3(0);
+	vec3 L = vec3(0) - shadowRay.state.I;
+	vec3 LN = vec3(0, 1, 0);
+	float area = 1.0;
+
+	float falloff = 1.0 / dot(L, L);
+	float cosO = dot(shadowRay.state.N, shadowRay.direction);
+	float cosI = dot(LN, -shadowRay.direction);
+
+	if (cosO > 0.0 && cosI > 0.0 && !intersectAnyTLAS(iRay))
 	{
-		// TODO: Get NEE data from ray & shade
-		accumulator[shadowRay.pixelIdx] += vec4(10, 0, 0, 1);
+		float solidAngle = cosI * area * falloff;
+		vec3 outColor = solidAngle * cosO * lightCount * shadowRay.state.brdf * emittance;
+		accumulator[shadowRay.state.pixelIdx] += vec4(outColor, 1);
 	}
 }

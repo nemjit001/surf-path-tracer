@@ -12,23 +12,48 @@ struct RayMetadata
 	Float2 hitCoordinates	= Float2(0.0f, 0.0f);
 };
 
-/// @brief Mirrors GLSL compute struct for Rays -> needed for size calculation on GPU side
+struct GPURayState
+{
+	bool inMedium;
+	bool lastSpecular;
+	uint pixelIdx;
+};
+
+struct GPUShadowRayState
+{
+	uint pixelIdx;
+	uint instanceIdx;
+	uint primitiveIdx;
+	Float2 triCoords;
+	Float3 I;
+	Float3 N;
+	Float3 brdf;
+};
+
+struct GPURayHit
+{
+	U32 instanceIdx;
+	U32 primitiveIdx;
+	Float2 hitCoords;
+};
+
+struct GPUShadowRay
+{
+	Float3 origin;
+	Float3 direction;
+	F32 depth;
+	GPUShadowRayState state;
+};
+
 struct GPURay
 {
 	Float3 origin;
 	Float3 direction;
 	F32 depth;
-	bool inMedium;
 	Float3 transmission;
 	Float3 energy;
-	U32 pixelIdx;
-
-	struct GPURayHit
-	{
-		U32 instanceIdx;
-		U32 primitiveIdx;
-		Float2 hitCoords;
-	};
+	GPURayState state;
+	GPURayHit hit;
 };
 
 struct Ray

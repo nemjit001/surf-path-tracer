@@ -38,6 +38,13 @@ struct Material
 	vec3 absorption;
 };
 
+struct RayState
+{
+	bool inMedium;
+	bool lastSpecular;
+	uint pixelIdx;
+};
+
 struct RayHit
 {
 	uint instanceIdx;
@@ -45,16 +52,34 @@ struct RayHit
 	vec2 hitCoords;
 };
 
+struct ShadowRayState
+{
+	uint pixelIdx;
+	uint instanceIdx;
+	uint primitiveIdx;
+	vec2 triCoords;
+	vec3 I;
+	vec3 N;
+	vec3 brdf;
+};
+
 struct Ray
 {
 	vec3 origin;
 	vec3 direction;
 	float depth;
-	bool inMedium;
 	vec3 transmission;
 	vec3 energy;
-	uint pixelIdx;		// Pixel index for ray into out buffer
+	RayState state;
 	RayHit hit;
+};
+
+struct ShadowRay
+{
+	vec3 origin;
+	vec3 direction;
+	float depth;
+	ShadowRayState state;
 };
 
 uint WangHash(uint seed)
@@ -166,10 +191,9 @@ Ray newRay(vec3 origin, vec3 direction)
 		origin,
 		direction,
 		F32_FAR_AWAY,
-		false,
 		vec3(1),
 		vec3(0),
-		UNSET_IDX,
+		RayState(false, true, UNSET_IDX),
 		RayHit(UNSET_IDX, UNSET_IDX, vec2(0))
 	);
 }
@@ -178,7 +202,7 @@ void copyRayMetadata(inout Ray new, Ray old)
 {
 	new.transmission = old.transmission;
 	new.energy = old.energy;
-	new.pixelIdx = old.pixelIdx;
+	new.state = old.state;
 }
 
 bool depthInBounds(float depth, float maxDepth)
