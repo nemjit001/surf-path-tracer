@@ -97,8 +97,7 @@ struct GPUInstance
 	U32 bvhNodeOffset;		// Index offset into BVH GPU node array
 	U32 materialOffset;		// Index offset into material GPU array
 	F32 area;
-	F32 pad[3];				// Padding to align mat4s on 16 byte mem boundary
-	Mat4 transform;
+	ALIGN(16) Mat4 transform;
 	Mat4 invTransform;
 };
 
@@ -183,7 +182,7 @@ inline GPUInstance Instance::toGPUInstance() const
 	return GPUInstance{
 		0, 0,
 		0, 0,
-		area, {/* pad */},
+		area,
 		m_transform, m_invTransform
 	};
 }
