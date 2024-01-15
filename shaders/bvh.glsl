@@ -31,6 +31,7 @@ struct Instance
 	uint idxOffset;
 	uint nodeOffset;
 	uint materialOffset;
+	float area;
 	mat4 transform;
 	mat4 invTransform;
 };

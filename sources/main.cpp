@@ -31,8 +31,8 @@
 #define	CAMERA_SPEED		2.0f
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
-#define FRAMEDATA_OUTPUT		0
-#define GPU_PATH_TRACING		1
+#define FRAMEDATA_OUTPUT		1
+#define GPU_PATH_TRACING		0
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
