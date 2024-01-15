@@ -435,9 +435,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 Ray shadowRay = Ray(srOrigin, srDirection);
                 shadowRay.depth = distance - 2.0f * F32_EPSILON;
 
-                // if (srDirection.dot(LN) > 0.0f)
-                //     LN *= -1.0f;
-
                 F32 cosO = normal.dot(srDirection);
                 F32 cosI = LN.dot(-1.0 * srDirection);
                 if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(shadowRay))
@@ -1281,7 +1278,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayConnectPipeline.bindPoint(), m_rayConnectPipeline.handle());
-        vkCmdDispatch(commandBuffer, 1, 1, 1);
+        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32) + 1, (m_renderResolution.height / 32) + 1, 1);
     }
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
