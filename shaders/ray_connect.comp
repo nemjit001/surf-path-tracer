@@ -15,18 +15,18 @@ layout(set = 0, binding = 1) uniform FrameState
 
 layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
-layout(set = 1, binding = 3) coherent buffer ShadowRayCounter 	{ uint rayCount; } shadowRayCounter;
-layout(set = 1, binding = 4) coherent buffer ShadowRayBuffer 	{ Ray rays[]; } shadowRays;
+layout(set = 1, binding = 3) coherent volatile buffer ShadowRayCounter 	{ int rayCount; } shadowRayCounter;
+layout(set = 1, binding = 4) coherent readonly buffer ShadowRayBuffer 	{ Ray rays[]; } shadowRays;
 
-layout(set = 2, binding = 0) uniform SceneData 		{ SceneBackground background; } sceneData;
-layout(set = 2, binding = 1) buffer TriBuffer 		{ Triangle triangles[]; };
-layout(set = 2, binding = 2) buffer TriExtBuffer 	{ TriExtension triExtensions[]; };
-layout(set = 2, binding = 3) buffer BLASIndexBuffer { uint blasIndices[]; };
-layout(set = 2, binding = 4) buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
-layout(set = 2, binding = 5) buffer MaterialBuffer 	{ Material materials[]; };
-layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
-layout(set = 2, binding = 7) buffer TLASIndexBuffer { uint tlasIndices[]; };
-layout(set = 2, binding = 8) buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
+layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
+layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
+layout(set = 2, binding = 2) readonly buffer TriExtBuffer 		{ TriExtension triExtensions[]; };
+layout(set = 2, binding = 3) readonly buffer BLASIndexBuffer 	{ uint blasIndices[]; };
+layout(set = 2, binding = 4) readonly buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
+layout(set = 2, binding = 5) readonly buffer MaterialBuffer 	{ Material materials[]; };
+layout(set = 2, binding = 6) readonly buffer InstanceBuffer 	{ Instance instances[]; };
+layout(set = 2, binding = 7) readonly buffer TLASIndexBuffer 	{ uint tlasIndices[]; };
+layout(set = 2, binding = 8) readonly buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
@@ -171,12 +171,17 @@ bool intersectAnyTLAS(inout Ray ray)
 
 void main()
 {
-	// TODO: pop shadow ray from ray stack
-	Ray shadowRay = newRay(vec3(0), vec3(0, 1, 0));
-
-	if (intersectAnyTLAS(shadowRay))
+	int rayIdx = atomicAdd(shadowRayCounter.rayCount, -1) - 1;
+	if (rayIdx < 0)
 	{
-		// shade according to light material
-		// used by Next Event Estimation
+		atomicMax(shadowRayCounter.rayCount, 0);
+		return;
+	}
+
+	Ray shadowRay = shadowRays.rays[rayIdx];
+	if (!intersectAnyTLAS(shadowRay))
+	{
+		// TODO: Get NEE data from ray & shade
+		accumulator[shadowRay.pixelIdx] += vec4(10, 0, 0, 1);
 	}
 }

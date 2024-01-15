@@ -12,14 +12,16 @@ layout(set = 0, binding = 1) uniform FrameState
 
 layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
-layout(set = 1, binding = 0) coherent buffer RayCounters 	{ int rayIn; int rayOut; } rayCounters;
-layout(set = 1, binding = 1) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
-layout(set = 1, binding = 2) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
+layout(set = 1, binding = 0) coherent buffer RayCounters 					{ int rayIn; int rayOut; } rayCounters;
+layout(set = 1, binding = 1) coherent buffer RayInBuffer 					{ Ray rays[]; } rayIn;
+layout(set = 1, binding = 2) coherent buffer RayOutBuffer 					{ Ray rays[]; } rayOut;
+layout(set = 1, binding = 3) coherent writeonly buffer ShadowRayCounter 	{ int rayCount; } shadowRayCounter;
+layout(set = 1, binding = 4) coherent writeonly buffer ShadowRayBuffer 		{ Ray rays[]; } shadowRays;
 
-layout(set = 2, binding = 0) uniform SceneData 		{ SceneBackground background; } sceneData;
-layout(set = 2, binding = 2) buffer TriExtBuffer 	{ TriExtension triExtensions[]; };
-layout(set = 2, binding = 5) buffer MaterialBuffer 	{ Material materials[]; };
-layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
+layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
+layout(set = 2, binding = 2) readonly buffer TriExtBuffer 		{ TriExtension triExtensions[]; };
+layout(set = 2, binding = 5) readonly buffer MaterialBuffer 	{ Material materials[]; };
+layout(set = 2, binding = 6) readonly buffer InstanceBuffer 	{ Instance instances[]; };
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
@@ -139,16 +141,24 @@ void main()
 	}
 	else
 	{
+		vec3 brdf = material.albedo * F32_INV_PI;
+
+		// NEE
+		vec3 srDirection = vec3(0, 1, 0);	// TODO: get direction to randomly sampled light in scene
+		vec3 srOrigin = I + F32_EPSILON * srDirection;
+		Ray shadowRay = newRay(srOrigin, srDirection);
+		shadowRay.pixelIdx = ray.pixelIdx;
+		shadowRays.rays[atomicAdd(shadowRayCounter.rayCount, 1)] = shadowRay;
+
 		vec3 newDirection = diffuseReflectCosineWeighted(seed, N);
 		vec3 newOrigin = I + F32_EPSILON * newDirection;
 		Ray bounceRay = newRay(newOrigin, newDirection);
 
 		float cosTheta = dot(newDirection, N);
 		float invCosTheta = 1.0 / cosTheta;
-		vec3 brdf = material.albedo * F32_INV_PI;
 		float inversePdf = F32_PI * invCosTheta;
 
-		ray.transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf * mediumScale * rrScale;
+		ray.transmission *= inversePdf * cosTheta * brdf * mediumScale * rrScale;
 		bounceRay.inMedium = ray.inMedium;
 
 		copyRayMetadata(bounceRay, ray);

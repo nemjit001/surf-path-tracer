@@ -821,6 +821,22 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     rayCounterWriteSet.bufferInfo.offset = 0;
     rayCounterWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
 
+    WriteDescriptorSet shadowRayCounterWriteSet = {};
+    shadowRayCounterWriteSet.set = 1;
+    shadowRayCounterWriteSet.binding = 3;
+    shadowRayCounterWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    shadowRayCounterWriteSet.bufferInfo.buffer = m_shadowRayCounter.handle();
+    shadowRayCounterWriteSet.bufferInfo.offset = 0;
+    shadowRayCounterWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
+    WriteDescriptorSet shadowRayBufferWriteSet = {};
+    shadowRayBufferWriteSet.set = 1;
+    shadowRayBufferWriteSet.binding = 4;
+    shadowRayBufferWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    shadowRayBufferWriteSet.bufferInfo.buffer = m_shadowRayBuffer.handle();
+    shadowRayBufferWriteSet.bufferInfo.offset = 0;
+    shadowRayBufferWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
     // Update all compute pipeline descriptor sets
     m_rayGenPipeline.updateDescriptorSets({
         cameraWriteSet,
@@ -840,6 +856,8 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         frameStateWriteSet,
         accumulatorWriteSet,
         rayCounterWriteSet,
+        shadowRayCounterWriteSet,
+        shadowRayBufferWriteSet,
         sceneDataWriteSet,
         triExtBufWriteset,
         materialWriteSet,
@@ -849,11 +867,15 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     m_rayConnectPipeline.updateDescriptorSets({
         frameStateWriteSet,
         accumulatorWriteSet,
-        rayCounterWriteSet,
+        shadowRayCounterWriteSet,
+        shadowRayBufferWriteSet,
         sceneDataWriteSet,
+        triBufWriteset,
         triExtBufWriteset,
+        blasIdxWriteSet, blasNodeWriteSet,
         materialWriteSet,
         instanceWriteSet,
+        tlasIdxWriteSet, tlasNodeWriteSet,
     });
 
     m_wfFinalizePipeline.updateDescriptorSets({
@@ -1219,6 +1241,39 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
     buffer1Barrier.offset = 0;
     buffer1Barrier.size = VK_WHOLE_SIZE;
 
+    VkBufferMemoryBarrier2 accumulatorBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    accumulatorBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    accumulatorBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    accumulatorBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    accumulatorBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    accumulatorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    accumulatorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    accumulatorBarrier.buffer = m_accumulatorSSBO.handle();
+    accumulatorBarrier.offset = 0;
+    accumulatorBarrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 srCounterBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    srCounterBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    srCounterBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    srCounterBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srCounterBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srCounterBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srCounterBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srCounterBarrier.buffer = m_shadowRayCounter.handle();
+    srCounterBarrier.offset = 0;
+    srCounterBarrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 srBufferBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    srBufferBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    srBufferBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    srBufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srBufferBarrier.buffer = m_shadowRayBuffer.handle();
+    srBufferBarrier.offset = 0;
+    srBufferBarrier.size = VK_WHOLE_SIZE;
+
     VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     cmdBeginInfo.flags = 0;
     cmdBeginInfo.pInheritanceInfo = nullptr;
@@ -1265,6 +1320,17 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
         vkCmdBindPipeline(commandBuffer, m_rayShadePipeline.bindPoint(), m_rayShadePipeline.handle());
         vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32) + 1, (m_renderResolution.height / 32) + 1, 1);
     }
+
+    VkBufferMemoryBarrier2 shadeConnectBufferBarriers[] = {
+        accumulatorBarrier,
+        srCounterBarrier,
+        srBufferBarrier,
+    };
+
+    VkDependencyInfo shadeConnectDependency = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    extendShadeDependency.bufferMemoryBarrierCount = 3;
+    extendShadeDependency.pBufferMemoryBarriers = shadeConnectBufferBarriers;
+    vkCmdPipelineBarrier2(commandBuffer, &shadeConnectDependency);
 
     // connect kernel dispatch
     {

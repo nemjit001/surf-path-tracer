@@ -303,11 +303,13 @@ private:
                 DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
             }
         },
-        DescriptorSetLayout{    // Wavefront compute SSBOs (GPU counters, rayBuffers 0 & 1)
+        DescriptorSetLayout{    // Wavefront compute SSBOs (GPU counters, rayBuffers 0 & 1, shadow ray counter, shadow ray buffer)
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 4, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
         DescriptorSetLayout{    // Scene UBOs & SSBOs (scene data & instance, bvh, mesh buffers)
@@ -387,6 +389,20 @@ private:
     );
 
     Buffer m_rayBuffer1 = Buffer(
+        m_context->allocator, c_rayBufferSize,
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0
+    );
+
+    Buffer m_shadowRayCounter = Buffer(
+        m_context->allocator, sizeof(I32),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0
+    );
+
+    Buffer m_shadowRayBuffer = Buffer(
         m_context->allocator, c_rayBufferSize,
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,

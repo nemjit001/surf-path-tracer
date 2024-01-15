@@ -11,12 +11,12 @@ layout(set = 1, binding = 0) coherent buffer RayCounters 	{ int rayIn; int rayOu
 layout(set = 1, binding = 1) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
 layout(set = 1, binding = 2) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
 
-layout(set = 2, binding = 1) buffer TriBuffer 		{ Triangle triangles[]; };
-layout(set = 2, binding = 3) buffer BLASIndexBuffer { uint blasIndices[]; };
-layout(set = 2, binding = 4) buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
-layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
-layout(set = 2, binding = 7) buffer TLASIndexBuffer { uint tlasIndices[]; };
-layout(set = 2, binding = 8) buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
+layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
+layout(set = 2, binding = 3) readonly buffer BLASIndexBuffer 	{ uint blasIndices[]; };
+layout(set = 2, binding = 4) readonly buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
+layout(set = 2, binding = 6) readonly buffer InstanceBuffer 	{ Instance instances[]; };
+layout(set = 2, binding = 7) readonly buffer TLASIndexBuffer 	{ uint tlasIndices[]; };
+layout(set = 2, binding = 8) readonly buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
