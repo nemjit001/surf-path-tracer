@@ -325,6 +325,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
     // Non recursive path tracing implementation
     RgbColor energy(0.0f);
     RgbColor transmission(1.0f);
+    bool lastSpecular = true;
     for (;;)
     {
         if (!m_scene.intersect(ray))
@@ -339,7 +340,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
         if (material->isLight())
         {
-            energy += transmission * material->emittance();
+            energy += lastSpecular ? transmission * material->emittance() : Float3(0);
             break;
         }
 
@@ -348,6 +349,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (p < randomF32(seed))
             break;
 
+        Float3 hitPosition = ray.hitPosition();
         Float3 normal = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
         Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
         const F32 rrScale = 1.0f / p;
@@ -364,12 +366,13 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (r < material->reflectivity)
         {
             Float3 newDirection = reflect(ray.direction, normal);
-            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
             bool wasInMedium = ray.inMedium;
             ray = Ray(newOrigin, newDirection);
             ray.inMedium = wasInMedium;
 
             transmission *= material->albedo * rrScale * mediumScale;
+            lastSpecular = true;
         }
         else if (r < (material->reflectivity + material->refractivity))
         {
@@ -389,7 +392,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
 
                 Float3 newDirection = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * normal);
-                Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+                Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
                 bool wasInMedium = ray.inMedium;
                 ray = Ray(newOrigin, newDirection);
                 ray.inMedium = !wasInMedium;
@@ -397,31 +400,65 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 if (randomF32(seed) > Fresnel)
                 {
                     transmission *= material->albedo * rrScale * mediumScale;
+                    lastSpecular = true;
                     continue;
                 }
             }
 
             Float3 newDirection = reflect(ray.direction, normal);
-            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
             bool wasInMedium = ray.inMedium;
             ray = Ray(newOrigin, newDirection);
             ray.inMedium = wasInMedium;
             transmission *= material->albedo * rrScale * mediumScale;
+            lastSpecular = true;
         }
         else
         {
+            Float3 directIllumination = Float3(0);
+            RgbColor brdf = material->albedo * F32_INV_PI;
+            U32 lightCount = m_scene.lightCount();
+
+            // Can use NEE if there are lights in scene
+            if (lightCount > 0)
+            {
+                const Instance& light = m_scene.sampleLights(seed);
+
+                SamplePoint lightPoint = light.samplePoint(seed);
+                Float3 L = lightPoint.position - hitPosition;
+                Float3 LN = lightPoint.normal;
+                F32 distance = L.magnitude();
+                F32 falloff = 1.0 / L.dot(L);
+
+                Float3 srDirection = L.normalize();
+                Float3 srOrigin = hitPosition + F32_EPSILON * srDirection;
+                Ray shadowRay = Ray(srOrigin, srDirection);
+                shadowRay.depth = distance - 2.0f * F32_EPSILON;
+
+                // if (srDirection.dot(LN) > 0.0f)
+                //     LN *= -1.0f;
+
+                F32 cosO = normal.dot(srDirection);
+                F32 cosI = LN.dot(-1.0 * srDirection);
+                if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(shadowRay))
+                {
+                    F32 solidAngle = cosI * light.area * falloff;
+                    directIllumination = solidAngle * cosO * static_cast<F32>(lightCount) * brdf * light.material->emittance();
+                }
+            }
+
             Float3 newDirection = randomOnHemisphereCosineWeighted(seed, normal);
-            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
             bool wasInMedium = ray.inMedium;
             ray = Ray(newOrigin, newDirection);
             ray.inMedium = wasInMedium;
 
             F32 cosTheta = newDirection.dot(normal);
             F32 invCosTheta = 1.0f / cosTheta;
-            RgbColor brdf = material->albedo * F32_INV_PI;
             F32 inversePdf = F32_PI * invCosTheta;
 
-            transmission *= material->emittance() + rrScale * inversePdf * cosTheta * brdf * mediumScale;
+            transmission *= directIllumination + rrScale * inversePdf * cosTheta * brdf * mediumScale;
+            lastSpecular = false;
         }
     }
 

@@ -19,7 +19,17 @@ Scene::Scene(SceneBackground background, std::vector<Instance> instances)
 	m_background(background),
 	m_sceneTlas(instances)
 {
-	//
+	// Collect lights in scene
+	SizeType idx = 0;
+	for (auto const& instance : instances)
+	{
+		if (instance.material->isLight())
+		{
+			m_lightIndices.push_back(idx);
+		}
+
+		idx++;
+	}
 }
 
 RgbColor Scene::sampleBackground(const Ray& ray) const
@@ -140,7 +150,8 @@ const GPUBatchInfo GPUBatcher::createBatchInfo(const std::vector<Instance>& inst
 
 GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std::vector<Instance> instances)
 	:
-	Scene(background, instances),
+	m_background(background),
+	m_sceneTlas(instances),
 	m_renderContext(renderContext),
 	m_batchInfo(GPUBatcher::createBatchInfo(instances)),
 	globalTriBuffer(

@@ -36,6 +36,8 @@ public:
 
 	inline Float3 normal(SizeType primitiveIndex) const;
 
+	inline Float3 position(SizeType primitiveIndex, const Float2& barycentric) const;
+
 	inline Float3 normal(SizeType primitiveIndex, const Float2& barycentric) const;
 
 	inline Float2 textureCoordinate(SizeType primitiveIndex, const Float2& barycentric) const;
@@ -49,6 +51,13 @@ Float3 Mesh::normal(SizeType primitiveIndex) const
 {
 	assert(primitiveIndex < triangles.size());
 	return triangles[primitiveIndex].normal();
+}
+
+Float3 Mesh::position(SizeType primitiveIndex, const Float2& barycentric) const
+{
+	assert(primitiveIndex < triangles.size());
+	const Triangle& tri = triangles[primitiveIndex];
+	return barycentric.u * tri.v0 + barycentric.v * tri.v2 + (1.0f - barycentric.u - barycentric.v) * tri.v1;
 }
 
 Float3 Mesh::normal(SizeType primitiveIndex, const Float2& barycentric) const

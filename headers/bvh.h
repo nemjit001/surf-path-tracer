@@ -101,6 +101,12 @@ struct GPUInstance
 	Mat4 invTransform;
 };
 
+struct SamplePoint
+{
+	Float3 position;
+	Float3 normal;
+};
+
 class Instance
 {
 public:
@@ -115,6 +121,8 @@ public:
 	inline GPUInstance toGPUInstance() const;
 
 	void setTransform(const Mat4& transform);
+
+	SamplePoint samplePoint(U32& seed) const;
 
 	inline void updateInstanceData() { updateBounds(); }
 

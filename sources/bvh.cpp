@@ -513,6 +513,27 @@ void Instance::setTransform(const Mat4& transform)
 	calculateMeshArea();
 }
 
+SamplePoint Instance::samplePoint(U32& seed) const
+{
+	const Mesh* pMesh = bvh->mesh();
+	F32 u = randomRange(seed, 0.0f, 1.0f);
+	F32 v = randomRange(seed, 0.0f, 1.0f - u);
+
+	Float2 barycentric = Float2(u, v);
+	U32 index = static_cast<U32>(randomRange(seed, 0, pMesh->triangles.size()));
+
+	Float4 position = Float4(pMesh->position(index, barycentric), 1);
+	Float4 normal = Float4(pMesh->normal(index, barycentric), 0);
+
+	glm::vec4 tPos = m_transform * static_cast<glm::vec4>(position);
+	glm::vec4 tNormal = m_transform * static_cast<glm::vec4>(normal);
+
+	return SamplePoint{
+		Float3(tPos.x, tPos.y, tPos.z) / tPos.w,
+		Float3(tNormal.x, tNormal.y, tNormal.z),
+	};
+}
+
 void Instance::updateBounds()
 {
 	const AABB& localBounds = bvh->bounds();
