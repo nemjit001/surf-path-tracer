@@ -799,6 +799,15 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         0, VK_WHOLE_SIZE
     };
 
+    WriteDescriptorSet lightDataWriteSet = {};
+    lightDataWriteSet.set = 2;
+    lightDataWriteSet.binding = 9;
+    lightDataWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    lightDataWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.lightBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
 #if GPU_MEGAKERNEL == 1
     m_megakernelPipeline.updateDescriptorSets({
         cameraWriteSet,
@@ -863,9 +872,11 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         shadowRayCounterWriteSet,
         shadowRayBufferWriteSet,
         sceneDataWriteSet,
+        triBufWriteset,
         triExtBufWriteset,
         materialWriteSet,
         instanceWriteSet,
+        lightDataWriteSet,
     });
 
     m_rayConnectPipeline.updateDescriptorSets({
@@ -880,6 +891,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         materialWriteSet,
         instanceWriteSet,
         tlasIdxWriteSet, tlasNodeWriteSet,
+        lightDataWriteSet,
     });
 
     m_wfFinalizePipeline.updateDescriptorSets({
@@ -938,6 +950,9 @@ WaveFrontRenderer::~WaveFrontRenderer()
 void WaveFrontRenderer::clearAccumulator()
 {
     vkDeviceWaitIdle(m_context->device);
+
+    // Clear any still queued rays
+    m_rayCounters.clear();
 
     // clear accumulator buffer
     m_frameState.totalSamples = 0;
@@ -1077,11 +1092,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
 
             // Check diff threshold and leave rest of rays for next frame to process
             U32 newRayCount = pRayCounters->rayOut;
-            if (oldRayCount - newRayCount < WF_RAY_DIFF_THRESHOLD && newRayCount <= WF_RAY_NF_BATCH_SIZE)
-            {
-                memset(pRayCounters, 0, sizeof(RayBufferCounters));
-                break;
-            }
+            if (oldRayCount - newRayCount < WF_RAY_DIFF_THRESHOLD && newRayCount <= WF_RAY_NF_BATCH_SIZE) break;
         }
     }
 

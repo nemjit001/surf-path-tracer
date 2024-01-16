@@ -27,7 +27,7 @@ layout(set = 2, binding = 5) readonly buffer MaterialBuffer 	{ Material material
 layout(set = 2, binding = 6) readonly buffer InstanceBuffer 	{ Instance instances[]; };
 layout(set = 2, binding = 7) readonly buffer TLASIndexBuffer 	{ uint tlasIndices[]; };
 layout(set = 2, binding = 8) readonly buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
-layout(set = 2, binding = 9) readonly buffer LightIndices 		{ uint indices[]; } lights;
+layout(set = 2, binding = 9) readonly buffer LightBuffer		{ LightData lights[]; };
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
@@ -192,7 +192,7 @@ void main()
 			return;
 		}
 
-		int lightCount = lights.indices.length();
+		int lightCount = lights.length();
 		ShadowRayMetadata srData = shadowRays.rays[rayIdx];
 		Instance light = sceneInstance(srData.lightInstanceIdx);
 		Material hitMaterial = sceneMaterial(srData.hitInstanceIdx);

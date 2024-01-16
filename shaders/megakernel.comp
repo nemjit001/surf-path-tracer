@@ -186,7 +186,7 @@ bool intersectTLAS(inout Ray ray)
 vec3 sceneNormal(Ray ray)
 {
 	Instance instance = instances[ray.hit.instanceIdx];
-	return scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray);
+	return scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray.hit.hitCoords);
 }
 
 Material sceneMaterial(Ray ray)

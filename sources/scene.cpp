@@ -142,6 +142,14 @@ const GPUBatchInfo GPUBatcher::createBatchInfo(const std::vector<Instance>& inst
 			gpuInstance.materialOffset++;
 		}
 
+		if (instance.material->isLight())
+		{
+			batchInfo.lights.push_back(GPULightData{
+				static_cast<U32>(batchInfo.gpuInstances.size()),
+				static_cast<U32>(instance.bvh->triCount()),
+			});
+		}
+
 		batchInfo.gpuInstances.push_back(gpuInstance);
 	}
 
@@ -210,8 +218,8 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0
 	),
-	lightIndexBuffer(
-		renderContext->allocator, m_sceneTlas.nodesUsed() * sizeof(BvhNode),
+	lightBuffer(
+		renderContext->allocator, m_batchInfo.lights.size() * sizeof(GPULightData),
 		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 		| VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -236,6 +244,7 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 	SizeType instanceBufSize = m_batchInfo.gpuInstances.size() * sizeof(GPUInstance);
 	SizeType tlasIndexBufSize = m_batchInfo.gpuInstances.size() * sizeof(U32);
 	SizeType tlasNodeBufSize = m_sceneTlas.nodesUsed() * sizeof(BvhNode);
+	SizeType lightBufSize = m_batchInfo.lights.size() * sizeof(GPULightData);
 
 	uploadToGPU(m_batchInfo.triBuffer.data(), triBufSize, globalTriBuffer);
 	uploadToGPU(m_batchInfo.triExtBuffer.data(), triExtBufSize, globalTriExtBuffer);
@@ -245,6 +254,7 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 	uploadToGPU(m_batchInfo.gpuInstances.data(), instanceBufSize, instanceBuffer);
 	uploadToGPU(m_sceneTlas.indices(), tlasIndexBufSize, TLASIndexBuffer);
 	uploadToGPU(m_sceneTlas.nodePool(), tlasNodeBufSize, TLASNodeBuffer);
+	uploadToGPU(m_batchInfo.lights.data(), lightBufSize, lightBuffer);
 }
 
 GPUScene::~GPUScene()

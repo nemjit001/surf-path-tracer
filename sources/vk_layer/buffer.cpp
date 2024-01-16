@@ -22,6 +22,9 @@ Buffer::Buffer(
     m_allocationInfo{},
     m_buffer(VK_NULL_HANDLE)
 {
+    if (size == 0)
+        return;
+
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.flags = 0;
     bufferCreateInfo.pNext = nullptr;

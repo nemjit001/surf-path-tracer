@@ -36,15 +36,30 @@ struct Instance
 	mat4 invTransform;
 };
 
+struct LightData
+{
+	uint lightInstanceIdx;
+	uint primitiveCount;
+};
+
 bool bvhNodeIsLeaf(BvhNode node)
 {
 	return node.count != 0;
 }
 
-vec3 scaleNormalBarycentric(TriExtension ext, Ray ray)
+vec3 scaleVertexBarycentric(Triangle tri, vec2 uv)
 {
-	vec2 uv = ray.hit.hitCoords;
+	return uv.x * tri.v0 + uv.y * tri.v2 + (1.0 - uv.x - uv.y) * tri.v1;
+}
+
+vec3 scaleNormalBarycentric(TriExtension ext, vec2 uv)
+{
 	return uv.x * ext.n0 + uv.y * ext.n2 + (1.0 - uv.x - uv.y) * ext.n1;
+}
+
+vec2 scaleTexCoordsBarycentric(TriExtension ext, vec2 uv)
+{
+	return uv.x * ext.uv0 + uv.y * ext.uv2 + (1.0 - uv.x - uv.y) * ext.uv1;
 }
 
 bool triangleIntersect(Triangle tri, inout Ray ray)
