@@ -975,6 +975,20 @@ void WaveFrontRenderer::render(F32 deltaTime)
     VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
     VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
 
+    // Update frame instrumentation data Lumen output
+    SizeType accumulatorSize = m_renderResolution.width * m_renderResolution.height;
+    F32 invSamples = 1.0f / static_cast<F32>(m_frameState.totalSamples);
+    Float4* pAccumulator = nullptr;
+    
+    m_accumulatorSSBO.persistentMap(reinterpret_cast<void**>(&pAccumulator));
+    m_frameInstrumentationData.energy = 0.0f;
+    for (SizeType i = 0; i < accumulatorSize; i++)
+    {
+        RgbaColor color = pAccumulator[i] * invSamples;
+        m_frameInstrumentationData.energy += color.r + color.g + color.b;
+    }
+    m_accumulatorSSBO.unmap();
+
     // Update cameraUBO
     CameraUBO cameraUBO = CameraUBO{
         m_camera.position,

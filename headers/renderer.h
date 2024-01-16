@@ -220,9 +220,8 @@ public:
 
     virtual const FrameInstrumentationData& frameInfo() override
     {
+        // update total samples before returning
         m_frameInstrumentationData.totalSamples = m_frameState.totalSamples;
-        m_frameInstrumentationData.energy = 0.0f;   // reading energy back from GPU is very slow -> don't do it
-
         return m_frameInstrumentationData;
     }
 
