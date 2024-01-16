@@ -520,7 +520,7 @@ SamplePoint Instance::samplePoint(U32& seed) const
 	F32 v = randomRange(seed, 0.0f, 1.0f - u);
 
 	Float2 barycentric = Float2(u, v);
-	U32 index = static_cast<U32>(randomRange(seed, 0, pMesh->triangles.size()));
+	U32 index = randomRange(seed, 0, static_cast<U32>(pMesh->triangles.size()));
 
 	Float4 position = Float4(pMesh->position(index, barycentric), 1);
 	Float4 normal = Float4(pMesh->normal(index, barycentric), 0);
@@ -572,7 +572,7 @@ void Instance::calculateMeshArea()
 		Float3 v2 = Float3(tv2.x, tv2.y, tv2.z) / tv2.w;
 
 		Float3 a = v1 - v0, b = v2 - v0;
-		area += (a.magnitude() * b.magnitude()) / 2.0f;
+		area += 0.5f * a.cross(b).magnitude();
 	}
 }
 

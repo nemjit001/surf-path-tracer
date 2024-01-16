@@ -415,7 +415,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         }
         else
         {
-            Float3 directIllumination = Float3(0);
             RgbColor brdf = material->albedo * F32_INV_PI;
             U32 lightCount = m_scene.lightCount();
 
@@ -439,8 +438,8 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 F32 cosI = LN.dot(-1.0 * srDirection);
                 if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(shadowRay))
                 {
-                    F32 solidAngle = cosI * light.area * falloff;
-                    directIllumination = solidAngle * cosO * static_cast<F32>(lightCount) * brdf * light.material->emittance();
+                    F32 inversePdf = cosI * light.area * falloff;
+                    energy += transmission * inversePdf * cosO * static_cast<F32>(lightCount) * brdf * light.material->emittance();
                 }
             }
 
@@ -454,7 +453,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             F32 invCosTheta = 1.0f / cosTheta;
             F32 inversePdf = F32_PI * invCosTheta;
 
-            transmission *= directIllumination + rrScale * inversePdf * cosTheta * brdf * mediumScale;
+            transmission *= rrScale * inversePdf * cosTheta * brdf * mediumScale;
             lastSpecular = false;
         }
     }

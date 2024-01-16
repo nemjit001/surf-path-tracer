@@ -47,7 +47,7 @@ public:
 
 	inline const U32 lightCount() const { return static_cast<U32>(m_lightIndices.size()); }
 
-	inline const Instance& sampleLights(U32& seed) { return m_sceneTlas.instance(m_lightIndices[static_cast<U32>(randomRange(seed, 0, lightCount()))]); }
+	inline const Instance& sampleLights(U32& seed) { return m_sceneTlas.instance(m_lightIndices[randomRange(seed, 0, lightCount())]); }
 
 	RgbColor sampleBackground(const Ray& ray) const;
 
