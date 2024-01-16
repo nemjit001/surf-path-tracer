@@ -312,7 +312,7 @@ private:
                 DescriptorSetBinding{ 4, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
-        DescriptorSetLayout{    // Scene UBOs & SSBOs (scene data & instance, bvh, mesh buffers)
+        DescriptorSetLayout{    // Scene UBOs & SSBOs
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
@@ -323,6 +323,7 @@ private:
                 DescriptorSetBinding{ 6, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 7, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 8, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 9, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
     });
@@ -373,7 +374,7 @@ private:
 #if GPU_MEGAKERNEL != 1
     // Size is 2 * render resolution to ensure large enough buffers for generated rays in flight
     const SizeType c_rayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
-    const SizeType c_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
+    const SizeType c_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRayMetadata);
     Buffer m_rayCounters = Buffer(
         m_context->allocator, sizeof(RayBufferCounters),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,

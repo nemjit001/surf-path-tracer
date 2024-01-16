@@ -69,6 +69,7 @@ struct GPUBatchInfo
 	std::vector<BvhNode> BLASNodes;
 	std::vector<Material> materials;
 	std::vector<GPUInstance> gpuInstances;
+	std::vector<U32> m_lightIndices;
 };
 
 class GPUBatcher
@@ -109,4 +110,5 @@ public:
 	Buffer instanceBuffer;			// The Instance buffer contains GPUInstances with offsets into global BLAS buffers.
 	Buffer TLASIndexBuffer;			// The TLAS index buffer containes indices into the instance buffer.
 	Buffer TLASNodeBuffer;			// The TLAS Node buffer contains TLAS BVH nodes.
+	Buffer lightIndexBuffer;		// The light index buffer contains all light instance indices in the scene.
 };

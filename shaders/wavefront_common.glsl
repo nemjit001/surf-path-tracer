@@ -63,15 +63,12 @@ struct Ray
 	RayHit hit;
 };
 
-
-// FIXME: check this for correctness
-struct ShadowRayData
+struct ShadowRayMetadata
 {
 	Ray shadowRay;
-	Ray hitRay;
-	vec3 L;
-	vec3 LN;
-	uint lightInstanceIdx;
+	vec3 L, LN;
+	vec3 brdf, N;
+	uint hitInstanceIdx, lightInstanceIdx;
 };
 
 uint WangHash(uint seed)
@@ -106,6 +103,11 @@ float randomF32(inout uint seed)
 float randomRange(inout uint seed, float minRange, float maxRange)
 {
 	return (randomF32(seed) * (maxRange - minRange)) + minRange;
+}
+
+uint randomRangeU32(inout uint seed, uint minRange, uint maxRange)
+{
+	return (randomU32(seed) + minRange) % maxRange;
 }
 
 vec3 diffuseReflect(inout uint seed, vec3 normal)

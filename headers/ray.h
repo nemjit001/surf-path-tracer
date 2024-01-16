@@ -37,6 +37,17 @@ struct GPURay
 	GPURayHit hit;
 };
 
+struct GPUShadowRayMetadata
+{
+	GPURay shadowRay;
+	Float3 L;
+	Float3 LN;
+	Float3 brdf;
+	Float3 N;
+	ALIGN(16) U32 hitInstanceIdx;
+	U32 lightInstanceIdx;
+};
+
 struct Ray
 {
 	Float3 origin;

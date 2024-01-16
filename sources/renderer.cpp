@@ -1078,7 +1078,10 @@ void WaveFrontRenderer::render(F32 deltaTime)
             // Check diff threshold and leave rest of rays for next frame to process
             U32 newRayCount = pRayCounters->rayOut;
             if (oldRayCount - newRayCount < WF_RAY_DIFF_THRESHOLD && newRayCount <= WF_RAY_NF_BATCH_SIZE)
+            {
+                memset(pRayCounters, 0, sizeof(RayBufferCounters));
                 break;
+            }
         }
     }
 

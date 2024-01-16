@@ -209,6 +209,13 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 		| VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0
+	),
+	lightIndexBuffer(
+		renderContext->allocator, m_sceneTlas.nodesUsed() * sizeof(BvhNode),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+		| VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
 	)
 {
 	assert(renderContext != nullptr);
