@@ -22,6 +22,7 @@
 
 #define RECURSIVE_IMPLEMENTATION    0   // Use a simple recursive path tracing implementation with no variance reduction & clamped depth
 #define COLOR_BLACK                 RgbColor(0.0f, 0.0f, 0.0f)
+#define RAY_DIFF_THRESHOLD          50
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
@@ -427,7 +428,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 Float3 L = lightPoint.position - hitPosition;
                 Float3 LN = lightPoint.normal;
                 F32 distance = L.magnitude();
-                F32 falloff = 1.0 / L.dot(L);
+                F32 falloff = 1.0f / L.dot(L);
 
                 Float3 srDirection = L.normalize();
                 Float3 srOrigin = hitPosition + F32_EPSILON * srDirection;
@@ -1041,6 +1042,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
         
         while (pRayCounters->rayIn > 0 || pRayCounters->rayOut > 0)
         {
+            U32 oldRayCount = pRayCounters->rayOut;
             swap(rayInBuffer, rayOutBuffer);
             swap(pRayCounters->rayIn, pRayCounters->rayOut);
             inBufferWriteSet.bufferInfo.buffer = rayInBuffer->handle();
@@ -1056,7 +1058,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
                 outBufferWriteSet,
             });
 
-            bakeWavePass(activeCompute.waveBuffer);
+            bakeWavePass(activeCompute.waveBuffer, pRayCounters->rayIn);
             VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
             waveSubmit.commandBufferCount = 1;
             waveSubmit.pCommandBuffers = &m_wavefrontCompute.waveBuffer;
@@ -1068,6 +1070,11 @@ void WaveFrontRenderer::render(F32 deltaTime)
             VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &waveSubmit, m_wavefrontCompute.computeReady));
             VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
             VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
+
+            // Check diff threshold and leave rest of rays for next frame to process
+            U32 newRayCount = pRayCounters->rayOut;
+            if (oldRayCount - newRayCount < RAY_DIFF_THRESHOLD)
+                break;
         }
     }
 
@@ -1203,7 +1210,7 @@ void WaveFrontRenderer::bakeRayGenPass(VkCommandBuffer commandBuffer)
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
+void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInputSize)
 {
     assert(commandBuffer != VK_NULL_HANDLE);
 
@@ -1291,7 +1298,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayExtPipeline.bindPoint(), m_rayExtPipeline.handle());
-        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 8) + 1, (m_renderResolution.height / 8) + 1, 1);
+        vkCmdDispatch(commandBuffer, rayInputSize / 32 + 1, 1, 1);
     }
 
     VkBufferMemoryBarrier2 extendShadeBufferBarriers[] = {
@@ -1317,7 +1324,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayShadePipeline.bindPoint(), m_rayShadePipeline.handle());
-        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32) + 1, (m_renderResolution.height / 32) + 1, 1);
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 32 + 1, m_renderResolution.height / 32 + 1, 1);
     }
 
     VkBufferMemoryBarrier2 shadeConnectBufferBarriers[] = {
@@ -1343,7 +1350,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayConnectPipeline.bindPoint(), m_rayConnectPipeline.handle());
-        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32) + 1, (m_renderResolution.height / 32) + 1, 1);
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 32 + 1, m_renderResolution.height / 32 + 1, 1);
     }
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));

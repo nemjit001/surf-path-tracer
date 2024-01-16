@@ -234,7 +234,7 @@ private:
 #else
     void bakeRayGenPass(VkCommandBuffer commandBuffer);
 
-    void bakeWavePass(VkCommandBuffer commandBuffer);
+    void bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInputSize);
 
     void bakeFinalizePass(VkCommandBuffer commandBuffer);
 #endif
@@ -373,7 +373,7 @@ private:
 #if GPU_MEGAKERNEL != 1
     // Size is 2 * render resolution to ensure large enough buffers for generated rays in flight
     const SizeType c_rayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
-    const SizeType c_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRay);
+    const SizeType c_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
     Buffer m_rayCounters = Buffer(
         m_context->allocator, sizeof(RayBufferCounters),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,

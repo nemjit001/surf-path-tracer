@@ -16,7 +16,7 @@ layout(set = 1, binding = 0) coherent buffer RayCounters 					{ int rayIn; int r
 layout(set = 1, binding = 1) coherent buffer RayInBuffer 					{ Ray rays[]; } rayIn;
 layout(set = 1, binding = 2) coherent buffer RayOutBuffer 					{ Ray rays[]; } rayOut;
 layout(set = 1, binding = 3) coherent writeonly buffer ShadowRayCounter 	{ int rayCount; } shadowRayCounter;
-layout(set = 1, binding = 4) coherent writeonly buffer ShadowRayBuffer 		{ ShadowRay rays[]; } shadowRays;
+layout(set = 1, binding = 4) coherent writeonly buffer ShadowRayBuffer 		{ Ray rays[]; } shadowRays;
 
 layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
 layout(set = 2, binding = 2) readonly buffer TriExtBuffer 		{ TriExtension triExtensions[]; };
@@ -41,9 +41,10 @@ void main()
 {	
 	const uvec3 GlobalWorkGroupSize = gl_NumWorkGroups * gl_WorkGroupSize;
 	const uint InvocationIndex1D = gl_GlobalInvocationID.x + \
-	gl_GlobalInvocationID.y * GlobalWorkGroupSize.x + \
-	gl_GlobalInvocationID.z * GlobalWorkGroupSize.x * GlobalWorkGroupSize.y;
+		gl_GlobalInvocationID.y * GlobalWorkGroupSize.x + \
+		gl_GlobalInvocationID.z * GlobalWorkGroupSize.x * GlobalWorkGroupSize.y;
 
+	uint seed = initSeed(InvocationIndex1D + frameState.totalSamples * 1799);
 	int rayIdx = atomicAdd(rayCounters.rayIn, -1) - 1;
 	if (rayIdx < 0)
 	{
@@ -51,9 +52,7 @@ void main()
 		return;
 	}
 
-	uint seed = initSeed(InvocationIndex1D + frameState.totalSamples * 1799);
 	Ray ray = rayIn.rays[rayIdx];
-
 	if (ray.depth == F32_FAR_AWAY)
 	{
 		ray.energy += ray.transmission * sampleSkyColor(ray, sceneData.background);
@@ -141,25 +140,18 @@ void main()
 	{
 		vec3 brdf = material.albedo * F32_INV_PI;
 
-#if 0
 		// TODO: sample random light from scene & point + normal on that light
 		vec3 lightPos = vec3(0);
 		vec3 L = lightPos - I;
 
 		vec3 srDirection = normalize(L);
 		vec3 srOrigin = I + F32_EPSILON * srDirection;
-		ShadowRay shadowRay = ShadowRay(
-			srOrigin, srDirection,
-			length(L) - 2.0 * F32_EPSILON,	// depth
-			ShadowRayState(
-				ray.state.pixelIdx,
-				UNSET_IDX, UNSET_IDX,
-				vec2(0),
-				I, N, brdf
-			)
-		);
+		Ray shadowRay = newRay(srOrigin, srDirection);
+		copyRayMetadata(shadowRay, ray);
+		shadowRay.depth = length(L) - 2.0 * F32_EPSILON;
+
+		// TODO: store hit data (BRDF, I, N, L, LN, light instance idx) in buffer
 		shadowRays.rays[atomicAdd(shadowRayCounter.rayCount, 1)] = shadowRay;
-#endif
 
 		vec3 newDirection = diffuseReflectCosineWeighted(seed, N);
 		vec3 newOrigin = I + F32_EPSILON * newDirection;
@@ -171,7 +163,7 @@ void main()
 
 		ray.transmission *= inversePdf * cosTheta * brdf * mediumScale * rrScale;
 		copyRayMetadata(bounceRay, ray);
-		bounceRay.state.lastSpecular = true;	// FIXME: set to false when NEE works
+		bounceRay.state.lastSpecular = true;
 		rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = bounceRay;
 	}
 }

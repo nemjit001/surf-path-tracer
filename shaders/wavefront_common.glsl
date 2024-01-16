@@ -52,17 +52,6 @@ struct RayHit
 	vec2 hitCoords;
 };
 
-struct ShadowRayState
-{
-	uint pixelIdx;
-	uint instanceIdx;
-	uint primitiveIdx;
-	vec2 triCoords;
-	vec3 I;
-	vec3 N;
-	vec3 brdf;
-};
-
 struct Ray
 {
 	vec3 origin;
@@ -74,12 +63,15 @@ struct Ray
 	RayHit hit;
 };
 
-struct ShadowRay
+
+// FIXME: check this for correctness
+struct ShadowRayData
 {
-	vec3 origin;
-	vec3 direction;
-	float depth;
-	ShadowRayState state;
+	Ray shadowRay;
+	Ray hitRay;
+	vec3 L;
+	vec3 LN;
+	uint lightInstanceIdx;
 };
 
 uint WangHash(uint seed)

@@ -32,7 +32,7 @@
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
 #define FRAMEDATA_OUTPUT		1
-#define GPU_PATH_TRACING		0
+#define GPU_PATH_TRACING		1
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
@@ -203,9 +203,12 @@ int main()
 	Instance cubeR(
 		&cubeBVH,
 		&lightMaterial,
-		glm::translate(
-			Mat4(1.0f),
-			static_cast<glm::vec3>(Float3(10.0f, 5.0f, 0.0f))
+		glm::scale(
+			glm::translate(
+				Mat4(1.0f),
+				static_cast<glm::vec3>(Float3(10.0f, 5.0f, 0.0f))
+			),
+			static_cast<glm::vec3>(Float3(2.0f, 2.0f, 2.0f))
 		)
 	);
 

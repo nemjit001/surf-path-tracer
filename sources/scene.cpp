@@ -25,7 +25,7 @@ Scene::Scene(SceneBackground background, std::vector<Instance> instances)
 	{
 		if (instance.material->isLight())
 		{
-			m_lightIndices.push_back(idx);
+			m_lightIndices.push_back(static_cast<U32>(idx));
 		}
 
 		idx++;
