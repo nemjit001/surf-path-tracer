@@ -22,7 +22,11 @@
 
 #define RECURSIVE_IMPLEMENTATION    0   // Use a simple recursive path tracing implementation with no variance reduction & clamped depth
 #define COLOR_BLACK                 RgbColor(0.0f, 0.0f, 0.0f)
-#define RAY_DIFF_THRESHOLD          50
+
+// Threshold for difference in ray counts between waves in wavefront path tracing
+#define WF_RAY_DIFF_THRESHOLD          50
+// Batch size that is allowed to be deferred to the next frame in wavefron path tracing
+#define WF_RAY_NF_BATCH_SIZE           7500
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
@@ -1073,7 +1077,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
 
             // Check diff threshold and leave rest of rays for next frame to process
             U32 newRayCount = pRayCounters->rayOut;
-            if (oldRayCount - newRayCount < RAY_DIFF_THRESHOLD)
+            if (oldRayCount - newRayCount < WF_RAY_DIFF_THRESHOLD && newRayCount <= WF_RAY_NF_BATCH_SIZE)
                 break;
         }
     }
