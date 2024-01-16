@@ -9,7 +9,7 @@ layout(set = 0, binding = 1) uniform FrameState
 	uint totalSamples;
 } frameState;
 
-layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
+layout(set = 0, binding = 2) readonly buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 layout(set = 0, binding = 3, rgba8) uniform image2D outputImage;
 
 void main()

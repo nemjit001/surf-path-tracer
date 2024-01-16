@@ -270,7 +270,7 @@ void GPUScene::update(F32 deltaTime)
 	instance.setTransform(glm::rotate(instance.transform(), 1.0f * deltaTime, static_cast<glm::vec3>(WORLD_UP)));
 
 	m_sceneTlas.refit();
-	m_batchInfo = GPUBatcher::createBatchInfo(m_sceneTlas.instances());	// FIXME: is rebatching fast enough for realtime use with larger scenes?
+	m_batchInfo = GPUBatcher::createBatchInfo(m_sceneTlas.instances());	// XXX: is rebatching fast enough for realtime use with larger scenes?
 
 	SizeType instanceBufSize = m_batchInfo.gpuInstances.size() * sizeof(GPUInstance);
 	SizeType tlasIndexBufSize = m_batchInfo.gpuInstances.size() * sizeof(U32);
