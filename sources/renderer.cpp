@@ -24,9 +24,11 @@
 #define COLOR_BLACK                 RgbColor(0.0f, 0.0f, 0.0f)
 
 // Threshold for difference in ray counts between waves in wavefront path tracing
-#define WF_RAY_DIFF_THRESHOLD          50
-// Batch size that is allowed to be deferred to the next frame in wavefron path tracing
-#define WF_RAY_NF_BATCH_SIZE           7500
+#define WF_RAY_DIFF_THRESHOLD           50
+// Batch size that is allowed to be deferred to the next frame in wavefront path tracing
+#define WF_RAY_NF_BATCH_SIZE            500
+// Output lumen data WARN: drops framerate to sub second on discrete GPUs
+#define WF_LUMEN_OUTPUT                 0
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
@@ -975,6 +977,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
     VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
     VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
 
+#if WF_LUMEN_OUTPUT == 1
     // Update frame instrumentation data Lumen output
     SizeType accumulatorSize = m_renderResolution.width * m_renderResolution.height;
     F32 invSamples = 1.0f / static_cast<F32>(m_frameState.totalSamples);
@@ -988,6 +991,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
         m_frameInstrumentationData.energy += color.r + color.g + color.b;
     }
     m_accumulatorSSBO.unmap();
+#endif
 
     // Update cameraUBO
     CameraUBO cameraUBO = CameraUBO{
@@ -1120,6 +1124,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
     finalizeSubmit.pSignalSemaphores = &activeCompute.computeFinished;
     VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
 
+    memset(pRayCounters, 0, sizeof(RayBufferCounters));
     m_rayCounters.unmap();
 #endif
 
