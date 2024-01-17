@@ -73,7 +73,7 @@ void main()
 	vec3 origin = camera.position + sampleDefocusDisk(pixelSeed);
 	vec3 direction = generateDirection(pixelSeed, origin, xPixel, yPixel);
 	Ray ray = newRay(origin, direction);
-	ray.pixelIdx = pixelIdx;
+	ray.state.pixelIdx = pixelIdx;
 
 	rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = ray;
 }

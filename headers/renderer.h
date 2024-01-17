@@ -220,9 +220,8 @@ public:
 
     virtual const FrameInstrumentationData& frameInfo() override
     {
+        // update total samples before returning
         m_frameInstrumentationData.totalSamples = m_frameState.totalSamples;
-        m_frameInstrumentationData.energy = 0.0f;   // reading energy back from GPU is very slow -> don't do it
-
         return m_frameInstrumentationData;
     }
 
@@ -234,7 +233,7 @@ private:
 #else
     void bakeRayGenPass(VkCommandBuffer commandBuffer);
 
-    void bakeWavePass(VkCommandBuffer commandBuffer);
+    void bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInputSize);
 
     void bakeFinalizePass(VkCommandBuffer commandBuffer);
 #endif
@@ -303,14 +302,16 @@ private:
                 DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
             }
         },
-        DescriptorSetLayout{    // Wavefront compute SSBOs (GPU counters, rayBuffers 0 & 1)
+        DescriptorSetLayout{    // Wavefront compute SSBOs (GPU counters, rayBuffers 0 & 1, shadow ray counter, shadow ray buffer)
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 2, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 3, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 4, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
-        DescriptorSetLayout{    // Scene UBOs & SSBOs (scene data & instance, bvh, mesh buffers)
+        DescriptorSetLayout{    // Scene UBOs & SSBOs
             std::vector{
                 DescriptorSetBinding{ 0, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
                 DescriptorSetBinding{ 1, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
@@ -321,6 +322,7 @@ private:
                 DescriptorSetBinding{ 6, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 7, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
                 DescriptorSetBinding{ 8, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+                DescriptorSetBinding{ 9, VK_SHADER_STAGE_COMPUTE_BIT, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
             }
         },
     });
@@ -371,6 +373,7 @@ private:
 #if GPU_MEGAKERNEL != 1
     // Size is 2 * render resolution to ensure large enough buffers for generated rays in flight
     const SizeType c_rayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
+    const SizeType c_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRayMetadata);
     Buffer m_rayCounters = Buffer(
         m_context->allocator, sizeof(RayBufferCounters),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -388,6 +391,20 @@ private:
 
     Buffer m_rayBuffer1 = Buffer(
         m_context->allocator, c_rayBufferSize,
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0
+    );
+
+    Buffer m_shadowRayCounter = Buffer(
+        m_context->allocator, sizeof(I32),
+        VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        0
+    );
+
+    Buffer m_shadowRayBuffer = Buffer(
+        m_context->allocator, c_shadowRayBufferSize,
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         0

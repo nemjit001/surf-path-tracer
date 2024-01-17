@@ -4,6 +4,9 @@
 #include "bvh.glsl"
 #include "wavefront_common.glsl"
 
+#define TLAS_ROOT_IDX			0
+#define TRAVERSAL_STACK_SIZE 	64
+
 layout(set = 0, binding = 1) uniform FrameState
 {
 	uint samplesPerFrame;
@@ -12,14 +15,198 @@ layout(set = 0, binding = 1) uniform FrameState
 
 layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
-layout(set = 2, binding = 0) uniform SceneData 		{ SceneBackground background; } sceneData;
-layout(set = 2, binding = 2) buffer TriExtBuffer 	{ TriExtension triExtensions[]; };
-layout(set = 2, binding = 5) buffer MaterialBuffer 	{ Material materials[]; };
-layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
+layout(set = 1, binding = 3) coherent volatile buffer ShadowRayCounter 	{ int rayCount; } shadowRayCounter;
+layout(set = 1, binding = 4) coherent readonly buffer ShadowRayBuffer 	{ ShadowRayMetadata rays[]; } shadowRays;
+
+layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
+layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
+layout(set = 2, binding = 2) readonly buffer TriExtBuffer 		{ TriExtension triExtensions[]; };
+layout(set = 2, binding = 3) readonly buffer BLASIndexBuffer 	{ uint blasIndices[]; };
+layout(set = 2, binding = 4) readonly buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
+layout(set = 2, binding = 5) readonly buffer MaterialBuffer 	{ Material materials[]; };
+layout(set = 2, binding = 6) readonly buffer InstanceBuffer 	{ Instance instances[]; };
+layout(set = 2, binding = 7) readonly buffer TLASIndexBuffer 	{ uint tlasIndices[]; };
+layout(set = 2, binding = 8) readonly buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
+layout(set = 2, binding = 9) readonly buffer LightBuffer		{ LightData lights[]; };
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
+bool intersectAnyBLAS(Instance instance, inout Ray ray)
+{
+	BvhNode node = blasNodes[instance.nodeOffset];
+	uint stack[TRAVERSAL_STACK_SIZE];
+	uint stackptr = 0;
+
+	while(true)
+	{
+		if (bvhNodeIsLeaf(node))
+		{
+			for (uint i = 0; i < node.count; i++)
+			{
+				uint primIdx = blasIndices[instance.idxOffset + node.leftFirst + i];
+				if (triangleIntersect(triangles[instance.triOffset + primIdx], ray))
+				{
+					ray.hit.primitiveIdx = primIdx;
+					return true;
+				}
+			}
+
+			if (stackptr == 0)
+				break;
+
+			node = blasNodes[stack[stackptr - 1]];
+			stackptr--;
+			continue;
+		}
+
+		uint childNearIdx = instance.nodeOffset + node.leftFirst;
+		uint childFarIdx = childNearIdx + 1;
+		float distNear = aabbIntersect(blasNodes[childNearIdx], ray);
+		float distFar = aabbIntersect(blasNodes[childFarIdx], ray);
+
+		if (distNear > distFar)
+		{
+			uint ti = childNearIdx; childNearIdx = childFarIdx; childFarIdx = ti;
+			float td = distNear; distNear = distFar; distFar = td;
+		}
+
+		if (distNear == F32_FAR_AWAY)
+		{
+			if (stackptr == 0)
+				break;
+			
+			node = blasNodes[stack[stackptr - 1]];
+			stackptr--;
+		}
+		else
+		{
+			node = blasNodes[childNearIdx];
+			if (distFar != F32_FAR_AWAY)
+			{
+				stack[stackptr] = childFarIdx;
+				stackptr++;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool intersectInstance(Instance instance, inout Ray ray)
+{
+	Ray oldRay = ray;
+
+	vec4 tPos = instance.invTransform * vec4(ray.origin, 1);
+	vec4 tDir = instance.invTransform * vec4(ray.direction, 0);
+
+	ray.origin = tPos.xyz / tPos.w;
+	ray.direction = tDir.xyz;
+
+	bool intersected = intersectAnyBLAS(instance, ray);
+	ray.origin = oldRay.origin;
+	ray.direction = oldRay.direction;
+
+	return intersected;
+}
+
+bool intersectAnyTLAS(inout Ray ray)
+{
+	BvhNode node = tlasNodes[TLAS_ROOT_IDX];
+	uint stack[TRAVERSAL_STACK_SIZE];
+	uint stackptr = 0;
+
+	while(true)
+	{
+		if (bvhNodeIsLeaf(node))
+		{
+			for (uint i = 0; i < node.count; i++)
+			{
+				uint instanceIdx = tlasIndices[node.leftFirst + i];
+				if (intersectInstance(instances[instanceIdx], ray))
+				{
+					ray.hit.instanceIdx = instanceIdx;
+					return true;
+				}
+			}
+
+			if (stackptr == 0)
+				break;
+
+			node = tlasNodes[stack[stackptr - 1]];
+			stackptr--;
+			continue;
+		}
+
+		uint childNearIdx = node.leftFirst;
+		uint childFarIdx = childNearIdx + 1;
+		float distNear = aabbIntersect(tlasNodes[childNearIdx], ray);
+		float distFar = aabbIntersect(tlasNodes[childFarIdx], ray);
+
+		if (distNear > distFar)
+		{
+			uint ti = childNearIdx; childNearIdx = childFarIdx; childFarIdx = ti;
+			float td = distNear; distNear = distFar; distFar = td;
+		}
+
+		if (distNear == F32_FAR_AWAY)
+		{
+			if (stackptr == 0)
+				break;
+			
+			node = tlasNodes[stack[stackptr - 1]];
+			stackptr--;
+		}
+		else
+		{
+			node = tlasNodes[childNearIdx];
+			if (distFar != F32_FAR_AWAY)
+			{
+				stack[stackptr] = childFarIdx;
+				stackptr++;
+			}
+		}
+	}
+
+	return false;
+}
+
+Instance sceneInstance(uint instanceIdx)
+{
+	return instances[instanceIdx];
+}
+
+Material sceneMaterial(uint instanceIdx)
+{
+	Instance hitInstance = instances[instanceIdx];
+	return materials[hitInstance.materialOffset];
+}
+
 void main()
 {
-	// TODO: connect shadow ray & update accumulator buffer
+	while(true)
+	{
+		int rayIdx = atomicAdd(shadowRayCounter.rayCount, -1) - 1;
+		if (rayIdx < 0)
+		{
+			atomicMax(shadowRayCounter.rayCount, 0);
+			return;
+		}
+
+		int lightCount = lights.length();
+		ShadowRayMetadata srData = shadowRays.rays[rayIdx];
+		Instance light = sceneInstance(srData.lightInstanceIdx);
+		Material hitMaterial = sceneMaterial(srData.hitInstanceIdx);
+		Material lightMaterial = sceneMaterial(srData.lightInstanceIdx);
+
+		float falloff = 1.0 / dot(srData.L, srData.L);
+		float cosO = dot(srData.N, srData.shadowRay.direction);
+		float cosI = dot(srData.LN, -srData.shadowRay.direction);
+
+		if (cosO > 0.0 && cosI > 0.0 && !intersectAnyTLAS(srData.shadowRay))
+		{
+			float inversePdf = cosI * light.area * falloff;
+			srData.shadowRay.energy += srData.shadowRay.transmission * inversePdf * cosO * float(lightCount) * srData.brdf * materialEmittance(lightMaterial); 
+			accumulator[srData.shadowRay.state.pixelIdx] += vec4(srData.shadowRay.energy, 1);
+		}
+	}
 }

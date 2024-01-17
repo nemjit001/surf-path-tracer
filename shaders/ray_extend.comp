@@ -11,14 +11,14 @@ layout(set = 1, binding = 0) coherent buffer RayCounters 	{ int rayIn; int rayOu
 layout(set = 1, binding = 1) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
 layout(set = 1, binding = 2) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
 
-layout(set = 2, binding = 1) buffer TriBuffer 		{ Triangle triangles[]; };
-layout(set = 2, binding = 3) buffer BLASIndexBuffer { uint blasIndices[]; };
-layout(set = 2, binding = 4) buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
-layout(set = 2, binding = 6) buffer InstanceBuffer 	{ Instance instances[]; };
-layout(set = 2, binding = 7) buffer TLASIndexBuffer { uint tlasIndices[]; };
-layout(set = 2, binding = 8) buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
+layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
+layout(set = 2, binding = 3) readonly buffer BLASIndexBuffer 	{ uint blasIndices[]; };
+layout(set = 2, binding = 4) readonly buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
+layout(set = 2, binding = 6) readonly buffer InstanceBuffer 	{ Instance instances[]; };
+layout(set = 2, binding = 7) readonly buffer TLASIndexBuffer 	{ uint tlasIndices[]; };
+layout(set = 2, binding = 8) readonly buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
 
-layout(local_size_x = 16, local_size_y = 16) in;
+layout(local_size_x = 32) in;
 
 bool intersectBLAS(Instance instance, inout Ray ray)
 {
@@ -163,21 +163,5 @@ bool intersectTLAS(inout Ray ray)
 
 void main()
 {
-	const uvec3 GlobalWorkGroupSize = gl_NumWorkGroups * gl_WorkGroupSize;
-	const uint WorkerSize1D = GlobalWorkGroupSize.x * GlobalWorkGroupSize.y * GlobalWorkGroupSize.z;
-	const uint InvocationIndex1D = \
-		gl_GlobalInvocationID.x + \
-		gl_GlobalInvocationID.y * GlobalWorkGroupSize.x + \
-		gl_GlobalInvocationID.z * GlobalWorkGroupSize.x * GlobalWorkGroupSize.y;
-
-	int segmentSize = int(ceil(rayCounters.rayIn / WorkerSize1D));
-	int segmentStart = int(InvocationIndex1D * segmentSize);
-	int segmentEnd = segmentStart + segmentSize;
-
-	if (segmentStart >= rayCounters.rayIn) return;	// no work to do for this warp
-
-	for (int rayIdx = segmentStart; rayIdx < segmentEnd; rayIdx++)
-	{
-		intersectTLAS(rayIn.rays[rayIdx]);
-	}
+	intersectTLAS(rayIn.rays[gl_GlobalInvocationID.x]);
 }

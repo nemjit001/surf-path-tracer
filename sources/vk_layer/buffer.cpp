@@ -22,6 +22,11 @@ Buffer::Buffer(
     m_allocationInfo{},
     m_buffer(VK_NULL_HANDLE)
 {
+    // Still allocate buffer if empty -> buggy hack to avoid stupid empty buffer logic everywhere else
+    // FIXME: this is a VERY possible source of bugs
+    if (size == 0)
+        size = sizeof(U32);
+
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.flags = 0;
     bufferCreateInfo.pNext = nullptr;

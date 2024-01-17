@@ -186,7 +186,7 @@ bool intersectTLAS(inout Ray ray)
 vec3 sceneNormal(Ray ray)
 {
 	Instance instance = instances[ray.hit.instanceIdx];
-	return scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray);
+	return scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray.hit.hitCoords);
 }
 
 Material sceneMaterial(Ray ray)
@@ -263,7 +263,7 @@ void main()
 				N *= -1;
 
 			vec3 mediumScale = vec3(1.0);
-			if (activeRay.inMedium)
+			if (activeRay.state.inMedium)
 				mediumScale = exp(material.absorption * -activeRay.depth);
 
 			float rrScale = 1.0 / p;
@@ -275,15 +275,13 @@ void main()
 				Ray reflectRay = newRay(newOrigin, newDirection);
 
 				activeRay.transmission *= material.albedo * mediumScale * rrScale;
-				reflectRay.inMedium = activeRay.inMedium;
-
 				copyRayMetadata(reflectRay, activeRay);
 				activeRay = reflectRay;
 			}
 			else if (r < (material.reflectivity + material.refractivity))
 			{
-				float n1 = activeRay.inMedium ? material.indexOfRefraction : 1.0f;
-				float n2 = activeRay.inMedium ? 1.0f : material.indexOfRefraction;
+				float n1 = activeRay.state.inMedium ? material.indexOfRefraction : 1.0f;
+				float n2 = activeRay.state.inMedium ? 1.0f : material.indexOfRefraction;
 				float iorRatio = n1 / n2;
 
 				float cosI = dot(-activeRay.direction, N);
@@ -304,9 +302,8 @@ void main()
 					if (randomF32(pixelSeed) > Fresnel)
 					{
 						activeRay.transmission *= material.albedo * mediumScale * rrScale;
-						transmitRay.inMedium = !activeRay.inMedium;
-
 						copyRayMetadata(transmitRay, activeRay);
+						transmitRay.state.inMedium = !activeRay.state.inMedium;
 						activeRay = transmitRay;
 						continue;
 					}
@@ -317,8 +314,6 @@ void main()
 				Ray reflectRay = newRay(newOrigin, newDirection);
 
 				activeRay.transmission *= material.albedo * mediumScale * rrScale;
-				reflectRay.inMedium = activeRay.inMedium;
-
 				copyRayMetadata(reflectRay, activeRay);
 				activeRay = reflectRay;
 			}
@@ -335,8 +330,6 @@ void main()
 				float inversePdf = F32_PI * invCosTheta;
 
 				activeRay.transmission *= materialEmittance(material) + inversePdf * cosTheta * brdf * mediumScale * rrScale;
-				bounceRay.inMedium = activeRay.inMedium;
-
 				copyRayMetadata(bounceRay, activeRay);
 				activeRay = bounceRay;
 			}

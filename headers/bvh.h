@@ -96,8 +96,15 @@ struct GPUInstance
 	U32 bvhIdxOffset;		// Index offset into BVH GPU index array
 	U32 bvhNodeOffset;		// Index offset into BVH GPU node array
 	U32 materialOffset;		// Index offset into material GPU array
-	Mat4 transform;
+	F32 area;
+	ALIGN(16) Mat4 transform;
 	Mat4 invTransform;
+};
+
+struct SamplePoint
+{
+	Float3 position;
+	Float3 normal;
 };
 
 class Instance
@@ -115,12 +122,20 @@ public:
 
 	void setTransform(const Mat4& transform);
 
+	SamplePoint samplePoint(U32& seed) const;
+
+	inline void updateInstanceData() { updateBounds(); }
+
+private:
 	void updateBounds();
+
+	void calculateMeshArea();
 
 public:
 	BvhBLAS* bvh;
 	Material* material;
 	AABB bounds;
+	F32 area;
 
 private:
 	Mat4 m_transform;
@@ -175,6 +190,7 @@ inline GPUInstance Instance::toGPUInstance() const
 	return GPUInstance{
 		0, 0,
 		0, 0,
+		area,
 		m_transform, m_invTransform
 	};
 }

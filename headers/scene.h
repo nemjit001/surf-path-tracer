@@ -22,26 +22,49 @@ struct SceneBackground
 	struct { RgbColor colorA; RgbColor colorB; } gradient;
 };
 
+class IScene
+{
+public:
+	virtual const SceneBackground& backgroundSettings() const = 0;
+
+	virtual void update(F32 deltaTime) = 0;
+};
+
 class Scene
+	:
+	public IScene
 {
 public:
 	Scene(SceneBackground background, std::vector<Instance> instances);
 
 	virtual ~Scene() = default;
 
-	inline bool intersect(Ray& ray) const;
+	inline bool intersect(Ray& ray) const { return m_sceneTlas.intersect(ray); }
 
-	inline const Instance& hitInstance(SizeType instanceIndex);
+	inline bool intersectAny(Ray& ray) const { return m_sceneTlas.intersectAny(ray); }
 
-	inline const SceneBackground& backgroundSettings() const;
+	inline const Instance& hitInstance(SizeType instanceIndex) { return m_sceneTlas.instance(instanceIndex); }
+
+	inline const U32 lightCount() const { return static_cast<U32>(m_lightIndices.size()); }
+
+	inline const Instance& sampleLights(U32& seed) { return m_sceneTlas.instance(m_lightIndices[randomRange(seed, 0, lightCount())]); }
 
 	RgbColor sampleBackground(const Ray& ray) const;
 
-	virtual void update(F32 deltaTime);
+	virtual inline const SceneBackground& backgroundSettings() const override { return m_background; }
 
-protected:
+	virtual void update(F32 deltaTime) override;
+
+private:
 	SceneBackground m_background;
 	BvhTLAS m_sceneTlas;
+	std::vector<U32> m_lightIndices;
+};
+
+struct GPULightData
+{
+	U32 lightInstanceIdx;
+	U32 primitiveCount;
 };
 
 struct GPUBatchInfo
@@ -52,6 +75,7 @@ struct GPUBatchInfo
 	std::vector<BvhNode> BLASNodes;
 	std::vector<Material> materials;
 	std::vector<GPUInstance> gpuInstances;
+	std::vector<GPULightData> lights;
 };
 
 class GPUBatcher
@@ -61,12 +85,14 @@ public:
 };
 
 class GPUScene
-	: public Scene
+	: public IScene
 {
 public:
 	GPUScene(RenderContext* renderContext, SceneBackground background, std::vector<Instance> instances);
 
 	virtual ~GPUScene();
+
+	virtual inline const SceneBackground& backgroundSettings() const override { return m_background; }
 
 	virtual void update(F32 deltaTime) override;
 
@@ -78,6 +104,8 @@ private:
 	VkCommandPool m_uploadOneshotPool = VK_NULL_HANDLE;
 	VkFence m_uploadFinishedFence 	= VK_NULL_HANDLE;
 	GPUBatchInfo m_batchInfo;
+	SceneBackground m_background;
+	BvhTLAS m_sceneTlas;
 
 public:
 	Buffer globalTriBuffer;			// Global mesh triangle buffer.
@@ -88,19 +116,5 @@ public:
 	Buffer instanceBuffer;			// The Instance buffer contains GPUInstances with offsets into global BLAS buffers.
 	Buffer TLASIndexBuffer;			// The TLAS index buffer containes indices into the instance buffer.
 	Buffer TLASNodeBuffer;			// The TLAS Node buffer contains TLAS BVH nodes.
+	Buffer lightBuffer;				// The light buffer contains needed data for all lights in the scene.
 };
-
-bool Scene::intersect(Ray& ray) const
-{
-	return m_sceneTlas.intersect(ray);
-}
-
-const Instance& Scene::hitInstance(SizeType instanceIndex)
-{
-	return m_sceneTlas.instance(instanceIndex);
-}
-
-const SceneBackground& Scene::backgroundSettings() const
-{
-	return m_background;
-}

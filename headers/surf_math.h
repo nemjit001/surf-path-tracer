@@ -216,6 +216,10 @@ F32 randomRange(F32 min, F32 max);
 
 F32 randomRange(U32& seed, F32 min, F32 max);
 
+U32 randomRange(U32 min, U32 max);
+
+U32 randomRange(U32& seed, U32 min, U32 max);
+
 Float3 randomOnHemisphere(U32& seed, const Float3& normal);
 
 Float3 randomOnHemisphereCosineWeighted(U32& seed, const Float3& normal);

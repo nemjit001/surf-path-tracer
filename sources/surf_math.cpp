@@ -84,6 +84,16 @@ F32 randomRange(U32& seed, F32 min, F32 max)
 	return (randomF32(seed) * range) + min;
 }
 
+U32 randomRange(U32 min, U32 max)
+{
+	return (randomU32() + min) % max;
+}
+
+U32 randomRange(U32& seed, U32 min, U32 max)
+{
+	return (randomU32(seed) + min) % max;
+}
+
 Float3 randomOnHemisphere(U32& seed, const Float3& normal)
 {
 	Float3 direction = Float3(0.0f);

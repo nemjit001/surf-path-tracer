@@ -23,6 +23,13 @@
 #define RECURSIVE_IMPLEMENTATION    0   // Use a simple recursive path tracing implementation with no variance reduction & clamped depth
 #define COLOR_BLACK                 RgbColor(0.0f, 0.0f, 0.0f)
 
+// Threshold for difference in ray counts between waves in wavefront path tracing
+#define WF_RAY_DIFF_THRESHOLD           50
+// Batch size that is allowed to be deferred to the next frame in wavefront path tracing
+#define WF_RAY_NF_BATCH_SIZE            500
+// Output lumen data WARN: drops framerate to sub second on discrete GPUs
+#define WF_LUMEN_OUTPUT                 0
+
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
     totalSamples(0),
@@ -325,6 +332,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
     // Non recursive path tracing implementation
     RgbColor energy(0.0f);
     RgbColor transmission(1.0f);
+    bool lastSpecular = true;
     for (;;)
     {
         if (!m_scene.intersect(ray))
@@ -339,7 +347,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
         if (material->isLight())
         {
-            energy += transmission * material->emittance();
+            energy += lastSpecular ? transmission * material->emittance() : Float3(0);
             break;
         }
 
@@ -348,6 +356,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (p < randomF32(seed))
             break;
 
+        Float3 hitPosition = ray.hitPosition();
         Float3 normal = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
         Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
         const F32 rrScale = 1.0f / p;
@@ -364,12 +373,13 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (r < material->reflectivity)
         {
             Float3 newDirection = reflect(ray.direction, normal);
-            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
             bool wasInMedium = ray.inMedium;
             ray = Ray(newOrigin, newDirection);
             ray.inMedium = wasInMedium;
 
             transmission *= material->albedo * rrScale * mediumScale;
+            lastSpecular = true;
         }
         else if (r < (material->reflectivity + material->refractivity))
         {
@@ -389,7 +399,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
 
                 Float3 newDirection = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * normal);
-                Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+                Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
                 bool wasInMedium = ray.inMedium;
                 ray = Ray(newOrigin, newDirection);
                 ray.inMedium = !wasInMedium;
@@ -397,31 +407,61 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 if (randomF32(seed) > Fresnel)
                 {
                     transmission *= material->albedo * rrScale * mediumScale;
+                    lastSpecular = true;
                     continue;
                 }
             }
 
             Float3 newDirection = reflect(ray.direction, normal);
-            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
             bool wasInMedium = ray.inMedium;
             ray = Ray(newOrigin, newDirection);
             ray.inMedium = wasInMedium;
             transmission *= material->albedo * rrScale * mediumScale;
+            lastSpecular = true;
         }
         else
         {
+            RgbColor brdf = material->albedo * F32_INV_PI;
+            U32 lightCount = m_scene.lightCount();
+
+            // Can use NEE if there are lights in scene
+            if (lightCount > 0)
+            {
+                const Instance& light = m_scene.sampleLights(seed);
+
+                SamplePoint lightPoint = light.samplePoint(seed);
+                Float3 L = lightPoint.position - hitPosition;
+                Float3 LN = lightPoint.normal;
+                F32 distance = L.magnitude();
+                F32 falloff = 1.0f / L.dot(L);
+
+                Float3 srDirection = L.normalize();
+                Float3 srOrigin = hitPosition + F32_EPSILON * srDirection;
+                Ray shadowRay = Ray(srOrigin, srDirection);
+                shadowRay.depth = distance - 2.0f * F32_EPSILON;
+
+                F32 cosO = normal.dot(srDirection);
+                F32 cosI = LN.dot(-1.0 * srDirection);
+                if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(shadowRay))
+                {
+                    F32 inversePdf = cosI * light.area * falloff;
+                    energy += transmission * inversePdf * cosO * static_cast<F32>(lightCount) * brdf * light.material->emittance();
+                }
+            }
+
             Float3 newDirection = randomOnHemisphereCosineWeighted(seed, normal);
-            Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
+            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
             bool wasInMedium = ray.inMedium;
             ray = Ray(newOrigin, newDirection);
             ray.inMedium = wasInMedium;
 
             F32 cosTheta = newDirection.dot(normal);
             F32 invCosTheta = 1.0f / cosTheta;
-            RgbColor brdf = material->albedo * F32_INV_PI;
             F32 inversePdf = F32_PI * invCosTheta;
 
-            transmission *= material->emittance() + rrScale * inversePdf * cosTheta * brdf * mediumScale;
+            transmission *= rrScale * inversePdf * cosTheta * brdf * mediumScale;
+            lastSpecular = false;
         }
     }
 
@@ -761,6 +801,15 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         0, VK_WHOLE_SIZE
     };
 
+    WriteDescriptorSet lightDataWriteSet = {};
+    lightDataWriteSet.set = 2;
+    lightDataWriteSet.binding = 9;
+    lightDataWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    lightDataWriteSet.bufferInfo = VkDescriptorBufferInfo{
+        m_scene.lightBuffer.handle(),
+        0, VK_WHOLE_SIZE
+    };
+
 #if GPU_MEGAKERNEL == 1
     m_megakernelPipeline.updateDescriptorSets({
         cameraWriteSet,
@@ -787,6 +836,22 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     rayCounterWriteSet.bufferInfo.offset = 0;
     rayCounterWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
 
+    WriteDescriptorSet shadowRayCounterWriteSet = {};
+    shadowRayCounterWriteSet.set = 1;
+    shadowRayCounterWriteSet.binding = 3;
+    shadowRayCounterWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    shadowRayCounterWriteSet.bufferInfo.buffer = m_shadowRayCounter.handle();
+    shadowRayCounterWriteSet.bufferInfo.offset = 0;
+    shadowRayCounterWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
+    WriteDescriptorSet shadowRayBufferWriteSet = {};
+    shadowRayBufferWriteSet.set = 1;
+    shadowRayBufferWriteSet.binding = 4;
+    shadowRayBufferWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    shadowRayBufferWriteSet.bufferInfo.buffer = m_shadowRayBuffer.handle();
+    shadowRayBufferWriteSet.bufferInfo.offset = 0;
+    shadowRayBufferWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
     // Update all compute pipeline descriptor sets
     m_rayGenPipeline.updateDescriptorSets({
         cameraWriteSet,
@@ -806,20 +871,29 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         frameStateWriteSet,
         accumulatorWriteSet,
         rayCounterWriteSet,
+        shadowRayCounterWriteSet,
+        shadowRayBufferWriteSet,
         sceneDataWriteSet,
+        triBufWriteset,
         triExtBufWriteset,
         materialWriteSet,
         instanceWriteSet,
+        lightDataWriteSet,
     });
 
     m_rayConnectPipeline.updateDescriptorSets({
         frameStateWriteSet,
         accumulatorWriteSet,
-        rayCounterWriteSet,
+        shadowRayCounterWriteSet,
+        shadowRayBufferWriteSet,
         sceneDataWriteSet,
+        triBufWriteset,
         triExtBufWriteset,
+        blasIdxWriteSet, blasNodeWriteSet,
         materialWriteSet,
         instanceWriteSet,
+        tlasIdxWriteSet, tlasNodeWriteSet,
+        lightDataWriteSet,
     });
 
     m_wfFinalizePipeline.updateDescriptorSets({
@@ -879,6 +953,9 @@ void WaveFrontRenderer::clearAccumulator()
 {
     vkDeviceWaitIdle(m_context->device);
 
+    // Clear any still queued rays
+    m_rayCounters.clear();
+
     // clear accumulator buffer
     m_frameState.totalSamples = 0;
     m_accumulatorSSBO.clear();
@@ -899,6 +976,22 @@ void WaveFrontRenderer::render(F32 deltaTime)
     // Wait on compute before updating uniforms
     VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
     VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
+
+#if WF_LUMEN_OUTPUT == 1
+    // Update frame instrumentation data Lumen output
+    SizeType accumulatorSize = m_renderResolution.width * m_renderResolution.height;
+    F32 invSamples = 1.0f / static_cast<F32>(m_frameState.totalSamples);
+    Float4* pAccumulator = nullptr;
+    
+    m_accumulatorSSBO.persistentMap(reinterpret_cast<void**>(&pAccumulator));
+    m_frameInstrumentationData.energy = 0.0f;
+    for (SizeType i = 0; i < accumulatorSize; i++)
+    {
+        RgbaColor color = pAccumulator[i] * invSamples;
+        m_frameInstrumentationData.energy += color.r + color.g + color.b;
+    }
+    m_accumulatorSSBO.unmap();
+#endif
 
     // Update cameraUBO
     CameraUBO cameraUBO = CameraUBO{
@@ -986,6 +1079,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
         
         while (pRayCounters->rayIn > 0 || pRayCounters->rayOut > 0)
         {
+            U32 oldRayCount = pRayCounters->rayOut;
             swap(rayInBuffer, rayOutBuffer);
             swap(pRayCounters->rayIn, pRayCounters->rayOut);
             inBufferWriteSet.bufferInfo.buffer = rayInBuffer->handle();
@@ -1001,7 +1095,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
                 outBufferWriteSet,
             });
 
-            bakeWavePass(activeCompute.waveBuffer);
+            bakeWavePass(activeCompute.waveBuffer, pRayCounters->rayIn);
             VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
             waveSubmit.commandBufferCount = 1;
             waveSubmit.pCommandBuffers = &m_wavefrontCompute.waveBuffer;
@@ -1013,6 +1107,10 @@ void WaveFrontRenderer::render(F32 deltaTime)
             VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &waveSubmit, m_wavefrontCompute.computeReady));
             VK_CHECK(vkWaitForFences(m_context->device, 1, &m_wavefrontCompute.computeReady, VK_TRUE, UINT64_MAX));
             VK_CHECK(vkResetFences(m_context->device, 1, &m_wavefrontCompute.computeReady));
+
+            // Check diff threshold and leave rest of rays for next frame to process
+            U32 newRayCount = pRayCounters->rayOut;
+            if (oldRayCount - newRayCount < WF_RAY_DIFF_THRESHOLD && newRayCount <= WF_RAY_NF_BATCH_SIZE) break;
         }
     }
 
@@ -1026,6 +1124,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
     finalizeSubmit.pSignalSemaphores = &activeCompute.computeFinished;
     VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &finalizeSubmit, m_wavefrontCompute.computeReady));
 
+    memset(pRayCounters, 0, sizeof(RayBufferCounters));
     m_rayCounters.unmap();
 #endif
 
@@ -1148,7 +1247,7 @@ void WaveFrontRenderer::bakeRayGenPass(VkCommandBuffer commandBuffer)
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
+void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInputSize)
 {
     assert(commandBuffer != VK_NULL_HANDLE);
 
@@ -1185,6 +1284,39 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
     buffer1Barrier.offset = 0;
     buffer1Barrier.size = VK_WHOLE_SIZE;
 
+    VkBufferMemoryBarrier2 accumulatorBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    accumulatorBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    accumulatorBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    accumulatorBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    accumulatorBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    accumulatorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    accumulatorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    accumulatorBarrier.buffer = m_accumulatorSSBO.handle();
+    accumulatorBarrier.offset = 0;
+    accumulatorBarrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 srCounterBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    srCounterBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    srCounterBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    srCounterBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srCounterBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srCounterBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srCounterBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srCounterBarrier.buffer = m_shadowRayCounter.handle();
+    srCounterBarrier.offset = 0;
+    srCounterBarrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 srBufferBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    srBufferBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    srBufferBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    srBufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    srBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srBufferBarrier.buffer = m_shadowRayBuffer.handle();
+    srBufferBarrier.offset = 0;
+    srBufferBarrier.size = VK_WHOLE_SIZE;
+
     VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     cmdBeginInfo.flags = 0;
     cmdBeginInfo.pInheritanceInfo = nullptr;
@@ -1203,7 +1335,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayExtPipeline.bindPoint(), m_rayExtPipeline.handle());
-        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32) + 1, (m_renderResolution.height / 32) + 1, 1);
+        vkCmdDispatch(commandBuffer, rayInputSize / 32 + 1, 1, 1);
     }
 
     VkBufferMemoryBarrier2 extendShadeBufferBarriers[] = {
@@ -1229,8 +1361,19 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayShadePipeline.bindPoint(), m_rayShadePipeline.handle());
-        vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32) + 1, (m_renderResolution.height / 32) + 1, 1);
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 32 + 1, m_renderResolution.height / 32 + 1, 1);
     }
+
+    VkBufferMemoryBarrier2 shadeConnectBufferBarriers[] = {
+        accumulatorBarrier,
+        srCounterBarrier,
+        srBufferBarrier,
+    };
+
+    VkDependencyInfo shadeConnectDependency = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+    extendShadeDependency.bufferMemoryBarrierCount = 3;
+    extendShadeDependency.pBufferMemoryBarriers = shadeConnectBufferBarriers;
+    vkCmdPipelineBarrier2(commandBuffer, &shadeConnectDependency);
 
     // connect kernel dispatch
     {
@@ -1244,7 +1387,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayConnectPipeline.bindPoint(), m_rayConnectPipeline.handle());
-        vkCmdDispatch(commandBuffer, 1, 1, 1);
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 32 + 1, m_renderResolution.height / 32 + 1, 1);
     }
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));

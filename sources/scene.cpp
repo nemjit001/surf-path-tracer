@@ -19,7 +19,17 @@ Scene::Scene(SceneBackground background, std::vector<Instance> instances)
 	m_background(background),
 	m_sceneTlas(instances)
 {
-	//
+	// Collect lights in scene
+	SizeType idx = 0;
+	for (auto const& instance : instances)
+	{
+		if (instance.material->isLight())
+		{
+			m_lightIndices.push_back(static_cast<U32>(idx));
+		}
+
+		idx++;
+	}
 }
 
 RgbColor Scene::sampleBackground(const Ray& ray) const
@@ -132,6 +142,14 @@ const GPUBatchInfo GPUBatcher::createBatchInfo(const std::vector<Instance>& inst
 			gpuInstance.materialOffset++;
 		}
 
+		if (instance.material->isLight())
+		{
+			batchInfo.lights.push_back(GPULightData{
+				static_cast<U32>(batchInfo.gpuInstances.size()),
+				static_cast<U32>(instance.bvh->triCount()),
+			});
+		}
+
 		batchInfo.gpuInstances.push_back(gpuInstance);
 	}
 
@@ -140,7 +158,8 @@ const GPUBatchInfo GPUBatcher::createBatchInfo(const std::vector<Instance>& inst
 
 GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std::vector<Instance> instances)
 	:
-	Scene(background, instances),
+	m_background(background),
+	m_sceneTlas(instances),
 	m_renderContext(renderContext),
 	m_batchInfo(GPUBatcher::createBatchInfo(instances)),
 	globalTriBuffer(
@@ -198,6 +217,13 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 		| VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		0
+	),
+	lightBuffer(
+		renderContext->allocator, m_batchInfo.lights.size() * sizeof(GPULightData),
+		VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+		| VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		0
 	)
 {
 	assert(renderContext != nullptr);
@@ -218,6 +244,7 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 	SizeType instanceBufSize = m_batchInfo.gpuInstances.size() * sizeof(GPUInstance);
 	SizeType tlasIndexBufSize = m_batchInfo.gpuInstances.size() * sizeof(U32);
 	SizeType tlasNodeBufSize = m_sceneTlas.nodesUsed() * sizeof(BvhNode);
+	SizeType lightBufSize = m_batchInfo.lights.size() * sizeof(GPULightData);
 
 	uploadToGPU(m_batchInfo.triBuffer.data(), triBufSize, globalTriBuffer);
 	uploadToGPU(m_batchInfo.triExtBuffer.data(), triExtBufSize, globalTriExtBuffer);
@@ -227,6 +254,7 @@ GPUScene::GPUScene(RenderContext* renderContext, SceneBackground background, std
 	uploadToGPU(m_batchInfo.gpuInstances.data(), instanceBufSize, instanceBuffer);
 	uploadToGPU(m_sceneTlas.indices(), tlasIndexBufSize, TLASIndexBuffer);
 	uploadToGPU(m_sceneTlas.nodePool(), tlasNodeBufSize, TLASNodeBuffer);
+	uploadToGPU(m_batchInfo.lights.data(), lightBufSize, lightBuffer);
 }
 
 GPUScene::~GPUScene()
@@ -242,7 +270,7 @@ void GPUScene::update(F32 deltaTime)
 	instance.setTransform(glm::rotate(instance.transform(), 1.0f * deltaTime, static_cast<glm::vec3>(WORLD_UP)));
 
 	m_sceneTlas.refit();
-	m_batchInfo = GPUBatcher::createBatchInfo(m_sceneTlas.instances());	// FIXME: is rebatching fast enough for realtime use with larger scenes?
+	m_batchInfo = GPUBatcher::createBatchInfo(m_sceneTlas.instances());	// XXX: is rebatching fast enough for realtime use with larger scenes?
 
 	SizeType instanceBufSize = m_batchInfo.gpuInstances.size() * sizeof(GPUInstance);
 	SizeType tlasIndexBufSize = m_batchInfo.gpuInstances.size() * sizeof(U32);

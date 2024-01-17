@@ -510,6 +510,28 @@ void Instance::setTransform(const Mat4& transform)
 	m_transform = transform;
 
 	updateBounds();
+	calculateMeshArea();
+}
+
+SamplePoint Instance::samplePoint(U32& seed) const
+{
+	const Mesh* pMesh = bvh->mesh();
+	F32 u = randomRange(seed, 0.0f, 1.0f);
+	F32 v = randomRange(seed, 0.0f, 1.0f - u);
+
+	Float2 barycentric = Float2(u, v);
+	U32 index = randomRange(seed, 0, static_cast<U32>(pMesh->triangles.size()));
+
+	Float4 position = Float4(pMesh->position(index, barycentric), 1);
+	Float4 normal = Float4(pMesh->normal(index, barycentric), 0);
+
+	glm::vec4 tPos = m_transform * static_cast<glm::vec4>(position);
+	glm::vec4 tNormal = m_transform * static_cast<glm::vec4>(normal);
+
+	return SamplePoint{
+		Float3(tPos.x, tPos.y, tPos.z) / tPos.w,
+		Float3(tNormal.x, tNormal.y, tNormal.z),
+	};
 }
 
 void Instance::updateBounds()
@@ -532,6 +554,25 @@ void Instance::updateBounds()
 	{
 		glm::vec4 transformedPos = m_transform * static_cast<glm::vec4>(Float4(pos, 1.0f));
 		bounds.grow(Float3(transformedPos.x, transformedPos.y, transformedPos.z) / transformedPos.w);
+	}
+}
+
+void Instance::calculateMeshArea()
+{
+	area = 0.0f;
+	for (auto const& tri : bvh->mesh()->triangles)
+	{
+		// transform tri verts, calc area
+		glm::vec4 tv0 = m_transform * static_cast<glm::vec4>(Float4(tri.v0, 1.0));
+		glm::vec4 tv1 = m_transform * static_cast<glm::vec4>(Float4(tri.v1, 1.0));
+		glm::vec4 tv2 = m_transform * static_cast<glm::vec4>(Float4(tri.v2, 1.0));
+
+		Float3 v0 = Float3(tv0.x, tv0.y, tv0.z) / tv0.w;
+		Float3 v1 = Float3(tv1.x, tv1.y, tv1.z) / tv1.w;
+		Float3 v2 = Float3(tv2.x, tv2.y, tv2.z) / tv2.w;
+
+		Float3 a = v1 - v0, b = v2 - v0;
+		area += 0.5f * a.cross(b).magnitude();
 	}
 }
 
@@ -741,11 +782,11 @@ void BvhTLAS::refit()
 		BvhNode& node = m_nodePool[i];
 		if (node.isLeaf())
 		{
-			// Update node instance bounds because worldspace bounds of instance may have changed after a blas refit
+			// Update node instance because instance data may have changed after a blas refit
 			for (SizeType idx = 0; idx < node.count; idx++)
 			{
 				Instance& instance = m_instances[m_indices[node.first() + idx]];
-				instance.updateBounds();
+				instance.updateInstanceData();
 			}
 
 			updateNodeBounds(i);
