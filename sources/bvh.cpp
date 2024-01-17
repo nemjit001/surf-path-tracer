@@ -530,7 +530,7 @@ SamplePoint Instance::samplePoint(U32& seed) const
 
 	return SamplePoint{
 		Float3(tPos.x, tPos.y, tPos.z) / tPos.w,
-		Float3(tNormal.x, tNormal.y, tNormal.z),
+		Float3(tNormal.x, tNormal.y, tNormal.z).normalize(),
 	};
 }
 

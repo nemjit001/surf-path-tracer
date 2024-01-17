@@ -28,7 +28,7 @@
 // Batch size that is allowed to be deferred to the next frame in wavefront path tracing
 #define WF_RAY_NF_BATCH_SIZE            500
 // Output lumen data WARN: drops framerate to sub second on discrete GPUs
-#define WF_LUMEN_OUTPUT                 0
+#define WF_LUMEN_OUTPUT                 1
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
@@ -347,7 +347,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
         if (material->isLight())
         {
-            energy += transmission * material->emittance();
+            energy += lastSpecular ? transmission * material->emittance() : COLOR_BLACK;
             break;
         }
 
@@ -363,6 +363,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         Float3 I = ray.hitPosition();
         Float3 N = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
         Float2 UV = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+        U32 lightCount = m_scene.lightCount();
         F32 rrScale = 1.0f / p;
         F32 rng = randomF32(seed);
 
@@ -377,6 +378,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (rng < material->reflectivity)
         {
             R = reflect(ray.direction, N);
+            lastSpecular = true;
             transmission *= material->albedo * rrScale * mediumScale;
         }
         else if (rng < (material->reflectivity + material->refractivity))
@@ -406,16 +408,44 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                     R = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * N);
             }
 
+            lastSpecular = true;
             transmission *= material->albedo * rrScale * mediumScale;
             inMedium = mustRefract ? !inMedium : inMedium;
         }
         else
         {
+            if (lightCount > 0) // Can only do NEE if there are explicit lights to be sampled
+            {
+                const Instance& light = m_scene.sampleLights(seed);
+                const SamplePoint point = light.samplePoint(seed);
+                
+                Float3 IL = point.position - I;
+                Float3 L = IL.normalize();
+                Float3 LN = point.normal;
+
+                Float3 SO = I + F32_EPSILON * L;
+                Ray sr = Ray(SO, L);
+                sr.depth = IL.magnitude() - 2.0f * F32_EPSILON;
+
+                F32 falloff = 1.0f / IL.dot(IL);
+                F32 cosO = N.dot(L);
+                F32 cosI = LN.dot(-1.0f * L);
+                if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(sr))
+                {
+                    F32 SA = cosI * light.area * falloff;
+                    F32 lPdf = 1.0f / SA;
+
+                    Float3 Ld = light.material->emittance() * SA * brdf * cosO * static_cast<F32>(lightCount);
+                    energy += transmission * Ld;
+                }
+            }
+
             R = randomOnHemisphereCosineWeighted(seed, N);
             F32 cosTheta = N.dot(R);
             F32 invCosTheta = 1.0f / cosTheta;
             F32 invPdf = F32_PI * invCosTheta;
 
+            lastSpecular = false;
             transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
         }
 
