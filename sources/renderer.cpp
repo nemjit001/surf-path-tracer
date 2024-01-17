@@ -411,9 +411,10 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         }
         else
         {
-            R = randomOnHemisphere(seed, N);
+            R = randomOnHemisphereCosineWeighted(seed, N);
             F32 cosTheta = N.dot(R);
-            F32 invPdf = F32_2PI;
+            F32 invCosTheta = 1.0f / cosTheta;
+            F32 invPdf = F32_PI * invCosTheta;
 
             transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
         }
