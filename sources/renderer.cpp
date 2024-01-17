@@ -347,6 +347,93 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
         if (material->isLight())
         {
+            energy += transmission * material->emittance();
+            break;
+        }
+
+        Float3 mediumScale(1.0f);
+        if (ray.inMedium)
+            mediumScale = expf(material->absorption * -ray.depth);
+
+        // Calculate termination chance for russian roulette
+        const F32 p = clamp(max(transmission.r, max(transmission.g, transmission.b)), 0.0f, 1.0f);
+        if (p < randomF32(seed))
+            break;
+
+        Float3 I = ray.hitPosition();
+        Float3 N = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+        Float2 UV = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
+        F32 rrScale = 1.0f / p;
+        F32 rng = randomF32(seed);
+
+        Float3 R = Float3(0);
+        RgbColor brdf = material->albedo * F32_INV_PI;
+        bool inMedium = ray.inMedium;
+
+        // Flip normal on backface hits
+        if (ray.direction.dot(N) > 0.0f)
+            N *= -1.0f;
+
+        if (rng < material->reflectivity)
+        {
+            R = reflect(ray.direction, N);
+            transmission *= material->albedo * rrScale * mediumScale;
+        }
+        else if (rng < (material->reflectivity + material->refractivity))
+        {
+            // Assume reflect & precalculate ray
+            bool mustRefract = false;
+            R = reflect(ray.direction, N);
+
+            // Check for refraction
+            F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
+            F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
+            F32 iorRatio = n1 / n2;
+
+            F32 cosI = -ray.direction.dot(N);
+            F32 cosTheta2 = 1.0f - (iorRatio * iorRatio) * (1.0f - cosI * cosI);
+            F32 Fresnel = 1.0f;
+
+            if (cosTheta2 > 0.0f)
+            {
+                F32 a = n1 - n2, b = n1 + n2;
+                F32 r0 = (a * a) / (b * b);
+                F32 c = 1.0f - cosI;
+                F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+
+                mustRefract = randomF32(seed) > Fresnel;
+                if (mustRefract)
+                    R = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * N);
+            }
+
+            transmission *= material->albedo * rrScale * mediumScale;
+            inMedium = mustRefract ? !inMedium : inMedium;
+        }
+        else
+        {
+            R = randomOnHemisphere(seed, N);
+            F32 cosTheta = N.dot(R);
+            F32 invPdf = F32_2PI;
+
+            transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
+        }
+
+        Float3 O = I + F32_EPSILON * R;
+        ray = Ray(O, R);
+        ray.inMedium = inMedium;
+#if 0
+        if (!m_scene.intersect(ray))
+        {
+            energy += transmission * m_scene.sampleBackground(ray);
+            break;
+        }
+
+        const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
+        const Mesh* mesh = instance.bvh->mesh();
+        const Material* material = instance.material;
+
+        if (material->isLight())
+        {
             energy += lastSpecular ? transmission * material->emittance() : Float3(0);
             break;
         }
@@ -463,6 +550,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             transmission *= rrScale * inversePdf * cosTheta * brdf * mediumScale;
             lastSpecular = false;
         }
+#endif
     }
 
     return energy;
