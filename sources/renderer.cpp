@@ -374,114 +374,74 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (ray.direction.dot(N) > 0.0f)
             N *= -1.0f;
 
-        if (rng < material->reflectance)
+        Float3 V = -1.0f * ray.direction;
+        R = randomOnHemisphereCosineWeighted(seed, N);
+        Float3 H = (V + R).normalize();
+
+        // Clamping dot is to avoid divisions by 0
+        F32 NV = clamp(N.dot(V), F32_EPSILON, 1.0f - F32_EPSILON);
+        F32 NL = clamp(N.dot(R), F32_EPSILON, 1.0f - F32_EPSILON);
+        F32 NH = clamp(N.dot(H), F32_EPSILON, 1.0f - F32_EPSILON);
+        F32 VH = clamp(V.dot(H), F32_EPSILON, 1.0f - F32_EPSILON);
+
+        Float3 F0 = Float3(0.16f * material->reflectance * material->reflectance);
+        F0 = lerp(F0, material->baseColor, material->metallic);
+
+        // Schlick's reflectance approximation
+        F32 c = 1.0f - VH;
+        RgbColor F = F0 + (1.0f - F0) * (c * c * c * c * c);
+
+        // GGX normal distribution
+        F32 a = material->roughness * material->roughness;
+        F32 a2 = a * a;
+        F32 NH2 = NH * NH;
+        F32 b = NH2 * (a2 - 1.0f) + 1.0f;
+        F32 D = a2 * F32_INV_PI / (b * b);
+
+        // Gsmiths w/ Schlicks G1 geometry term
+        F32 k = a / 2.0f;
+        F32 G1L = NL / (NL * (1.0f - k) + k);
+        F32 G1V = NV / (NV * (1.0f - k) + k);
+        F32 G = G1L * G1V;
+
+        RgbColor diffuseBaseColor = (1.0f - F) * (1.0f - material->metallic) * material->baseColor;
+
+        RgbColor specularBrdf = (F * D * G) / (4.0f * NL * NV);
+        RgbColor diffuseBrdf = diffuseBaseColor * F32_INV_PI;
+        RgbColor brdf = diffuseBrdf + specularBrdf;
+
+        if (lightCount > 0) // Can only do NEE if there are explicit lights to be sampled
         {
-            R = reflect(ray.direction, N);
-            lastSpecular = true;
-            transmission *= material->baseColor * mediumScale * rrScale;
-        }
-        else if (rng < (material->reflectance + material->refractance))
-        {
-            // Assume reflect & precalculate ray
-            bool mustRefract = false;
-            R = reflect(ray.direction, N);
+            const Instance& light = m_scene.sampleLights(seed);
+            const SamplePoint point = light.samplePoint(seed);
+            
+            Float3 IL = point.position - I;
+            Float3 L = IL.normalize();
+            Float3 LN = point.normal;
 
-            // Check for refraction
-            F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
-            F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
-            F32 iorRatio = n1 / n2;
+            Float3 SO = I + F32_EPSILON * L;
+            Ray sr = Ray(SO, L);
+            sr.depth = IL.magnitude() - 2.0f * F32_EPSILON;
 
-            F32 cosI = -ray.direction.dot(N);
-            F32 cosTheta2 = 1.0f - (iorRatio * iorRatio) * (1.0f - cosI * cosI);
-            F32 Fresnel = 1.0f;
-
-            if (cosTheta2 > 0.0f)
+            F32 falloff = 1.0f / IL.dot(IL);
+            F32 cosO = N.dot(L);
+            F32 cosI = LN.dot(-1.0f * L);
+            if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(sr))
             {
-                F32 a = n1 - n2, b = n1 + n2;
-                F32 r0 = (a * a) / (b * b);
-                F32 c = 1.0f - cosI;
-                F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+                F32 SA = cosI * light.area * falloff;
+                F32 lPdf = 1.0f / SA;
 
-                mustRefract = randomF32(seed) > Fresnel;
-                if (mustRefract)
-                    R = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * N);
+                Float3 Ld = light.material->emittance() * SA * brdf * cosO * static_cast<F32>(lightCount);
+                energy += transmission * Ld;
             }
-
-            lastSpecular = true;
-            transmission *= material->baseColor * rrScale * mediumScale;
-            inMedium = mustRefract ? !inMedium : inMedium;
         }
-        else
-        {
-            Float3 V = -1.0f * ray.direction;
-            R = randomOnHemisphereCosineWeighted(seed, N);
-            Float3 H = (V + R).normalize();
 
-            // Clamping dot is to avoid divisions by 0
-            F32 NV = clamp(N.dot(V), F32_EPSILON, 1.0f - F32_EPSILON);
-            F32 NL = clamp(N.dot(R), F32_EPSILON, 1.0f - F32_EPSILON);
-            F32 NH = clamp(N.dot(H), F32_EPSILON, 1.0f - F32_EPSILON);
-            F32 VH = clamp(V.dot(H), F32_EPSILON, 1.0f - F32_EPSILON);
+        F32 cosTheta = NL;
+        F32 invCosTheta = 1.0f / cosTheta;
+        F32 invPdf = F32_PI * invCosTheta;
 
-            Float3 F0 = Float3(0.16f * material->reflectance * material->reflectance);
-            F0 = lerp(F0, material->baseColor, material->metallic);
-
-            // Schlick's reflectance approximation
-            F32 c = 1.0f - VH;
-            RgbColor F = F0 + (1.0f - F0) * (c * c * c * c * c);
-
-            // GGX normal distribution
-            F32 a = material->roughness * material->roughness;
-            F32 a2 = a * a;
-            F32 NH2 = NH * NH;
-            F32 b = NH2 * (a2 - 1.0f) + 1.0f;
-            F32 D = a2 * F32_INV_PI / (b * b);
-
-            // Gsmiths w/ Schlicks G1 geometry term
-            F32 k = a / 2.0f;
-            F32 G1L = NL / (NL * (1.0f - k) + k);
-            F32 G1V = NV / (NV * (1.0f - k) + k);
-            F32 G = G1L * G1V;
-
-            RgbColor diffuseBaseColor = (1.0f - F) * (1.0f - material->metallic) * material->baseColor;
-
-            RgbColor specularBrdf = (F * D * G) / (4.0f * NL * NV);
-            RgbColor diffuseBrdf = diffuseBaseColor * F32_INV_PI;
-            RgbColor brdf = diffuseBrdf + specularBrdf;
-
-            if (lightCount > 0) // Can only do NEE if there are explicit lights to be sampled
-            {
-                const Instance& light = m_scene.sampleLights(seed);
-                const SamplePoint point = light.samplePoint(seed);
-                
-                Float3 IL = point.position - I;
-                Float3 L = IL.normalize();
-                Float3 LN = point.normal;
-
-                Float3 SO = I + F32_EPSILON * L;
-                Ray sr = Ray(SO, L);
-                sr.depth = IL.magnitude() - 2.0f * F32_EPSILON;
-
-                F32 falloff = 1.0f / IL.dot(IL);
-                F32 cosO = N.dot(L);
-                F32 cosI = LN.dot(-1.0f * L);
-                if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(sr))
-                {
-                    F32 SA = cosI * light.area * falloff;
-                    F32 lPdf = 1.0f / SA;
-
-                    Float3 Ld = light.material->emittance() * SA * brdf * cosO * static_cast<F32>(lightCount);
-                    energy += transmission * Ld;
-                }
-            }
-
-            F32 cosTheta = NL;
-            F32 invCosTheta = 1.0f / cosTheta;
-            F32 invPdf = F32_PI * invCosTheta;
-
-            lastSpecular = false;
-            transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
-        }
+        lastSpecular = true;
+        transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
 
         Float3 O = I + F32_EPSILON * R;
         ray = Ray(O, R);

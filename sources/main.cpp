@@ -193,9 +193,9 @@ int main()
 	Material specularMaterial = Material{};
 	specularMaterial.baseColor = RgbColor(0.2f, 0.9f, 1.0f);
 	specularMaterial.metallic = 1.0f;
-	specularMaterial.specular = 0.5f;
-	specularMaterial.roughness = 0.2f;
-	specularMaterial.reflectance = 0.5f;
+	specularMaterial.specular = 1.0f;
+	specularMaterial.roughness = 0.0f;
+	specularMaterial.reflectance = 1.0f;
 
 	Material lightMaterial = Material{};
 	lightMaterial.emissionColor = RgbColor(1.0f, 1.0f, 0.7f);
