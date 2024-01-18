@@ -173,12 +173,13 @@ int main()
 	Material floorMaterial = Material{};
 	floorMaterial.baseColor = RgbColor(0.8f);
 	floorMaterial.specular = 0.5f;
-	floorMaterial.roughness = 0.8f;
-	floorMaterial.reflectance = 0.01f;
+	floorMaterial.roughness = 0.9f;
+	floorMaterial.reflectance = 0.05f;
 
 	Material diffuseMaterial = Material{};
 	diffuseMaterial.baseColor = RgbColor(1.0f, 0.0f, 0.0f);
-	diffuseMaterial.roughness = 1.0f;
+	diffuseMaterial.specular = 0.0f;
+	diffuseMaterial.roughness = 0.9f;
 
 	Material dielectricMaterial = Material{};
 	dielectricMaterial.baseColor = RgbColor(0.7f, 0.7f, 0.2f);

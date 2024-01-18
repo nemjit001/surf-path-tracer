@@ -277,15 +277,15 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         mediumScale = expf(material->absorption * -ray.depth);
 
     F32 r = randomF32(seed);
-    if (r < material->reflectivity)
+    if (r < material->reflectance)
     {
         Float3 newDirection = reflect(ray.direction, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newRay(newOrigin, newDirection);
         newRay.inMedium = ray.inMedium;
-        return material->albedo * mediumScale * trace(seed, newRay, depth + 1);
+        return material->baseColor * mediumScale * trace(seed, newRay, depth + 1);
     }
-    else if (r < material->reflectivity + material->refractivity)
+    else if (r < material->reflectance + material->refractance)
     {
         F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
         F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
@@ -308,18 +308,18 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             newTransmit.inMedium = !ray.inMedium;
 
             if (randomF32(seed) > Fresnel)
-                return material->albedo * mediumScale * trace(seed, newTransmit, depth + 1);
+                return material->baseColor * mediumScale * trace(seed, newTransmit, depth + 1);
         }
 
         Float3 newDirection = reflect(ray.direction, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
         Ray newReflect(newOrigin, newDirection);
         newReflect.inMedium = ray.inMedium;
-        return material->albedo * mediumScale * trace(seed, newReflect, depth + 1);
+        return material->baseColor * mediumScale * trace(seed, newReflect, depth + 1);
     }
     else
     {
-        RgbColor brdf = material->albedo * F32_INV_PI;
+        RgbColor brdf = material->baseColor * F32_INV_PI;
 
         Float3 newDirection = randomOnHemisphere(seed, normal);
         Float3 newOrigin = ray.hitPosition() + F32_EPSILON * newDirection;
@@ -416,6 +416,8 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             Float3 V = -1.0f * ray.direction;
             R = randomOnHemisphereCosineWeighted(seed, N);
             Float3 H = (V + R).normalize();
+
+            // Clamping dot is to avoid divisions by 0
             F32 NV = clamp(N.dot(V), F32_EPSILON, 1.0f - F32_EPSILON);
             F32 NL = clamp(N.dot(R), F32_EPSILON, 1.0f - F32_EPSILON);
             F32 NH = clamp(N.dot(H), F32_EPSILON, 1.0f - F32_EPSILON);
@@ -447,55 +449,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             RgbColor diffuseBrdf = diffuseBaseColor * F32_INV_PI;
             RgbColor brdf = diffuseBrdf + specularBrdf;
 
-            F32 cosTheta = NL;
-            F32 invCosTheta = 1.0f / cosTheta;
-            F32 invPdf = F32_PI * invCosTheta;
-
-            lastSpecular = true;
-            transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
-        }
-#if 0
-        if (rng < material->reflectivity)
-        {
-            R = reflect(ray.direction, N);
-            lastSpecular = true;
-            transmission *= material->albedo * rrScale * mediumScale;
-        }
-        else if (rng < (material->reflectivity + material->refractivity))
-        {
-            // Assume reflect & precalculate ray
-            bool mustRefract = false;
-            R = reflect(ray.direction, N);
-
-            // Check for refraction
-            F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
-            F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
-            F32 iorRatio = n1 / n2;
-
-            F32 cosI = -ray.direction.dot(N);
-            F32 cosTheta2 = 1.0f - (iorRatio * iorRatio) * (1.0f - cosI * cosI);
-            F32 Fresnel = 1.0f;
-
-            if (cosTheta2 > 0.0f)
-            {
-                F32 a = n1 - n2, b = n1 + n2;
-                F32 r0 = (a * a) / (b * b);
-                F32 c = 1.0f - cosI;
-                F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
-
-                mustRefract = randomF32(seed) > Fresnel;
-                if (mustRefract)
-                    R = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * N);
-            }
-
-            lastSpecular = true;
-            transmission *= material->albedo * rrScale * mediumScale;
-            inMedium = mustRefract ? !inMedium : inMedium;
-        }
-        else
-        {
-            RgbColor brdf = material->albedo * F32_INV_PI;
-
             if (lightCount > 0) // Can only do NEE if there are explicit lights to be sampled
             {
                 const Instance& light = m_scene.sampleLights(seed);
@@ -522,15 +475,13 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 }
             }
 
-            R = randomOnHemisphereCosineWeighted(seed, N);
-            F32 cosTheta = N.dot(R);
+            F32 cosTheta = NL;
             F32 invCosTheta = 1.0f / cosTheta;
             F32 invPdf = F32_PI * invCosTheta;
 
             lastSpecular = false;
             transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
         }
-#endif
 
         Float3 O = I + F32_EPSILON * R;
         ray = Ray(O, R);
