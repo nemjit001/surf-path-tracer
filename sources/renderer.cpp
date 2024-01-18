@@ -26,7 +26,7 @@
 // Threshold for difference in ray counts between waves in wavefront path tracing
 #define WF_RAY_DIFF_THRESHOLD           50
 // Batch size that is allowed to be deferred to the next frame in wavefront path tracing
-#define WF_RAY_NF_BATCH_SIZE            500
+#define WF_RAY_NF_BATCH_SIZE            7'500
 // Output lumen data WARN: drops framerate to sub second on discrete GPUs
 #define WF_LUMEN_OUTPUT                 0
 
