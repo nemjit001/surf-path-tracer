@@ -192,20 +192,24 @@ void main()
 			return;
 		}
 
-		int lightCount = lights.length();
 		ShadowRayMetadata srData = shadowRays.rays[rayIdx];
 		Instance light = sceneInstance(srData.lightInstanceIdx);
 		Material hitMaterial = sceneMaterial(srData.hitInstanceIdx);
 		Material lightMaterial = sceneMaterial(srData.lightInstanceIdx);
-
-		float falloff = 1.0 / dot(srData.L, srData.L);
+		
+		float lightCount = lights.length();
+		float falloff = 1.0 / dot(srData.IL, srData.IL);
 		float cosO = dot(srData.N, srData.shadowRay.direction);
 		float cosI = dot(srData.LN, -srData.shadowRay.direction);
 
 		if (cosO > 0.0 && cosI > 0.0 && !intersectAnyTLAS(srData.shadowRay))
 		{
-			float inversePdf = cosI * light.area * falloff;
-			srData.shadowRay.energy += srData.shadowRay.transmission * inversePdf * cosO * float(lightCount) * srData.brdf * materialEmittance(lightMaterial); 
+			float SA = cosI * light.area * falloff;
+			float lPdf = 1.0 / SA;
+
+			vec3 Ld = materialEmittance(lightMaterial) * SA * srData.brdf * cosO * lightCount;
+			srData.shadowRay.energy += srData.shadowRay.transmission * Ld;
+
 			accumulator[srData.shadowRay.state.pixelIdx] += vec4(srData.shadowRay.energy, 1);
 		}
 	}

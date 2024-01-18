@@ -66,7 +66,7 @@ struct Ray
 struct ShadowRayMetadata
 {
 	Ray shadowRay;
-	vec3 L, LN;
+	vec3 IL, LN;
 	vec3 brdf, N;
 	uint hitInstanceIdx, lightInstanceIdx;
 };

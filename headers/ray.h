@@ -40,7 +40,7 @@ struct GPURay
 struct GPUShadowRayMetadata
 {
 	GPURay shadowRay;
-	Float3 L;
+	Float3 IL;
 	Float3 LN;
 	Float3 brdf;
 	Float3 N;

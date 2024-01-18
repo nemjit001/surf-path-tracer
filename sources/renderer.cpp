@@ -28,7 +28,7 @@
 // Batch size that is allowed to be deferred to the next frame in wavefront path tracing
 #define WF_RAY_NF_BATCH_SIZE            500
 // Output lumen data WARN: drops framerate to sub second on discrete GPUs
-#define WF_LUMEN_OUTPUT                 1
+#define WF_LUMEN_OUTPUT                 0
 
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :

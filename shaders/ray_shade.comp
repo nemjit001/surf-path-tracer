@@ -127,12 +127,46 @@ void main()
 	}
 	else
 	{
+		if (lightCount > 0)
+		{
+			float u = randomF32(seed), v = randomRange(seed, 0.0, 1.0 - u);
+			vec2 triCoords = vec2(u, v);
+
+			LightData lightData = lights[randomRangeU32(seed, 0, lightCount)];
+			Instance light = instances[lightData.lightInstanceIdx];
+			uint neePrimIdx = light.triOffset + randomRangeU32(seed, 0, lightData.primitiveCount);
+			vec3 LP = scaleVertexBarycentric(triangles[neePrimIdx], triCoords);
+			vec3 LN = scaleNormalBarycentric(triExtensions[neePrimIdx], triCoords);
+
+			vec4 LPt = light.transform * vec4(LP, 1);
+			vec4 LNt = light.transform * vec4(LN, 0);
+
+			LP = LPt.xyz / LPt.w;
+			LN = normalize(LNt.xyz);
+			vec3 IL = LP - I;
+			vec3 L = normalize(IL);
+
+			vec3 SO = I + F32_EPSILON * L;
+			Ray sr = newRay(SO, L);
+			copyRayMetadata(sr, ray);
+			sr.depth = length(IL) - 2.0 * F32_EPSILON;
+
+			ShadowRayMetadata srData = ShadowRayMetadata(
+				sr,
+				IL, LN,
+				brdf, N,
+				ray.hit.instanceIdx, lightData.lightInstanceIdx
+			);
+
+			shadowRays.rays[atomicAdd(shadowRayCounter.rayCount, 1)] = srData;
+		}
+
 		R = diffuseReflectCosineWeighted(seed, N);
 		float cosTheta = dot(N, R);
 		float invCosTheta = 1.0 / cosTheta;
 		float invPdf = F32_PI * invCosTheta;
 
-		ray.state.lastSpecular = true;
+		ray.state.lastSpecular = false;
 		ray.transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
 	}
 
