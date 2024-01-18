@@ -94,7 +94,7 @@ void main()
 		ray.state.lastSpecular = true;
 		ray.transmission *= material.baseColor * rrScale * mediumScale;
 	}
-	else if (rng < (material.reflectance + material.refractivity))
+	else if (rng < (material.reflectance + material.refractance))
 	{
 		bool mustRefract = false;
 		R = reflect(ray.direction, N);

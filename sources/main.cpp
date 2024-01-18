@@ -178,13 +178,12 @@ int main()
 
 	Material diffuseMaterial = Material{};
 	diffuseMaterial.baseColor = RgbColor(1.0f, 0.0f, 0.0f);
-	diffuseMaterial.roughness = 0.5f;
-	diffuseMaterial.reflectance = 0.0f;
+	diffuseMaterial.roughness = 0.99f;
 
 	Material dielectricMaterial = Material{};
 	dielectricMaterial.baseColor = RgbColor(0.7f, 0.7f, 0.2f);
 	dielectricMaterial.absorption = RgbColor(0.3f, 0.04f, 0.3f);
-	dielectricMaterial.refractivity = 1.0f;
+	dielectricMaterial.refractance = 1.0f;
 	dielectricMaterial.indexOfRefraction = 1.42f;
 	dielectricMaterial.specular = 1.0f;
 	dielectricMaterial.roughness = 0.2f;

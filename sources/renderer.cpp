@@ -379,6 +379,37 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             R = reflect(ray.direction, N);
             transmission *= material->baseColor * mediumScale * rrScale;
         }
+        else if (rng < (material->reflectance + material->refractance))
+        {
+            // Assume reflect & precalculate ray
+            bool mustRefract = false;
+            R = reflect(ray.direction, N);
+
+            // Check for refraction
+            F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
+            F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
+            F32 iorRatio = n1 / n2;
+
+            F32 cosI = -ray.direction.dot(N);
+            F32 cosTheta2 = 1.0f - (iorRatio * iorRatio) * (1.0f - cosI * cosI);
+            F32 Fresnel = 1.0f;
+
+            if (cosTheta2 > 0.0f)
+            {
+                F32 a = n1 - n2, b = n1 + n2;
+                F32 r0 = (a * a) / (b * b);
+                F32 c = 1.0f - cosI;
+                F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+
+                mustRefract = randomF32(seed) > Fresnel;
+                if (mustRefract)
+                    R = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * N);
+            }
+
+            lastSpecular = true;
+            transmission *= material->baseColor * rrScale * mediumScale;
+            inMedium = mustRefract ? !inMedium : inMedium;
+        }
         else
         {
             F32 metallic = clamp(material->metallic, 0.0f, 1.0f);

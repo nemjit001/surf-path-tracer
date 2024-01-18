@@ -9,7 +9,7 @@ struct Material
 	RgbColor baseColor = RgbColor(0.0f);
 	RgbColor absorption = RgbColor(0.0f);
 	F32 emissionStrength 			= 0.0f;
-	F32 refractivity				= 0.0f;
+	F32 refractance					= 0.0f;
 	F32 indexOfRefraction			= 1.0f;
 	F32 metallic					= 0.0f;
 	F32 specular					= 0.5f;

@@ -34,7 +34,7 @@ struct Material
 	vec3 absorption;
 	float pad;
 	float emissionStrength;
-	float refractivity;
+	float refractance;
 	float indexOfRefraction;
 	float metallic;
 	float specular;
