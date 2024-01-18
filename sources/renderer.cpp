@@ -452,136 +452,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         Float3 O = I + F32_EPSILON * R;
         ray = Ray(O, R);
         ray.inMedium = inMedium;
-#if 0
-        if (!m_scene.intersect(ray))
-        {
-            energy += transmission * m_scene.sampleBackground(ray);
-            break;
-        }
-
-        const Instance& instance = m_scene.hitInstance(ray.metadata.instanceIndex);
-        const Mesh* mesh = instance.bvh->mesh();
-        const Material* material = instance.material;
-
-        if (material->isLight())
-        {
-            energy += lastSpecular ? transmission * material->emittance() : Float3(0);
-            break;
-        }
-
-        // Calculate termination chance & new scalefor russian roulette
-        const F32 p = clamp(max(transmission.r, max(transmission.g, transmission.b)), 0.0f, 1.0f);
-        if (p < randomF32(seed))
-            break;
-
-        Float3 hitPosition = ray.hitPosition();
-        Float3 normal = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
-        Float2 textureCoordinate = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
-        const F32 rrScale = 1.0f / p;
-
-        // Handle backface hits -> normal needs to be flipped if colinear with hit direction
-        if (ray.direction.dot(normal) > 0.0f)
-            normal *= -1.0f;
-
-        Float3 mediumScale(1.0f);
-        if (ray.inMedium)
-            mediumScale = expf(material->absorption * -ray.depth);
-
-        F32 r = randomF32(seed);
-        if (r < material->reflectivity)
-        {
-            Float3 newDirection = reflect(ray.direction, normal);
-            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
-            bool wasInMedium = ray.inMedium;
-            ray = Ray(newOrigin, newDirection);
-            ray.inMedium = wasInMedium;
-
-            transmission *= material->albedo * rrScale * mediumScale;
-            lastSpecular = true;
-        }
-        else if (r < (material->reflectivity + material->refractivity))
-        {
-            F32 n1 = ray.inMedium ? material->indexOfRefraction : 1.0f;
-            F32 n2 = ray.inMedium ? 1.0f : material->indexOfRefraction;
-            F32 iorRatio = n1 / n2;
-
-            F32 cosI = -ray.direction.dot(normal);
-            F32 cosTheta2 = 1.0f - iorRatio * iorRatio * (1.0f - cosI * cosI);
-            F32 Fresnel = 1.0f;
-            if (cosTheta2 > 0.0f)
-            {
-                F32 a = n1 - n2;
-                F32 b = n1 + n2;
-                F32 r0 = (a * a) / (b * b);
-                F32 c = 1.0f - cosI;
-                F32 Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
-
-                Float3 newDirection = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * normal);
-                Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
-                bool wasInMedium = ray.inMedium;
-                ray = Ray(newOrigin, newDirection);
-                ray.inMedium = !wasInMedium;
-
-                if (randomF32(seed) > Fresnel)
-                {
-                    transmission *= material->albedo * rrScale * mediumScale;
-                    lastSpecular = true;
-                    continue;
-                }
-            }
-
-            Float3 newDirection = reflect(ray.direction, normal);
-            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
-            bool wasInMedium = ray.inMedium;
-            ray = Ray(newOrigin, newDirection);
-            ray.inMedium = wasInMedium;
-            transmission *= material->albedo * rrScale * mediumScale;
-            lastSpecular = true;
-        }
-        else
-        {
-            RgbColor brdf = material->albedo * F32_INV_PI;
-            U32 lightCount = m_scene.lightCount();
-
-            // Can use NEE if there are lights in scene
-            if (lightCount > 0)
-            {
-                const Instance& light = m_scene.sampleLights(seed);
-
-                SamplePoint lightPoint = light.samplePoint(seed);
-                Float3 L = lightPoint.position - hitPosition;
-                Float3 LN = lightPoint.normal;
-                F32 distance = L.magnitude();
-                F32 falloff = 1.0f / L.dot(L);
-
-                Float3 srDirection = L.normalize();
-                Float3 srOrigin = hitPosition + F32_EPSILON * srDirection;
-                Ray shadowRay = Ray(srOrigin, srDirection);
-                shadowRay.depth = distance - 2.0f * F32_EPSILON;
-
-                F32 cosO = normal.dot(srDirection);
-                F32 cosI = LN.dot(-1.0 * srDirection);
-                if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(shadowRay))
-                {
-                    F32 inversePdf = cosI * light.area * falloff;
-                    energy += transmission * inversePdf * cosO * static_cast<F32>(lightCount) * brdf * light.material->emittance();
-                }
-            }
-
-            Float3 newDirection = randomOnHemisphereCosineWeighted(seed, normal);
-            Float3 newOrigin = hitPosition + F32_EPSILON * newDirection;
-            bool wasInMedium = ray.inMedium;
-            ray = Ray(newOrigin, newDirection);
-            ray.inMedium = wasInMedium;
-
-            F32 cosTheta = newDirection.dot(normal);
-            F32 invCosTheta = 1.0f / cosTheta;
-            F32 inversePdf = F32_PI * invCosTheta;
-
-            transmission *= rrScale * inversePdf * cosTheta * brdf * mediumScale;
-            lastSpecular = false;
-        }
-#endif
     }
 
     return energy;
@@ -767,19 +637,11 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     wfPoolCreateInfo.queueFamilyIndex = m_context->queues.computeQueue.familyIndex;
     VK_CHECK(vkCreateCommandPool(m_context->device, &wfPoolCreateInfo, nullptr, &m_wavefrontCompute.pool));
 
-#if GPU_MEGAKERNEL == 1
-    VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    computeBufferAllocateInfo.commandPool = m_wavefrontCompute.pool;
-    computeBufferAllocateInfo.commandBufferCount = 1;
-    VK_CHECK(vkAllocateCommandBuffers(m_context->device, &computeBufferAllocateInfo, &m_wavefrontCompute.commandBuffer));
-#else
     VkCommandBufferAllocateInfo computeBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     computeBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     computeBufferAllocateInfo.commandPool = m_wavefrontCompute.pool;
     computeBufferAllocateInfo.commandBufferCount = 3;
     VK_CHECK(vkAllocateCommandBuffers(m_context->device, &computeBufferAllocateInfo, m_wavefrontCompute.wavefrontBuffers));
-#endif
 
     VkFenceCreateInfo computeReadyCreateInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     computeReadyCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -929,23 +791,6 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         0, VK_WHOLE_SIZE
     };
 
-#if GPU_MEGAKERNEL == 1
-    m_megakernelPipeline.updateDescriptorSets({
-        cameraWriteSet,
-        frameStateWriteSet,
-        accumulatorWriteSet,
-        outputImageWriteSet,
-        sceneDataWriteSet,
-        triBufWriteset,
-        triExtBufWriteset,
-        blasIdxWriteSet,
-        blasNodeWriteSet,
-        materialWriteSet,
-        instanceWriteSet,
-        tlasIdxWriteSet,
-        tlasNodeWriteSet
-    });
-#else
     // Wavefront data
     WriteDescriptorSet rayCounterWriteSet = {};
     rayCounterWriteSet.set = 1;
@@ -1020,7 +865,6 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         accumulatorWriteSet,
         outputImageWriteSet,
     });
-#endif
 
     // Create write sets for graphics pipeline pass
     WriteDescriptorSet frameImageSamplerSet = {};
@@ -1038,13 +882,8 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         frameImageSamplerSet
     });
 
-#if GPU_MEGAKERNEL == 1
-    bakeMegakernelPass(m_wavefrontCompute.commandBuffer);
-#else
     // Finalize uses fixed descriptors -> can be prebaked
     bakeFinalizePass(m_wavefrontCompute.finalizeBuffer);
-#endif
-
     clearAccumulator();
 }
 
@@ -1138,18 +977,6 @@ void WaveFrontRenderer::render(F32 deltaTime)
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT    // Wait until compute passes have completed
     };
 
-#if GPU_MEGAKERNEL == 1
-    // Submit baked megakernel pass
-    VkSubmitInfo computeSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    computeSubmit.commandBufferCount = 1;
-    computeSubmit.pCommandBuffers = &activeCompute.commandBuffer;
-    computeSubmit.waitSemaphoreCount = 1;
-    computeSubmit.pWaitSemaphores = &activeFrame.swapImageAvailable;
-    computeSubmit.pWaitDstStageMask = computeWaitStages;
-    computeSubmit.signalSemaphoreCount = 1;
-    computeSubmit.pSignalSemaphores = &activeCompute.computeFinished;
-    VK_CHECK(vkQueueSubmit(m_context->queues.computeQueue.handle, 1, &computeSubmit, activeCompute.computeReady));
-#else
     // Map ray counters during wf pass
     RayBufferCounters* pRayCounters = nullptr;
     m_rayCounters.persistentMap(reinterpret_cast<void**>(&pRayCounters));
@@ -1245,7 +1072,6 @@ void WaveFrontRenderer::render(F32 deltaTime)
 
     memset(pRayCounters, 0, sizeof(RayBufferCounters));
     m_rayCounters.unmap();
-#endif
 
     VkPipelineStageFlags gfxWaitStages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
@@ -1283,60 +1109,6 @@ void WaveFrontRenderer::render(F32 deltaTime)
     VK_CHECK(vkQueuePresentKHR(m_context->queues.presentQueue.handle, &presentInfo));
     m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
 }
-
-#if GPU_MEGAKERNEL == 1
-
-void WaveFrontRenderer::bakeMegakernelPass(VkCommandBuffer commandBuffer)
-{
-    assert(commandBuffer != VK_NULL_HANDLE);
-
-    VkCommandBufferBeginInfo cmdBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    cmdBeginInfo.flags = 0;
-    cmdBeginInfo.pInheritanceInfo = nullptr;
-
-    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
-
-    // Transition storage image to write layout
-    VkImageMemoryBarrier storageTransitionBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    storageTransitionBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    storageTransitionBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    storageTransitionBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    storageTransitionBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    storageTransitionBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    storageTransitionBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    storageTransitionBarrier.image = m_frameImage.handle();
-    storageTransitionBarrier.subresourceRange = VkImageSubresourceRange{
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        0, 1,
-        0, 1
-    };
-
-    vkCmdPipelineBarrier(
-        commandBuffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &storageTransitionBarrier
-    );
-
-    const std::vector<VkDescriptorSet>& megaKernelSets = m_megakernelPipeline.descriptorSets();
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        m_megakernelPipeline.bindPoint(),
-        m_wavefrontLayout.handle(),
-        0, static_cast<U32>(megaKernelSets.size()),
-        megaKernelSets.data(),
-        0, nullptr
-    );
-    vkCmdBindPipeline(commandBuffer, m_megakernelPipeline.bindPoint(), m_megakernelPipeline.handle());
-    vkCmdDispatch(commandBuffer, (m_renderResolution.width / 32), (m_renderResolution.height / 32) + 1, 1);
-
-    VK_CHECK(vkEndCommandBuffer(commandBuffer));
-}
-
-#else
 
 void WaveFrontRenderer::bakeRayGenPass(VkCommandBuffer commandBuffer)
 {
@@ -1560,8 +1332,6 @@ void WaveFrontRenderer::bakeFinalizePass(VkCommandBuffer commandBuffer)
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
-
-#endif
 
 void WaveFrontRenderer::recordPresentPass(VkCommandBuffer commandBuffer, const Framebuffer& framebuffer)
 {

@@ -20,7 +20,6 @@
 #include "vk_layer/sampler.h"
 
 #define FRAMES_IN_FLIGHT    3
-#define GPU_MEGAKERNEL      0
 
 struct RendererConfig
 {
@@ -71,15 +70,10 @@ struct FrameData
 struct WavefrontCompute
 {
     VkCommandPool pool;
-#if GPU_MEGAKERNEL == 1
-    VkCommandBuffer commandBuffer;
-#else
-    // raygen, loop, finalize
     union {
         struct { VkCommandBuffer rayGenBuffer, waveBuffer, finalizeBuffer; };
         VkCommandBuffer wavefrontBuffers[3];
     };
-#endif
     VkFence computeReady;
     VkSemaphore computeFinished;
 };
@@ -226,17 +220,11 @@ public:
     }
 
 private:
-#if GPU_MEGAKERNEL == 1
-    void bakeMegakernelPass(
-        VkCommandBuffer commandBuffer
-    );
-#else
     void bakeRayGenPass(VkCommandBuffer commandBuffer);
 
     void bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInputSize);
 
     void bakeFinalizePass(VkCommandBuffer commandBuffer);
-#endif
 
     void recordPresentPass(
         VkCommandBuffer commandBuffer,
@@ -281,16 +269,12 @@ private:
     // Default descriptor pool
     DescriptorPool m_descriptorPool = DescriptorPool(m_context->device);
 
-#if GPU_MEGAKERNEL == 1
-    Shader m_megakernel = Shader(m_context->device, ShaderType::Compute, "shaders/megakernel.comp.spv");
-#else
     // Wavefront kernels
     Shader m_rayGeneration  = Shader(m_context->device, ShaderType::Compute, "shaders/ray_generation.comp.spv");
     Shader m_rayExtend      = Shader(m_context->device, ShaderType::Compute, "shaders/ray_extend.comp.spv");
     Shader m_rayShade       = Shader(m_context->device, ShaderType::Compute, "shaders/ray_shade.comp.spv");
     Shader m_rayConnect     = Shader(m_context->device, ShaderType::Compute, "shaders/ray_connect.comp.spv");
     Shader m_wfFinalize     = Shader(m_context->device, ShaderType::Compute, "shaders/wavefront_finalize.comp.spv");
-#endif
 
     // Wavefront layout & pipelines
     PipelineLayout m_wavefrontLayout = PipelineLayout(m_context->device, std::vector{
@@ -327,15 +311,11 @@ private:
         },
     });
 
-#if GPU_MEGAKERNEL == 1
-    ComputePipeline m_megakernelPipeline = ComputePipeline(m_context->device, m_descriptorPool, m_wavefrontLayout, &m_megakernel);
-#else
     ComputePipeline m_rayGenPipeline        = ComputePipeline(m_context->device, m_descriptorPool, m_wavefrontLayout, &m_rayGeneration);
     ComputePipeline m_rayExtPipeline        = ComputePipeline(m_context->device, m_descriptorPool, m_wavefrontLayout, &m_rayExtend);
     ComputePipeline m_rayShadePipeline      = ComputePipeline(m_context->device, m_descriptorPool, m_wavefrontLayout, &m_rayShade);
     ComputePipeline m_rayConnectPipeline    = ComputePipeline(m_context->device, m_descriptorPool, m_wavefrontLayout, &m_rayConnect);
     ComputePipeline m_wfFinalizePipeline    = ComputePipeline(m_context->device, m_descriptorPool, m_wavefrontLayout, &m_wfFinalize);
-#endif
 
     // Compute descriptors
     Buffer m_cameraUBO = Buffer(
@@ -370,7 +350,6 @@ private:
         VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     );
 
-#if GPU_MEGAKERNEL != 1
     // Size is 2 * render resolution to ensure large enough buffers for generated rays in flight
     const SizeType c_rayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
     const SizeType c_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRayMetadata);
@@ -409,7 +388,6 @@ private:
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         0
     );
-#endif
 
     // Present shaders
     Shader m_presentVert    = Shader(m_context->device, ShaderType::Vertex, "shaders/fs_quad.vert.spv");
