@@ -377,6 +377,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (rng < material->reflectance)
         {
             R = reflect(ray.direction, N);
+            lastSpecular = true;
             transmission *= material->baseColor * mediumScale * rrScale;
         }
         else if (rng < (material->reflectance + material->refractance))
@@ -412,28 +413,23 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         }
         else
         {
-            F32 metallic = clamp(material->metallic, 0.0f, 1.0f);
-            F32 specular = clamp(material->specular, 0.0f, 1.0f);
-            F32 roughness = clamp(material->roughness, 0.0f, 1.0f);
-            F32 reflectance = clamp(material->reflectance, 0.0f, 1.0f);
-
             Float3 V = -1.0f * ray.direction;
-            R = randomOnHemisphere(seed, N);
+            R = randomOnHemisphereCosineWeighted(seed, N);
             Float3 H = (V + R).normalize();
             F32 NV = clamp(N.dot(V), F32_EPSILON, 1.0f - F32_EPSILON);
             F32 NL = clamp(N.dot(R), F32_EPSILON, 1.0f - F32_EPSILON);
             F32 NH = clamp(N.dot(H), F32_EPSILON, 1.0f - F32_EPSILON);
             F32 VH = clamp(V.dot(H), F32_EPSILON, 1.0f - F32_EPSILON);
 
-            Float3 F0 = Float3(0.16f * reflectance * reflectance);
-            F0 = lerp(F0, material->baseColor, metallic);
+            Float3 F0 = Float3(0.16f * material->reflectance * material->reflectance);
+            F0 = lerp(F0, material->baseColor, material->metallic);
 
             // Schlick's reflectance approximation
             F32 c = 1.0f - VH;
             RgbColor F = F0 + (1.0f - F0) * (c * c * c * c * c);
 
             // GGX normal distribution
-            F32 a = roughness * roughness;
+            F32 a = material->roughness * material->roughness;
             F32 a2 = a * a;
             F32 NH2 = NH * NH;
             F32 b = NH2 * (a2 - 1.0f) + 1.0f;
@@ -445,15 +441,17 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             F32 G1V = NV / (NV * (1.0f - k) + k);
             F32 G = G1L * G1V;
 
-            RgbColor diffuseBaseColor = (1.0f - F) * (1.0f - metallic) * material->baseColor;
+            RgbColor diffuseBaseColor = (1.0f - F) * (1.0f - material->metallic) * material->baseColor;
 
             RgbColor specularBrdf = (F * D * G) / (4.0f * NL * NV);
             RgbColor diffuseBrdf = diffuseBaseColor * F32_INV_PI;
             RgbColor brdf = diffuseBrdf + specularBrdf;
 
             F32 cosTheta = NL;
-            F32 invPdf = F32_2PI;
+            F32 invCosTheta = 1.0f / cosTheta;
+            F32 invPdf = F32_PI * invCosTheta;
 
+            lastSpecular = true;
             transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
         }
 #if 0
