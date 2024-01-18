@@ -368,7 +368,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         F32 rng = randomF32(seed);
 
         Float3 R = Float3(0);
-        RgbColor brdf = material->albedo * F32_INV_PI;
         bool inMedium = ray.inMedium;
 
         // Flip normal on backface hits
@@ -414,6 +413,8 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         }
         else
         {
+            RgbColor brdf = material->albedo * F32_INV_PI;
+
             if (lightCount > 0) // Can only do NEE if there are explicit lights to be sampled
             {
                 const Instance& light = m_scene.sampleLights(seed);
