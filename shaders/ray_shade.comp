@@ -13,10 +13,10 @@ layout(set = 0, binding = 1) uniform FrameState
 layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
 layout(set = 1, binding = 0) coherent buffer RayCounters 					{ int rayIn; int rayOut; } rayCounters;
-layout(set = 1, binding = 1) coherent buffer RayInBuffer 					{ Ray rays[]; } rayIn;
 layout(set = 1, binding = 2) coherent buffer RayOutBuffer 					{ Ray rays[]; } rayOut;
 layout(set = 1, binding = 3) coherent writeonly buffer ShadowRayCounter 	{ int rayCount; } shadowRayCounter;
 layout(set = 1, binding = 4) coherent writeonly buffer ShadowRayBuffer 		{ ShadowRayMetadata rays[]; } shadowRays;
+layout(set = 1, binding = 5) coherent buffer MatEvalRayBuffer 				{ int counter; Ray rays[]; } matEvalRays;
 
 layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
 layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
@@ -47,21 +47,14 @@ void main()
 		gl_GlobalInvocationID.z * GlobalWorkGroupSize.x * GlobalWorkGroupSize.y;
 
 	uint seed = initSeed(InvocationIndex1D + frameState.totalSamples * 1799);
-	int rayIdx = atomicAdd(rayCounters.rayIn, -1) - 1;
+	int rayIdx = atomicAdd(matEvalRays.counter, -1) - 1;
 	if (rayIdx < 0)
 	{
-		atomicMax(rayCounters.rayIn, 0);
+		atomicMax(matEvalRays.counter, 0);
 		return;
 	}
 
-	Ray ray = rayIn.rays[rayIdx];
-	if (ray.depth == F32_FAR_AWAY)
-	{
-		ray.energy += ray.transmission * sampleSkyColor(ray, sceneData.background);
-		accumulator[ray.state.pixelIdx] += vec4(ray.energy, 1);
-		return;
-	}
-
+	Ray ray = matEvalRays.rays[rayIdx];
 	Material material = sceneMaterial(ray);
 	if (materialIsLight(material))
 	{

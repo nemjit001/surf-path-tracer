@@ -817,6 +817,14 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     shadowRayBufferWriteSet.bufferInfo.offset = 0;
     shadowRayBufferWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
 
+    WriteDescriptorSet matEvalRayBufferWriteSet = {};
+    matEvalRayBufferWriteSet.set = 1;
+    matEvalRayBufferWriteSet.binding = 5;
+    matEvalRayBufferWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    matEvalRayBufferWriteSet.bufferInfo.buffer = m_materialEvalRayBuffer.handle();
+    matEvalRayBufferWriteSet.bufferInfo.offset = 0;
+    matEvalRayBufferWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
     // Update all compute pipeline descriptor sets
     m_rayGenPipeline.updateDescriptorSets({
         cameraWriteSet,
@@ -825,7 +833,10 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
     });
 
     m_rayExtPipeline.updateDescriptorSets({
+        accumulatorWriteSet,
         rayCounterWriteSet,
+        matEvalRayBufferWriteSet,
+        sceneDataWriteSet,
         triBufWriteset,
         blasIdxWriteSet, blasNodeWriteSet,
         instanceWriteSet,
@@ -836,6 +847,7 @@ WaveFrontRenderer::WaveFrontRenderer(RenderContext* renderContext, UIManager* ui
         frameStateWriteSet,
         accumulatorWriteSet,
         rayCounterWriteSet,
+        matEvalRayBufferWriteSet,
         shadowRayCounterWriteSet,
         shadowRayBufferWriteSet,
         sceneDataWriteSet,
@@ -1231,13 +1243,14 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInput
     }
 
     VkBufferMemoryBarrier2 extendShadeBufferBarriers[] = {
+        accumulatorBarrier,
         rayCounterBarrier,
         buffer0Barrier,
         buffer1Barrier,
     };
 
     VkDependencyInfo extendShadeDependency = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-    extendShadeDependency.bufferMemoryBarrierCount = 3;
+    extendShadeDependency.bufferMemoryBarrierCount = 4;
     extendShadeDependency.pBufferMemoryBarriers = extendShadeBufferBarriers;
     vkCmdPipelineBarrier2(commandBuffer, &extendShadeDependency);
 
