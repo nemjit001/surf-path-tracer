@@ -171,21 +171,31 @@ int main()
 	BvhBLAS planeBVH(&planeMesh);
 
 	Material floorMaterial = Material{};
-	floorMaterial.albedo = RgbColor(0.8f);
-	floorMaterial.reflectivity = 0.01f;
+	floorMaterial.baseColor = RgbColor(0.8f);
+	floorMaterial.specular = 0.5f;
+	floorMaterial.roughness = 0.8f;
+	floorMaterial.reflectance = 0.1f;
 
 	Material diffuseMaterial = Material{};
-	diffuseMaterial.albedo = RgbColor(1.0f, 0.0f, 0.0f);
+	diffuseMaterial.baseColor = RgbColor(1.0f, 0.0f, 0.0f);
+	diffuseMaterial.roughness = 0.5f;
+	diffuseMaterial.reflectance = 0.0f;
 
 	Material dielectricMaterial = Material{};
-	dielectricMaterial.albedo = RgbColor(0.7f, 0.7f, 0.2f);
+	dielectricMaterial.baseColor = RgbColor(0.7f, 0.7f, 0.2f);
 	dielectricMaterial.absorption = RgbColor(0.3f, 0.04f, 0.3f);
 	dielectricMaterial.refractivity = 1.0f;
 	dielectricMaterial.indexOfRefraction = 1.42f;
+	dielectricMaterial.specular = 1.0f;
+	dielectricMaterial.roughness = 0.2f;
+	dielectricMaterial.reflectance = 0.0f;
 
 	Material specularMaterial = Material{};
-	specularMaterial.albedo = RgbColor(0.2f, 0.9f, 1.0f);
-	specularMaterial.reflectivity = 0.8f;
+	specularMaterial.baseColor = RgbColor(0.2f, 0.9f, 1.0f);
+	specularMaterial.metallic = 1.0f;
+	specularMaterial.specular = 0.5f;
+	specularMaterial.roughness = 0.2f;
+	specularMaterial.reflectance = 0.5f;
 
 	Material lightMaterial = Material{};
 	lightMaterial.emissionColor = RgbColor(1.0f, 1.0f, 0.7f);

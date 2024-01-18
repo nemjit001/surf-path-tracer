@@ -29,13 +29,17 @@ struct SceneBackground
 
 struct Material
 {
+	vec3 emissionColor;
+	vec3 baseColor;
+	vec3 absorption;
+	float pad;
 	float emissionStrength;
-	float reflectivity;
 	float refractivity;
 	float indexOfRefraction;
-	vec3 emissionColor;
-	vec3 albedo;
-	vec3 absorption;
+	float metallic;
+	float specular;
+	float roughness;
+	float reflectance;
 };
 
 struct RayState

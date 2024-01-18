@@ -88,13 +88,13 @@ void main()
 	if (dot(ray.direction, N) > 0.0f)
 		N *= -1;
 
-	if (rng < material.reflectivity)
+	if (rng < material.reflectance)
 	{
 		R = reflect(ray.direction, N);
 		ray.state.lastSpecular = true;
-		ray.transmission *= material.albedo * rrScale * mediumScale;
+		ray.transmission *= material.baseColor * rrScale * mediumScale;
 	}
-	else if (rng < (material.reflectivity + material.refractivity))
+	else if (rng < (material.reflectance + material.refractivity))
 	{
 		bool mustRefract = false;
 		R = reflect(ray.direction, N);
@@ -120,12 +120,12 @@ void main()
 		}
 
 		ray.state.lastSpecular = true;
-		ray.transmission *= material.albedo * rrScale * mediumScale;
+		ray.transmission *= material.baseColor * rrScale * mediumScale;
 		ray.state.inMedium = mustRefract ? !ray.state.inMedium : ray.state.inMedium;
 	}
 	else
 	{
-		vec3 brdf = material.albedo * F32_INV_PI;
+		vec3 brdf = material.baseColor * F32_INV_PI;
 
 		if (lightCount > 0)
 		{

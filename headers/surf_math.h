@@ -100,6 +100,11 @@ inline Float2 clamp(const Float2& a, F32 min, F32 max) { return Float2(clamp(a.x
 inline Float3 clamp(const Float3& a, F32 min, F32 max) { return Float3(clamp(a.x, min, max), clamp(a.y, min, max), clamp(a.z, min, max)); }
 inline Float4 clamp(const Float4& a, F32 min, F32 max) { return Float4(clamp(a.x, min, max), clamp(a.y, min, max), clamp(a.z, min, max), clamp(a.w, min, max)); }
 
+inline F32 lerp(F32 a, F32 b, F32 alpha) { return (1.0f - alpha) * a + alpha * b; }
+inline Float2 lerp(const Float2& a, const Float2& b, F32 alpha) { return Float2(lerp(a.x, b.x, alpha), lerp(a.y, b.y, alpha)); }
+inline Float3 lerp(const Float3& a, const Float3& b, F32 alpha) { return Float3(lerp(a.x, b.x, alpha), lerp(a.y, b.y, alpha), lerp(a.z, b.z, alpha)); }
+inline Float4 lerp(const Float4& a, const Float4& b, F32 alpha) { return Float4(lerp(a.x, b.x, alpha), lerp(a.y, b.y, alpha), lerp(a.z, b.z, alpha), lerp(a.w, b.w, alpha)); }
+
 inline Float2 expf(const Float2& a) { return Float2(expf(a.x), expf(a.y)); }
 inline Float3 expf(const Float3& a) { return Float3(expf(a.x), expf(a.y), expf(a.z)); }
 inline Float4 expf(const Float4& a) { return Float4(expf(a.x), expf(a.y), expf(a.z), expf(a.w)); }
