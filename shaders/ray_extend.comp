@@ -7,10 +7,13 @@
 #define TLAS_ROOT_IDX			0
 #define TRAVERSAL_STACK_SIZE 	64
 
-layout(set = 1, binding = 0) coherent buffer RayCounters 	{ int rayIn; int rayOut; } rayCounters;
-layout(set = 1, binding = 1) coherent buffer RayInBuffer 	{ Ray rays[]; } rayIn;
-layout(set = 1, binding = 2) coherent buffer RayOutBuffer 	{ Ray rays[]; } rayOut;
+layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
+layout(set = 1, binding = 0) coherent buffer RayCounters 		{ int rayIn; int rayOut; } rayCounters;
+layout(set = 1, binding = 1) coherent buffer RayInBuffer 		{ Ray rays[]; } rayIn;
+layout(set = 1, binding = 5) coherent buffer MatEvalRayBuffer 	{ int counter; Ray rays[]; } matEvalRays;
+
+layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
 layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
 layout(set = 2, binding = 3) readonly buffer BLASIndexBuffer 	{ uint blasIndices[]; };
 layout(set = 2, binding = 4) readonly buffer BLASNodeBuffer 	{ BvhNode blasNodes[]; };
@@ -163,5 +166,20 @@ bool intersectTLAS(inout Ray ray)
 
 void main()
 {
-	intersectTLAS(rayIn.rays[gl_GlobalInvocationID.x]);
+	int rayIdx = atomicAdd(rayCounters.rayIn, -1) - 1;
+	if (rayIdx < 0)
+	{
+		atomicMax(rayCounters.rayIn, 0);
+		return;
+	}
+
+	Ray ray = rayIn.rays[rayIdx];
+	if (!intersectTLAS(ray))
+	{
+		ray.energy += ray.transmission * sampleSkyColor(ray, sceneData.background);
+		accumulator[ray.state.pixelIdx] += vec4(ray.energy, 1);
+		return;
+	}
+
+	matEvalRays.rays[atomicAdd(matEvalRays.counter, 1)] = ray;
 }
