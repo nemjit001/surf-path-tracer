@@ -378,7 +378,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         {
             R = reflect(ray.direction, N);
             lastSpecular = true;
-            transmission *= material->albedo * rrScale * mediumScale;
+            transmission *= material->albedo * mediumScale * rrScale;
         }
         else if (rng < (material->reflectivity + material->refractivity))
         {
@@ -408,11 +408,14 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             }
 
             lastSpecular = true;
-            transmission *= material->albedo * rrScale * mediumScale;
+            transmission *= material->albedo * mediumScale * rrScale;
             inMedium = mustRefract ? !inMedium : inMedium;
         }
         else
         {
+            R = randomOnHemisphereCosineWeighted(seed, N);
+            F32 cosTheta = N.dot(R);
+            F32 diffusePDF = cosTheta * F32_INV_PI;
             RgbColor brdf = material->albedo * F32_INV_PI;
 
             if (lightCount > 0) // Can only do NEE if there are explicit lights to be sampled
@@ -431,21 +434,22 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                 F32 falloff = 1.0f / IL.dot(IL);
                 F32 cosO = N.dot(L);
                 F32 cosI = LN.dot(-1.0f * L);
-                if (cosO > 0.0f && cosI > 0.0f && !m_scene.intersectAny(sr))
+
+                if (cosO > 0.0f && cosI > 0.0f)
                 {
                     F32 SA = cosI * light.area * falloff;
-                    F32 lPdf = 1.0f / SA;
+                    F32 lightPDF = 1.0f / SA;
 
-                    Float3 Ld = light.material->emittance() * SA * brdf * cosO * static_cast<F32>(lightCount);
-                    energy += transmission * Ld;
+                    if (!m_scene.intersectAny(sr))
+                    {
+                        F32 invPdf = 1.0f / lightPDF;
+                        Float3 Ld = light.material->emittance() * invPdf * brdf * cosO * static_cast<F32>(lightCount);
+                        energy += transmission * Ld * rrScale;
+                    }
                 }
             }
 
-            R = randomOnHemisphereCosineWeighted(seed, N);
-            F32 cosTheta = N.dot(R);
-            F32 invCosTheta = 1.0f / cosTheta;
-            F32 invPdf = F32_PI * invCosTheta;
-
+            F32 invPdf = 1.0f / diffusePDF;
             lastSpecular = false;
             transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
         }

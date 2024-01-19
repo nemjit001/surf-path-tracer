@@ -13,8 +13,8 @@
 
 struct AABB
 {
-	Float3 bbMin	= Float3(F32_INF);
-	Float3 bbMax	= Float3(F32_NEG_INF);
+	ALIGN(16) Float3 bbMin	= Float3(F32_INF);
+	ALIGN(16) Float3 bbMax	= Float3(F32_NEG_INF);
 
 	void grow(const Float3& point);
 
@@ -35,8 +35,8 @@ struct BvhBin
 
 struct BvhNode
 {
-	U32 leftFirst;
-	U32 count;
+	ALIGN(4) U32 leftFirst;
+	ALIGN(4) U32 count;
 	AABB boundingBox;
 
 	inline U32 left() const { return leftFirst; }
@@ -92,13 +92,13 @@ private:
 
 struct GPUInstance
 {
-	U32 triOffset;			// Index offset into triangle array
-	U32 bvhIdxOffset;		// Index offset into BVH GPU index array
-	U32 bvhNodeOffset;		// Index offset into BVH GPU node array
-	U32 materialOffset;		// Index offset into material GPU array
-	F32 area;
+	ALIGN(4)  U32 triOffset;			// Index offset into triangle array
+	ALIGN(4)  U32 bvhIdxOffset;			// Index offset into BVH GPU index array
+	ALIGN(4)  U32 bvhNodeOffset;		// Index offset into BVH GPU node array
+	ALIGN(4)  U32 materialOffset;		// Index offset into material GPU array
+	ALIGN(4)  F32 area;
 	ALIGN(16) Mat4 transform;
-	Mat4 invTransform;
+	ALIGN(16) Mat4 invTransform;
 };
 
 struct SamplePoint

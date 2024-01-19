@@ -22,7 +22,7 @@
 #define F32_INV_2PI		0.15915494309189533576888f
 #define F32_2PI			6.28318530717958647692528f
 
-struct ALIGN(8) Float2
+struct ALIGN(4) Float2
 {
 	union {
 		struct { F32 x, y; };
@@ -42,7 +42,7 @@ struct ALIGN(8) Float2
 	inline operator glm::vec2() const { return glm::vec2(x, y); }
 };
 
-struct ALIGN(16) Float3
+struct ALIGN(4) Float3
 {
 	union {
 		struct { F32 x, y, z; };
@@ -64,7 +64,7 @@ struct ALIGN(16) Float3
 	inline operator glm::vec3() const { return glm::vec3(x, y, z); }
 };
 
-struct ALIGN(16) Float4
+struct ALIGN(8) Float4
 {
 	union {
 		struct { F32 x, y, z, w; };

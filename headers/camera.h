@@ -11,11 +11,11 @@
 // GLSL UBO format for camera data
 struct CameraUBO
 {
-	Float3 position;
-	Float3 up, fwd, right;
-	Float3 firstPixel, uVector, vVector;
-	Float2 resolution;
-	F32 focalLength, defocusAngle;
+	ALIGN(16) Float3 position;
+	ALIGN(16) Float3 up, fwd, right;
+	ALIGN(16) Float3 firstPixel, uVector, vVector;
+	ALIGN(8)  Float2 resolution;
+	ALIGN(4)  F32 focalLength, defocusAngle;
 };
 
 struct ViewPlane

@@ -17,9 +17,12 @@ enum class BackgroundType
 
 struct SceneBackground
 {
-	BackgroundType type;
-	RgbColor color;
-	struct { RgbColor colorA; RgbColor colorB; } gradient;
+	ALIGN(4)  BackgroundType type;
+	ALIGN(16) RgbColor color;
+	struct {
+		ALIGN(16) RgbColor colorA;
+		ALIGN(16) RgbColor colorB;
+	} gradient;
 };
 
 class IScene
@@ -63,8 +66,8 @@ private:
 
 struct GPULightData
 {
-	U32 lightInstanceIdx;
-	U32 primitiveCount;
+	ALIGN(4) U32 lightInstanceIdx;
+	ALIGN(4) U32 primitiveCount;
 };
 
 struct GPUBatchInfo

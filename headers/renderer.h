@@ -46,20 +46,20 @@ struct AccumulatorState
 
 struct FrameStateUBO
 {
-    U32 samplesPerFrame     = 0;
-    U32 totalSamples        = 0;
+    ALIGN(4) U32 samplesPerFrame     = 0;
+    ALIGN(4) U32 totalSamples        = 0;
 };
 
 struct RayBufferCounters
 {
-    I32 rayIn;
-    I32 rayOut;
+    ALIGN(4) I32 rayIn;
+    ALIGN(4) I32 rayOut;
 };
 
 struct ShadowRayCounter
 {
-    I32 rayCount;
-    bool extendBuffer;
+    ALIGN(4) I32 rayCount;
+    ALIGN(4) bool extendBuffer;
 };
 
 struct FrameData
@@ -398,7 +398,7 @@ private:
     );
 
     Buffer m_materialEvalRayBuffer = Buffer(
-        m_context->allocator, c_rayBufferSize + sizeof(I32),
+        m_context->allocator, (4 * sizeof(U32)) + c_rayBufferSize,
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         0

@@ -198,13 +198,13 @@ void main()
 		float cosO = dot(srData.N, shadowRay.direction);
 		float cosI = dot(srData.LN, -shadowRay.direction);
 
-		if (cosO > 0.0 && cosI > 0.0 && !intersectAnyTLAS(shadowRay))
+		if (!intersectAnyTLAS(shadowRay))
 		{
 			float SA = cosI * light.area * falloff;
-			float lPdf = 1.0 / SA;
+			float lightPDF = 1.0 / SA;
 
 			vec3 Ld = materialEmittance(lightMaterial) * SA * srData.brdf * cosO * lightCount;
-			shadowRay.energy += shadowRay.transmission * Ld;
+			shadowRay.energy += shadowRay.transmission * Ld * (lightPDF / srData.PDFSum);
 
 			accumulator[shadowRay.state.pixelIdx] += vec4(shadowRay.energy, 1);
 		}

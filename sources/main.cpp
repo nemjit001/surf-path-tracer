@@ -32,7 +32,7 @@
 #define NUM_SMOOTH_FRAMES	20	// Number of frames to smooth FPS / frame timing over
 
 #define FRAMEDATA_OUTPUT		1
-#define GPU_PATH_TRACING		1
+#define GPU_PATH_TRACING		0
 
 void handleCameraInput(GLFWwindow* window, Camera& camera, F32 deltaTime, bool& updated)
 {
@@ -354,7 +354,7 @@ int main()
 	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0, wallL, wallR, wallTop, wallFront, wallBack });
 
 	RendererConfig rendererConfig = RendererConfig{
-		5,	// Max bounces
+		7,	// Max bounces
 		uiState.spp
 	};
 
@@ -363,7 +363,7 @@ int main()
 	GPUScene scene(&renderContext, background, { floor, cubeL, cubeR, susanne0, susanne1, lens0, wallL, wallR, wallTop, wallFront, wallBack });
 
 	RendererConfig rendererConfig = RendererConfig{
-		5,	// Max bounces
+		7,	// Max bounces
 		uiState.spp
 	};
 

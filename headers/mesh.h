@@ -11,10 +11,10 @@
 
 struct Triangle
 {
-	Float3 v0;
-	Float3 v1;
-	Float3 v2;
-	Float3 centroid;
+	ALIGN(16) Float3 v0;
+	ALIGN(16) Float3 v1;
+	ALIGN(16) Float3 v2;
+	ALIGN(16) Float3 centroid;
 
 	Triangle(Float3 v1, Float3 v0, Float3 v2);
 
@@ -25,8 +25,8 @@ struct Triangle
 
 struct TriExtension
 {
-	Float3 n0, n1, n2;
-	Float2 uv0, uv1, uv2;
+	ALIGN(16) Float3 n0, n1, n2;
+	ALIGN(8)  Float2 uv0, uv1, uv2;
 };
 
 class Mesh
