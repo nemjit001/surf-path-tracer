@@ -61,14 +61,15 @@ vec3 generateDirection(inout uint seed, vec3 origin, float xPixel, float yPixel)
 
 void main()
 {
-	uint xPixel = gl_GlobalInvocationID.x;
-	uint yPixel = gl_GlobalInvocationID.y;
-	uint pixelIdx = xPixel + (yPixel * (gl_NumWorkGroups.x * gl_WorkGroupSize.x));
-	uint pixelSeed = initSeed(pixelIdx + frameState.totalSamples * 1799);
+	const uint xPixel = gl_GlobalInvocationID.x;
+	const uint yPixel = gl_GlobalInvocationID.y;
 
 	// Only generate enough rays for resolution
-	if (pixelIdx >= camera.resolution.x * camera.resolution.y)
+	if (xPixel >= camera.resolution.x || yPixel >= camera.resolution.y)
 		return;
+
+	const uint pixelIdx = uint(dot(gl_GlobalInvocationID, uvec3(1, camera.resolution.x, camera.resolution.x * camera.resolution.y)));
+	uint pixelSeed = initSeed(pixelIdx + frameState.totalSamples * 1799);
 
 	vec3 origin = camera.position + sampleDefocusDisk(pixelSeed);
 	vec3 direction = generateDirection(pixelSeed, origin, xPixel, yPixel);

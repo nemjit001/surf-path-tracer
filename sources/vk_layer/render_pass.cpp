@@ -101,6 +101,8 @@ RenderPass& RenderPass::operator=(RenderPass&& other) noexcept
     this->m_device = other.m_device;
     this->m_renderPass = other.m_renderPass;
 
+    other.m_renderPass = VK_NULL_HANDLE;
+
     return *this;
 }
 

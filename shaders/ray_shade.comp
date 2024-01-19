@@ -10,11 +10,11 @@ layout(set = 0, binding = 1) uniform FrameState
 	uint totalSamples;
 } frameState;
 
-layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
+layout(set = 0, binding = 2) coherent buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
 layout(set = 1, binding = 0) coherent buffer RayCounters 					{ int rayIn; int rayOut; } rayCounters;
-layout(set = 1, binding = 2) coherent buffer RayOutBuffer 					{ Ray rays[]; } rayOut;
-layout(set = 1, binding = 3) coherent writeonly buffer ShadowRayCounter 	{ int rayCount; } shadowRayCounter;
+layout(set = 1, binding = 2) coherent writeonly buffer RayOutBuffer 		{ Ray rays[]; } rayOut;
+layout(set = 1, binding = 3) coherent buffer ShadowRayCounter 				{ int rayCount; bool extendBuffer; } shadowRayCounter;
 layout(set = 1, binding = 4) coherent writeonly buffer ShadowRayBuffer 		{ ShadowRayMetadata rays[]; } shadowRays;
 layout(set = 1, binding = 5) coherent buffer MatEvalRayBuffer 				{ int counter; Ray rays[]; } matEvalRays;
 
@@ -30,7 +30,9 @@ layout(local_size_x = 32, local_size_y = 32) in;
 vec3 sceneNormal(Ray ray)
 {
 	Instance instance = instances[ray.hit.instanceIdx];
-	return scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray.hit.hitCoords);
+	vec3 N = scaleNormalBarycentric(triExtensions[instance.triOffset + ray.hit.primitiveIdx], ray.hit.hitCoords);
+	vec4 Nt = instance.transform * vec4(N, 0);
+	return normalize(Nt.xyz);
 }
 
 Material sceneMaterial(Ray ray)
@@ -47,124 +49,132 @@ void main()
 		gl_GlobalInvocationID.z * GlobalWorkGroupSize.x * GlobalWorkGroupSize.y;
 
 	uint seed = initSeed(InvocationIndex1D + frameState.totalSamples * 1799);
-	int rayIdx = atomicAdd(matEvalRays.counter, -1) - 1;
-	if (rayIdx < 0)
+
+	while (true)
 	{
-		atomicMax(matEvalRays.counter, 0);
-		return;
-	}
-
-	Ray ray = matEvalRays.rays[rayIdx];
-	Material material = sceneMaterial(ray);
-	if (materialIsLight(material))
-	{
-		ray.energy += ray.state.lastSpecular ? ray.transmission * materialEmittance(material) : vec3(0);
-		accumulator[ray.state.pixelIdx] += vec4(ray.energy, 1);
-		return;
-	}
-
-	vec3 mediumScale = vec3(1.0);
-	if (ray.state.inMedium)
-		mediumScale = exp(material.absorption * -ray.depth);
-
-	float p = clamp(max(ray.transmission.r, max(ray.transmission.g, ray.transmission.b)), 0.0, 1.0);
-	if (p < randomF32(seed))
-		return;
-
-	vec3 I = rayHitPosition(ray);
-	vec3 N = sceneNormal(ray);
-	uint lightCount = lights.length();
-	float rrScale = 1.0 / p;
-	float rng = randomF32(seed);
-	vec3 R = vec3(0);
-
-	if (dot(ray.direction, N) > 0.0f)
-		N *= -1;
-
-	if (rng < material.reflectivity)
-	{
-		R = reflect(ray.direction, N);
-		ray.state.lastSpecular = true;
-		ray.transmission *= material.albedo * rrScale * mediumScale;
-	}
-	else if (rng < (material.reflectivity + material.refractivity))
-	{
-		bool mustRefract = false;
-		R = reflect(ray.direction, N);
-
-		float n1 = ray.state.inMedium ? material.indexOfRefraction : 1.0;
-        float n2 = ray.state.inMedium ? 1.0 : material.indexOfRefraction;
-        float iorRatio = n1 / n2;
-
-        float cosI = dot(-ray.direction, N);
-        float cosTheta2 = 1.0 - (iorRatio * iorRatio) * (1.0 - cosI * cosI);
-        float Fresnel = 1.0;
-
-		if (cosTheta2 > 0.0f)
-        {
-			float a = n1 - n2, b = n1 + n2;
-            float r0 = (a * a) / (b * b);
-            float c = 1.0f - cosI;
-            float Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
-
-			mustRefract = randomF32(seed) > Fresnel;
-            if (mustRefract)
-                R = iorRatio * ray.direction + ((iorRatio * cosI - sqrt(abs(cosTheta2))) * N);
-		}
-
-		ray.state.lastSpecular = true;
-		ray.transmission *= material.albedo * rrScale * mediumScale;
-		ray.state.inMedium = mustRefract ? !ray.state.inMedium : ray.state.inMedium;
-	}
-	else
-	{
-		vec3 brdf = material.albedo * F32_INV_PI;
-
-		if (lightCount > 0)
+		int rayIdx = atomicAdd(matEvalRays.counter, -1) - 1;
+		if (rayIdx < 0)
 		{
-			float u = randomF32(seed), v = randomRange(seed, 0.0, 1.0 - u);
-			vec2 triCoords = vec2(u, v);
-
-			LightData lightData = lights[randomRangeU32(seed, 0, lightCount)];
-			Instance light = instances[lightData.lightInstanceIdx];
-			uint neePrimIdx = light.triOffset + randomRangeU32(seed, 0, lightData.primitiveCount);
-			vec3 LP = scaleVertexBarycentric(triangles[neePrimIdx], triCoords);
-			vec3 LN = scaleNormalBarycentric(triExtensions[neePrimIdx], triCoords);
-
-			vec4 LPt = light.transform * vec4(LP, 1);
-			vec4 LNt = light.transform * vec4(LN, 0);
-
-			LP = LPt.xyz / LPt.w;
-			LN = normalize(LNt.xyz);
-			vec3 IL = LP - I;
-			vec3 L = normalize(IL);
-
-			vec3 SO = I + F32_EPSILON * L;
-			Ray sr = newRay(SO, L);
-			copyRayMetadata(sr, ray);
-			sr.depth = length(IL) - 2.0 * F32_EPSILON;
-
-			ShadowRayMetadata srData = ShadowRayMetadata(
-				sr,
-				IL, LN,
-				brdf, N,
-				ray.hit.instanceIdx, lightData.lightInstanceIdx
-			);
-
-			shadowRays.rays[atomicAdd(shadowRayCounter.rayCount, 1)] = srData;
+			atomicMax(matEvalRays.counter, 0);
+			return;
 		}
 
-		R = diffuseReflectCosineWeighted(seed, N);
-		float cosTheta = dot(N, R);
-		float invCosTheta = 1.0 / cosTheta;
-		float invPdf = F32_PI * invCosTheta;
+		Ray ray = matEvalRays.rays[rayIdx];
+		Material material = sceneMaterial(ray);
+		if (materialIsLight(material))
+		{
+			ray.energy += ray.state.lastSpecular ? ray.transmission * materialEmittance(material) : vec3(0);
+			accumulator[ray.state.pixelIdx] += vec4(ray.energy, 1);
+			return;
+		}
 
-		ray.state.lastSpecular = false;
-		ray.transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
+		vec3 mediumScale = vec3(1.0);
+		if (ray.state.inMedium)
+			mediumScale = exp(material.absorption * -ray.depth);
+
+		float p = clamp(max(ray.transmission.r, max(ray.transmission.g, ray.transmission.b)), 0.0, 1.0);
+		if (p < randomF32(seed))
+			return;
+
+		vec3 I = rayHitPosition(ray);
+		vec3 N = sceneNormal(ray);
+		uint lightCount = lights.length();
+		float rrScale = 1.0 / p;
+		float rng = randomF32(seed);
+		vec3 R = vec3(0);
+
+		if (dot(ray.direction, N) > 0.0f)
+			N *= -1;
+
+		if (rng < material.reflectivity)
+		{
+			R = reflect(ray.direction, N);
+			ray.state.lastSpecular = true;
+			ray.transmission *= material.albedo * rrScale * mediumScale;
+		}
+		else if (rng < (material.reflectivity + material.refractivity))
+		{
+			bool mustRefract = false;
+			R = reflect(ray.direction, N);
+
+			float n1 = ray.state.inMedium ? material.indexOfRefraction : 1.0;
+			float n2 = ray.state.inMedium ? 1.0 : material.indexOfRefraction;
+			float iorRatio = n1 / n2;
+
+			float cosI = dot(-ray.direction, N);
+			float cosTheta2 = 1.0 - (iorRatio * iorRatio) * (1.0 - cosI * cosI);
+			float Fresnel = 1.0;
+
+			if (cosTheta2 > 0.0f)
+			{
+				float a = n1 - n2, b = n1 + n2;
+				float r0 = (a * a) / (b * b);
+				float c = 1.0f - cosI;
+				float Fresnel = r0 + (1.0f - r0) * (c * c * c * c * c);
+
+				mustRefract = randomF32(seed) > Fresnel;
+				if (mustRefract)
+					R = iorRatio * ray.direction + ((iorRatio * cosI - sqrt(abs(cosTheta2))) * N);
+			}
+
+			ray.state.lastSpecular = true;
+			ray.transmission *= material.albedo * rrScale * mediumScale;
+			ray.state.inMedium = mustRefract ? !ray.state.inMedium : ray.state.inMedium;
+		}
+		else
+		{
+			vec3 brdf = material.albedo * F32_INV_PI;
+
+			if (lightCount > 0)
+			{
+				float u = randomRange(seed, 0.0, 1.0), v = randomRange(seed, 0.0, 1.0 - u);
+				vec2 triCoords = vec2(u, v);
+
+				LightData lightData = lights[randomRangeU32(seed, 0, lightCount)];
+				Instance light = instances[lightData.lightInstanceIdx];
+				uint lightPrimIdx = light.triOffset + randomRangeU32(seed, 0, lightData.primitiveCount);
+				vec3 LP = scaleVertexBarycentric(triangles[lightPrimIdx], triCoords);
+				vec3 LN = scaleNormalBarycentric(triExtensions[lightPrimIdx], triCoords);
+
+				vec4 LPt = light.transform * vec4(LP, 1);
+				vec4 LNt = light.transform * vec4(LN, 0);
+
+				LP = LPt.xyz / LPt.w;
+				LN = normalize(LNt.xyz);
+				vec3 IL = LP - I;
+
+				vec3 L = normalize(IL);
+				vec3 SO = I + F32_EPSILON * L;
+				Ray sr = newRay(SO, L);
+				copyRayMetadata(sr, ray);
+				sr.depth = length(IL) - 2.0 * F32_EPSILON;
+
+				ShadowRayMetadata srData = ShadowRayMetadata(
+					sr,
+					IL, LN,
+					brdf, N,
+					ray.hit.instanceIdx, lightData.lightInstanceIdx
+				);
+
+				shadowRays.rays[atomicAdd(shadowRayCounter.rayCount, 1)] = srData;
+
+				// Mark shadow ray buffer for extension
+				if (shadowRayCounter.rayCount >= shadowRays.rays.length())
+					shadowRayCounter.extendBuffer = true;
+			}
+
+			R = diffuseReflectCosineWeighted(seed, N);
+			float cosTheta = dot(N, R);
+			float invCosTheta = 1.0 / cosTheta;
+			float invPdf = F32_PI * invCosTheta;
+
+			ray.state.lastSpecular = false;
+			ray.transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
+		}
+
+		vec3 O = I + F32_EPSILON * R;
+		Ray bounce = newRay(O, R);
+		copyRayMetadata(bounce, ray);
+		rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = bounce;
 	}
-
-	vec3 O = I + F32_EPSILON * R;
-	Ray bounce = newRay(O, R);
-	copyRayMetadata(bounce, ray);
-	rayOut.rays[atomicAdd(rayCounters.rayOut, 1)] = bounce;
 }

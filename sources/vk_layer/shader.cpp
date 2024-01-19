@@ -65,6 +65,8 @@ Shader& Shader::operator=(Shader&& other) noexcept
     this->m_type = other.m_type;
     this->m_shader = other.m_shader;
 
+    other.m_shader = VK_NULL_HANDLE;
+
     return *this;
 }
 

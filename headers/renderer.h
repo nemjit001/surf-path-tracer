@@ -56,6 +56,12 @@ struct RayBufferCounters
     I32 rayOut;
 };
 
+struct ShadowRayCounter
+{
+    I32 rayCount;
+    bool extendBuffer;
+};
+
 struct FrameData
 {
     VkCommandPool pool;
@@ -222,7 +228,7 @@ public:
 private:
     void bakeRayGenPass(VkCommandBuffer commandBuffer);
 
-    void bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInputSize);
+    void bakeWavePass(VkCommandBuffer commandBuffer);
 
     void bakeFinalizePass(VkCommandBuffer commandBuffer);
 
@@ -353,7 +359,7 @@ private:
 
     // Size is 2 * render resolution to ensure large enough buffers for generated rays in flight
     const SizeType c_rayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
-    const SizeType c_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRayMetadata);
+    SizeType m_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRayMetadata);
     Buffer m_rayCounters = Buffer(
         m_context->allocator, sizeof(RayBufferCounters),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -377,14 +383,15 @@ private:
     );
 
     Buffer m_shadowRayCounter = Buffer(
-        m_context->allocator, sizeof(I32),
+        m_context->allocator, sizeof(ShadowRayCounter),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        0
+        VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     );
 
     Buffer m_shadowRayBuffer = Buffer(
-        m_context->allocator, c_shadowRayBufferSize,
+        m_context->allocator, m_shadowRayBufferSize,
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         0

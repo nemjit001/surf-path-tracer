@@ -9,9 +9,9 @@
 
 layout(set = 0, binding = 2) buffer AccumulatorBuffer	{ vec4 accumulator[]; };
 
-layout(set = 1, binding = 0) coherent buffer RayCounters 		{ int rayIn; int rayOut; } rayCounters;
-layout(set = 1, binding = 1) coherent buffer RayInBuffer 		{ Ray rays[]; } rayIn;
-layout(set = 1, binding = 5) coherent buffer MatEvalRayBuffer 	{ int counter; Ray rays[]; } matEvalRays;
+layout(set = 1, binding = 0) coherent buffer RayCounters 				{ int rayIn; int rayOut; } rayCounters;
+layout(set = 1, binding = 1) coherent readonly buffer RayInBuffer 		{ Ray rays[]; } rayIn;
+layout(set = 1, binding = 5) coherent writeonly buffer MatEvalRayBuffer	{ int counter; Ray rays[]; } matEvalRays;
 
 layout(set = 2, binding = 0) readonly uniform SceneData 		{ SceneBackground background; } sceneData;
 layout(set = 2, binding = 1) readonly buffer TriBuffer 			{ Triangle triangles[]; };
@@ -21,7 +21,7 @@ layout(set = 2, binding = 6) readonly buffer InstanceBuffer 	{ Instance instance
 layout(set = 2, binding = 7) readonly buffer TLASIndexBuffer 	{ uint tlasIndices[]; };
 layout(set = 2, binding = 8) readonly buffer TLASNodeBuffer 	{ BvhNode tlasNodes[]; };
 
-layout(local_size_x = 32) in;
+layout(local_size_x = 8, local_size_y = 8) in;
 
 bool intersectBLAS(Instance instance, inout Ray ray)
 {

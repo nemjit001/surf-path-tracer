@@ -55,6 +55,8 @@ Sampler& Sampler::operator=(Sampler&& other) noexcept
 	this->m_device = other.m_device;
 	this->m_sampler = other.m_sampler;
 
+	other.m_sampler = VK_NULL_HANDLE;
+
 	return *this;
 }
 

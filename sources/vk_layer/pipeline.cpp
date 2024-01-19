@@ -130,6 +130,9 @@ IPipeline& IPipeline::operator=(IPipeline&& other) noexcept
     this->m_pipeline = other.m_pipeline;
     this->m_descriptorSets = other.m_descriptorSets;
 
+    other.m_pipeline = VK_NULL_HANDLE;
+    other.m_descriptorSets.clear();
+
     return *this;
 }
 

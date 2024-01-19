@@ -116,6 +116,10 @@ Image& Image::operator=(Image&& other) noexcept
     this->m_image = other.m_image;
     this->m_view = other.m_view;
 
+    other.m_allocation = VK_NULL_HANDLE;
+    other.m_image = VK_NULL_HANDLE;
+    other.m_view = VK_NULL_HANDLE;
+
     return *this;
 }
 

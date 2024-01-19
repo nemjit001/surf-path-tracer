@@ -54,6 +54,8 @@ Framebuffer& Framebuffer::operator=(Framebuffer&& other) noexcept
     this->m_device = other.m_device;
     this->m_framebuffer = other.m_framebuffer;
 
+    other.m_framebuffer = VK_NULL_HANDLE;
+
     return *this;
 }
 

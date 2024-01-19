@@ -103,10 +103,9 @@ void UIManager::drawUI(F32 deltaTimeMillis, UIState& uiState)
 			uiState.updated |= ImGui::SliderInt("Samples Per Pass", reinterpret_cast<I32*>(&uiState.spp), 1, 24);
 			ImGui::TreePop();
 		}
-
-		ImGui::End();
 	}
 
+	ImGui::End();
 	ImGui::Render();
 }
 

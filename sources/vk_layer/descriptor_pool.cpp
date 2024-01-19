@@ -50,6 +50,8 @@ DescriptorPool& DescriptorPool::operator=(DescriptorPool&& other)
     this->m_device = other.m_device;
     this->m_pool = other.m_pool;
 
+    other.m_pool = VK_NULL_HANDLE;
+
     return *this;
 }
 

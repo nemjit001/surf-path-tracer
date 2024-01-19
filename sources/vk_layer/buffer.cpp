@@ -84,6 +84,9 @@ Buffer& Buffer::operator=(Buffer&& other)
     this->m_allocation = other.m_allocation;
     this->m_allocationInfo = other.m_allocationInfo;
     this->m_buffer = other.m_buffer;
+    
+    other.m_allocation = VK_NULL_HANDLE;
+    other.m_buffer = VK_NULL_HANDLE;
 
     return *this;
 }

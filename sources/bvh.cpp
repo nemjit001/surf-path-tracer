@@ -495,6 +495,23 @@ bool Instance::intersect(Ray& ray) const
 	return intersected;
 }
 
+bool Instance::intersectAny(Ray& ray) const
+{
+	assert(bvh != nullptr);
+	Ray oldRay = ray;
+
+	glm::vec4 tPos = m_invTransform * static_cast<glm::vec4>(Float4(ray.origin, 1.0f));
+	glm::vec4 tDir = m_invTransform * static_cast<glm::vec4>(Float4(ray.direction, 0.0f));
+	ray.origin = Float3(tPos.x, tPos.y, tPos.z) / tPos.w;
+	ray.direction = Float3(tDir.x, tDir.y, tDir.z);
+
+	bool intersected = bvh->intersectAny(ray);
+	ray.origin = oldRay.origin;
+	ray.direction = oldRay.direction;
+
+	return intersected;
+}
+
 Float3 Instance::normal(U32 primitiveIndex, const Float2& barycentric) const
 {
 	Float3 normal = bvh->mesh()->normal(primitiveIndex, barycentric);
@@ -713,7 +730,7 @@ bool BvhTLAS::intersectAny(Ray& ray) const
 				U32 instanceIndex = m_indices[node->first() + i];
 				const Instance& instance = m_instances[instanceIndex];
 
-				if (instance.intersect(ray))
+				if (instance.intersectAny(ray))
 				{
 					return true;
 				}

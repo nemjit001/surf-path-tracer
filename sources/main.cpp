@@ -174,6 +174,15 @@ int main()
 	floorMaterial.albedo = RgbColor(0.8f);
 	floorMaterial.reflectivity = 0.01f;
 
+	Material wallRedMaterial = Material{};
+	wallRedMaterial.albedo = RgbColor(1.0f, 0.0f, 0.0f);
+
+	Material wallGreenMaterial = Material{};
+	wallGreenMaterial.albedo = RgbColor(0.0f, 1.0f, 0.0f);
+
+	Material wallBlueMaterial = Material{};
+	wallBlueMaterial.albedo = RgbColor(0.0f, 0.0f, 1.0f);
+
 	Material diffuseMaterial = Material{};
 	diffuseMaterial.albedo = RgbColor(1.0f, 0.0f, 0.0f);
 
@@ -187,28 +196,35 @@ int main()
 	specularMaterial.albedo = RgbColor(0.2f, 0.9f, 1.0f);
 	specularMaterial.reflectivity = 0.8f;
 
-	Material lightMaterial = Material{};
-	lightMaterial.emissionColor = RgbColor(1.0f, 1.0f, 0.7f);
-	lightMaterial.emissionStrength = 5.0f;
+	Material softLightMaterial = Material{};
+	softLightMaterial.emissionColor = RgbColor(1.0f, 0.8f, 0.6f);
+	softLightMaterial.emissionStrength = 2.0f;
+
+	Material redLightMaterial = Material{};
+	redLightMaterial.emissionColor = RgbColor(1.0f, 0.5f, 0.2f);
+	redLightMaterial.emissionStrength = 3.0f;
 
 	Instance cubeL(
 		&cubeBVH,
-		&lightMaterial,
-		glm::translate(
-			Mat4(1.0f),
-			static_cast<glm::vec3>(Float3(-10.0f, 5.0f, 0.0f))
+		&softLightMaterial,
+		glm::scale(
+			glm::translate(
+				Mat4(1.0f),
+				static_cast<glm::vec3>(Float3(-8.0f, 7.0f, 5.0f))
+			),
+			static_cast<glm::vec3>(Float3(0.5f, 0.5f, 0.5f))
 		)
 	);
 
 	Instance cubeR(
 		&cubeBVH,
-		&lightMaterial,
+		&redLightMaterial,
 		glm::scale(
 			glm::translate(
 				Mat4(1.0f),
-				static_cast<glm::vec3>(Float3(10.0f, 5.0f, 0.0f))
+				static_cast<glm::vec3>(Float3(9.0f, 5.0f, -5.0f))
 			),
-			static_cast<glm::vec3>(Float3(2.0f, 2.0f, 2.0f))
+			static_cast<glm::vec3>(Float3(1.0f, 1.0f, 1.0f))
 		)
 	);
 
@@ -251,6 +267,82 @@ int main()
 		)
 	);
 
+	Instance wallL(
+		&planeBVH,
+		&wallRedMaterial,
+		glm::scale(
+			glm::rotate(
+				glm::translate(
+					Mat4(1.0f),
+					static_cast<glm::vec3>(Float3(-10.0f, 4.0f, 0.0f))
+				),
+				radians(90.0f),
+				static_cast<glm::vec3>(WORLD_FORWARD)
+			),
+			static_cast<glm::vec3>(Float3(5.0f, 10.0f, 10.0f))
+		)
+	);
+
+	Instance wallR(
+		&planeBVH,
+		&wallGreenMaterial,
+		glm::scale(
+			glm::rotate(
+				glm::translate(
+					Mat4(1.0f),
+					static_cast<glm::vec3>(Float3(10.0f, 4.0f, 0.0f))
+				),
+				radians(90.0f),
+				static_cast<glm::vec3>(WORLD_FORWARD)
+			),
+			static_cast<glm::vec3>(Float3(5.0f, 10.0f, 10.0f))
+		)
+	);
+
+	Instance wallTop(
+		&planeBVH,
+		&floorMaterial,
+		glm::scale(
+			glm::translate(
+				Mat4(1.0f),
+				static_cast<glm::vec3>(Float3(0.0, 9.0f, 0.0f))
+			),
+			static_cast<glm::vec3>(Float3(10.0f, 10.0f, 10.0f))
+		)
+	);
+
+	Instance wallFront(
+		&planeBVH,
+		&wallBlueMaterial,
+		glm::scale(
+			glm::rotate(
+				glm::translate(
+					Mat4(1.0f),
+					static_cast<glm::vec3>(Float3(0.0, 4.0f, -10.0f))
+				),
+				radians(90.0f),
+				static_cast<glm::vec3>(WORLD_RIGHT)
+			),
+			static_cast<glm::vec3>(Float3(10.0f, 10.0f, 5.0f))
+		)
+	);
+
+	Instance wallBack(
+		&planeBVH,
+		&wallBlueMaterial,
+		glm::scale(
+			glm::rotate(
+				glm::translate(
+					Mat4(1.0f),
+					static_cast<glm::vec3>(Float3(0.0, 4.0f, 10.0f))
+				),
+				radians(90.0f),
+				static_cast<glm::vec3>(WORLD_RIGHT)
+			),
+			static_cast<glm::vec3>(Float3(10.0f, 10.0f, 5.0f))
+		)
+	);
+
 	SceneBackground background = SceneBackground{};
 	background.type = BackgroundType::ColorGradient;
 	background.gradient.colorA = RgbColor(0.8f, 0.8f, 0.8f);
@@ -259,7 +351,7 @@ int main()
 	// -- END Scene setup
 
 #if GPU_PATH_TRACING == 0
-	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
+	Scene scene(background, { floor, cubeL, cubeR, susanne0, susanne1, lens0, wallL, wallR, wallTop, wallFront, wallBack });
 
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces
@@ -268,7 +360,7 @@ int main()
 
 	Renderer renderer(&renderContext, &uiManager, rendererConfig, resultBuffer, worldCam, scene);
 #else
-	GPUScene scene(&renderContext, background, { floor, cubeL, cubeR, susanne0, susanne1, lens0 });
+	GPUScene scene(&renderContext, background, { floor, cubeL, cubeR, susanne0, susanne1, lens0, wallL, wallR, wallTop, wallFront, wallBack });
 
 	RendererConfig rendererConfig = RendererConfig{
 		5,	// Max bounces

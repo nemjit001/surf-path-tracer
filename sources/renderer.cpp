@@ -992,10 +992,37 @@ void WaveFrontRenderer::render(F32 deltaTime)
 
     // Map ray counters during wf pass
     RayBufferCounters* pRayCounters = nullptr;
+    ShadowRayCounter* pSrCounter = nullptr;
     m_rayCounters.persistentMap(reinterpret_cast<void**>(&pRayCounters));
-    assert(pRayCounters != nullptr);
+    m_shadowRayCounter.persistentMap(reinterpret_cast<void**>(&pSrCounter));
+    assert(pRayCounters != nullptr && pSrCounter != nullptr);
 
-    // Do wf compute pass for every sample
+    // Check if previous frame shadow ray buffer was big enough
+    if (pSrCounter->extendBuffer)
+    {
+        printf("WARN: shadow ray buffer too small, reallocating!\n");
+        pSrCounter->extendBuffer = false;
+        m_shadowRayBufferSize *= 2;
+        m_shadowRayBuffer = std::move(Buffer(
+            m_context->allocator, m_shadowRayBufferSize,
+            VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            0
+        ));
+
+        WriteDescriptorSet shadowRayBufferWriteSet = {};
+        shadowRayBufferWriteSet.set = 1;
+        shadowRayBufferWriteSet.binding = 4;
+        shadowRayBufferWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        shadowRayBufferWriteSet.bufferInfo.buffer = m_shadowRayBuffer.handle();
+        shadowRayBufferWriteSet.bufferInfo.offset = 0;
+        shadowRayBufferWriteSet.bufferInfo.range = VK_WHOLE_SIZE;
+
+        m_rayShadePipeline.updateDescriptorSets({ shadowRayBufferWriteSet });
+        m_rayConnectPipeline.updateDescriptorSets({ shadowRayBufferWriteSet });
+    }
+
+    // Do wf compute pass for every sample in the frame
     for (U32 sample = 0; sample < m_config.samplesPerFrame; sample++)
     {
         Buffer* rayInBuffer = &m_rayBuffer0;
@@ -1054,7 +1081,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
                 outBufferWriteSet,
             });
 
-            bakeWavePass(activeCompute.waveBuffer, pRayCounters->rayIn);
+            bakeWavePass(activeCompute.waveBuffer);
             VkSubmitInfo waveSubmit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
             waveSubmit.commandBufferCount = 1;
             waveSubmit.pCommandBuffers = &m_wavefrontCompute.waveBuffer;
@@ -1069,7 +1096,8 @@ void WaveFrontRenderer::render(F32 deltaTime)
 
             // Check diff threshold and leave rest of rays for next frame to process
             U32 newRayCount = pRayCounters->rayOut;
-            if (oldRayCount - newRayCount < WF_RAY_DIFF_THRESHOLD && newRayCount <= WF_RAY_NF_BATCH_SIZE) break;
+            if (oldRayCount - newRayCount < WF_RAY_DIFF_THRESHOLD && newRayCount <= WF_RAY_NF_BATCH_SIZE)
+                break;
         }
     }
 
@@ -1085,6 +1113,7 @@ void WaveFrontRenderer::render(F32 deltaTime)
 
     memset(pRayCounters, 0, sizeof(RayBufferCounters));
     m_rayCounters.unmap();
+    m_shadowRayCounter.unmap();
 
     VkPipelineStageFlags gfxWaitStages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT   // Wait until color output has been written to signal finish
@@ -1145,13 +1174,13 @@ void WaveFrontRenderer::bakeRayGenPass(VkCommandBuffer commandBuffer)
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayGenPipeline.bindPoint(), m_rayGenPipeline.handle());
-        vkCmdDispatch(commandBuffer, m_renderResolution.width / 32, (m_renderResolution.height / 32) + 1, 1);
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 32 + 1, m_renderResolution.height / 32 + 1, 1);
     }
 
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
-void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInputSize)
+void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer)
 {
     assert(commandBuffer != VK_NULL_HANDLE);
 
@@ -1187,6 +1216,17 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInput
     buffer1Barrier.buffer = m_rayBuffer1.handle();
     buffer1Barrier.offset = 0;
     buffer1Barrier.size = VK_WHOLE_SIZE;
+
+    VkBufferMemoryBarrier2 matEvalBufferBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
+    matEvalBufferBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    matEvalBufferBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    matEvalBufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    matEvalBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    matEvalBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    matEvalBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    matEvalBufferBarrier.buffer = m_materialEvalRayBuffer.handle();
+    matEvalBufferBarrier.offset = 0;
+    matEvalBufferBarrier.size = VK_WHOLE_SIZE;
 
     VkBufferMemoryBarrier2 accumulatorBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
     accumulatorBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
@@ -1239,7 +1279,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInput
             0, nullptr
         );
         vkCmdBindPipeline(commandBuffer, m_rayExtPipeline.bindPoint(), m_rayExtPipeline.handle());
-        vkCmdDispatch(commandBuffer, rayInputSize / 32 + 1, 1, 1);
+        vkCmdDispatch(commandBuffer, m_renderResolution.width / 8 + 1, m_renderResolution.height / 8 + 1, 1);
     }
 
     VkBufferMemoryBarrier2 extendShadeBufferBarriers[] = {
@@ -1247,10 +1287,11 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInput
         rayCounterBarrier,
         buffer0Barrier,
         buffer1Barrier,
+        matEvalBufferBarrier,
     };
 
     VkDependencyInfo extendShadeDependency = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-    extendShadeDependency.bufferMemoryBarrierCount = 4;
+    extendShadeDependency.bufferMemoryBarrierCount = sizeof(extendShadeBufferBarriers) / sizeof(extendShadeBufferBarriers[0]);
     extendShadeDependency.pBufferMemoryBarriers = extendShadeBufferBarriers;
     vkCmdPipelineBarrier2(commandBuffer, &extendShadeDependency);
 
@@ -1276,7 +1317,7 @@ void WaveFrontRenderer::bakeWavePass(VkCommandBuffer commandBuffer, U32 rayInput
     };
 
     VkDependencyInfo shadeConnectDependency = { VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-    extendShadeDependency.bufferMemoryBarrierCount = 3;
+    extendShadeDependency.bufferMemoryBarrierCount = sizeof(shadeConnectBufferBarriers) / sizeof(shadeConnectBufferBarriers[0]);
     extendShadeDependency.pBufferMemoryBarriers = shadeConnectBufferBarriers;
     vkCmdPipelineBarrier2(commandBuffer, &shadeConnectDependency);
 
