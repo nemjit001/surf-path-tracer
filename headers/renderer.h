@@ -357,9 +357,9 @@ private:
         VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
     );
 
-    // Size is 2 * render resolution to ensure large enough buffers for generated rays in flight
-    const SizeType c_rayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay);
-    SizeType m_shadowRayBufferSize = 2 * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRayMetadata);
+    // Size is ceil(1.5 * render resolution) to ensure large enough buffers for generated rays in flight
+    const SizeType c_rayBufferSize = static_cast<SizeType>(1.5f * m_renderResolution.width * m_renderResolution.height * sizeof(GPURay)) + 1;
+    SizeType m_shadowRayBufferSize = static_cast<SizeType>(1.5f * m_renderResolution.width * m_renderResolution.height * sizeof(GPUShadowRayMetadata)) + 1;
     Buffer m_rayCounters = Buffer(
         m_context->allocator, sizeof(RayBufferCounters),
         VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
