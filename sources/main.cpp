@@ -188,7 +188,7 @@ int main()
 
 	Material dielectricMaterial = Material{};
 	dielectricMaterial.albedo = RgbColor(0.7f, 0.7f, 0.2f);
-	dielectricMaterial.absorption = RgbColor(0.3f, 0.04f, 0.3f);
+	dielectricMaterial.absorption = RgbColor(0.03f, 0.04f, 0.03f);
 	dielectricMaterial.refractivity = 1.0f;
 	dielectricMaterial.indexOfRefraction = 1.42f;
 
