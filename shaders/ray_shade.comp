@@ -63,7 +63,7 @@ void main()
 		Material material = sceneMaterial(ray);
 		if (materialIsLight(material))
 		{
-			ray.energy += ray.transmission * materialEmittance(material);
+			ray.energy += ray.state.lastSpecular ? ray.transmission * materialEmittance(material) : vec3(0);
 			accumulator[ray.state.pixelIdx] += vec4(ray.energy, 1);
 			continue;
 		}
@@ -72,14 +72,8 @@ void main()
 		if (ray.state.inMedium)
 			mediumScale = exp(material.absorption * -ray.depth);
 
-		float p = clamp(max(ray.transmission.r, max(ray.transmission.g, ray.transmission.b)), 0.0, 1.0);
-		if (p < randomF32(seed))
-			continue;
-
 		vec3 I = rayHitPosition(ray);
 		vec3 N = sceneNormal(ray);
-		uint lightCount = lights.length();
-		float rrScale = 1.0 / p;
 		float rng = randomF32(seed);
 		vec3 R = vec3(0);
 
@@ -89,7 +83,8 @@ void main()
 		if (rng < material.reflectivity)
 		{
 			R = reflect(ray.direction, N);
-			ray.transmission *= material.albedo * mediumScale * rrScale;
+			ray.state.lastSpecular = true;
+			ray.transmission *= material.albedo * mediumScale;
 		}
 		else if (rng < (material.reflectivity + material.refractivity))
 		{
@@ -116,7 +111,8 @@ void main()
 					R = iorRatio * ray.direction + ((iorRatio * cosI - sqrt(abs(cosTheta2))) * N);
 			}
 
-			ray.transmission *= material.albedo * rrScale * mediumScale;
+			ray.state.lastSpecular = true;
+			ray.transmission *= material.albedo * mediumScale;
 			ray.state.inMedium = mustRefract ? !ray.state.inMedium : ray.state.inMedium;
 		}
 		else
@@ -124,13 +120,12 @@ void main()
 			R = diffuseReflectCosineWeighted(seed, N);
 			float cosTheta = dot(N, R);
 			float diffusePDF = cosTheta * F32_INV_PI;
-			float PDFSum = diffusePDF;
 			vec3 brdf = material.albedo * F32_INV_PI;
 
-			if (lightCount > 0)
+			if (lights.length() > 0)
 			{
 				// Pick random light & fetch instance
-				LightData lightData = lights[randomRangeU32(seed, 0, lightCount)];
+				LightData lightData = lights[randomRangeU32(seed, 0, lights.length())];
 				Instance light = instances[lightData.lightInstanceIdx];
 
 				// randomly pick primitive & coordinate on primitive
@@ -163,14 +158,12 @@ void main()
                 {
                     float SA = cosI * light.area * falloff;
                     float lightPDF = 1.0 / SA;
-                    PDFSum += lightPDF;
 
 					ShadowRayMetadata srData = ShadowRayMetadata(
 						sr,
 						IL, LN,
 						brdf, N,
-						ray.hit.instanceIdx, lightData.lightInstanceIdx,
-						PDFSum
+						ray.hit.instanceIdx, lightData.lightInstanceIdx
 					);
 
 					// Queue shadow ray & possibly mark shadow ray buffer for extension
@@ -180,8 +173,14 @@ void main()
 				}
 			}
 
+			float p = clamp(max(ray.transmission.r, max(ray.transmission.g, ray.transmission.b)), 0.0, 1.0);
+			if (p < randomF32(seed))
+				continue;
+
+			float rrScale = 1.0 / p;
 			float invPdf = 1.0 / diffusePDF;
-			ray.transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale * (diffusePDF / PDFSum);
+			ray.state.lastSpecular = false;
+			ray.transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
 		}
 
 		vec3 O = I + F32_EPSILON * R;

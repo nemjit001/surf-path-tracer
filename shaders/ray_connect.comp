@@ -204,7 +204,7 @@ void main()
 			float lightPDF = 1.0 / SA;
 
 			vec3 Ld = materialEmittance(lightMaterial) * SA * srData.brdf * cosO * lightCount;
-			shadowRay.energy += shadowRay.transmission * Ld * (lightPDF / srData.PDFSum);
+			shadowRay.energy += shadowRay.transmission * Ld;
 
 			accumulator[shadowRay.state.pixelIdx] += vec4(shadowRay.energy, 1);
 		}

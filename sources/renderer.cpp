@@ -355,16 +355,9 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (ray.inMedium)
             mediumScale = expf(material->absorption * -ray.depth);
 
-        // Calculate termination chance for russian roulette
-        const F32 p = clamp(max(transmission.r, max(transmission.g, transmission.b)), 0.0f, 1.0f);
-        if (p < randomF32(seed))
-            break;
-
         Float3 I = ray.hitPosition();
         Float3 N = instance.normal(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
         Float2 UV = mesh->textureCoordinate(ray.metadata.primitiveIndex, ray.metadata.hitCoordinates);
-        U32 lightCount = m_scene.lightCount();
-        F32 rrScale = 1.0f / p;
         F32 rng = randomF32(seed);
 
         Float3 R = Float3(0);
@@ -378,7 +371,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         {
             R = reflect(ray.direction, N);
             lastSpecular = true;
-            transmission *= material->albedo * mediumScale * rrScale;
+            transmission *= material->albedo * mediumScale;
         }
         else if (rng < (material->reflectivity + material->refractivity))
         {
@@ -408,12 +401,13 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             }
 
             lastSpecular = true;
-            transmission *= material->albedo * mediumScale * rrScale;
+            transmission *= material->albedo * mediumScale;
             inMedium = mustRefract ? !inMedium : inMedium;
         }
         else
         {
             R = randomOnHemisphereCosineWeighted(seed, N);
+            U32 lightCount = m_scene.lightCount();
             F32 cosTheta = N.dot(R);
             F32 diffusePDF = cosTheta * F32_INV_PI;
             RgbColor brdf = material->albedo * F32_INV_PI;
@@ -444,11 +438,17 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                     {
                         F32 invPdf = 1.0f / lightPDF;
                         Float3 Ld = light.material->emittance() * invPdf * brdf * cosO * static_cast<F32>(lightCount);
-                        energy += transmission * Ld * rrScale;
+                        energy += transmission * Ld;
                     }
                 }
             }
 
+            // Calculate termination chance for russian roulette
+            const F32 p = clamp(max(transmission.r, max(transmission.g, transmission.b)), 0.0f, 1.0f);
+            if (p < randomF32(seed))
+                break;
+
+            F32 rrScale = 1.0f / p;
             F32 invPdf = 1.0f / diffusePDF;
             lastSpecular = false;
             transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;

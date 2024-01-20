@@ -41,6 +41,7 @@ struct Material
 struct RayState
 {
 	bool inMedium;
+	bool lastSpecular;
 	uint pixelIdx;
 };
 
@@ -68,7 +69,6 @@ struct ShadowRayMetadata
 	vec3 IL, LN;
 	vec3 brdf, N;
 	uint hitInstanceIdx, lightInstanceIdx;
-	float PDFSum;
 };
 
 uint WangHash(uint seed)
@@ -187,7 +187,7 @@ Ray newRay(vec3 origin, vec3 direction)
 		F32_FAR_AWAY,
 		vec3(1),
 		vec3(0),
-		RayState(false, UNSET_IDX),
+		RayState(false, true, UNSET_IDX),
 		RayHit(UNSET_IDX, UNSET_IDX, vec2(0))
 	);
 }

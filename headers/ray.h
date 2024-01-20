@@ -8,6 +8,7 @@
 struct GPURayState
 {
 	ALIGN(4) bool inMedium;
+	ALIGN(4) bool lastSpecular;
 	ALIGN(4) U32 pixelIdx;
 };
 
@@ -38,7 +39,6 @@ struct GPUShadowRayMetadata
 	ALIGN(16) Float3 N;
 	ALIGN(4) U32 hitInstanceIdx;
 	ALIGN(4) U32 lightInstanceIdx;
-	ALIGN(4) F32 PDFSum;
 };
 
 struct RayMetadata
