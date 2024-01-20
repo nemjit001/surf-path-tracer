@@ -387,6 +387,15 @@ int main()
 		static F32 AVERAGE_FRAMETIME = 10.0f;
 		static F32 ALPHA = 1.0f;
 
+		// Skip scene update, rendering, etc. if window is minimized
+		if (windowManager.windowIsMinimized(window))
+		{
+			// Tick frametime & poll window events
+			frameTimer.tick();
+			windowManager.pollEvents();
+			continue;
+		}
+
 		// Update scene state
 		if (uiState.animate)
 			scene.update(deltaTime);
@@ -436,7 +445,7 @@ int main()
 		);
 #endif
 
-		glfwPollEvents();
+		windowManager.pollEvents();
 	}
 
 	printf("Goodbye!\n");
