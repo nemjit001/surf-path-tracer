@@ -30,6 +30,9 @@
 // Output lumen data WARN: drops framerate to sub second on discrete GPUs
 #define WF_LUMEN_OUTPUT                 0
 
+// Calculate MIS pdf weight
+#define MIS_PDF_WEIGHT(pdf, pdfOther) (pdf / (pdf + pdfOther))
+
 AccumulatorState::AccumulatorState(U32 width, U32 height)
     :
     totalSamples(0),
@@ -347,7 +350,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
         if (material->isLight())
         {
-            energy += lastSpecular ? transmission * material->emittance() : COLOR_BLACK;
+            energy += transmission * material->emittance();
             break;
         }
 
@@ -370,7 +373,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
         if (rng < material->reflectivity)
         {
             R = reflect(ray.direction, N);
-            lastSpecular = true;
             transmission *= material->albedo * mediumScale;
         }
         else if (rng < (material->reflectivity + material->refractivity))
@@ -400,7 +402,6 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
                     R = iorRatio * ray.direction + ((iorRatio * cosI - sqrtf(fabsf(cosTheta2))) * N);
             }
 
-            lastSpecular = true;
             transmission *= material->albedo * mediumScale;
             inMedium = mustRefract ? !inMedium : inMedium;
         }
@@ -409,7 +410,9 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
             R = randomOnHemisphereCosineWeighted(seed, N);
             U32 lightCount = m_scene.lightCount();
             F32 cosTheta = N.dot(R);
+
             F32 diffusePDF = cosTheta * F32_INV_PI;
+            F32 lightPDF = 0.0f;
             RgbColor brdf = material->albedo * F32_INV_PI;
 
             if (lightCount > 0) // Can only do NEE if there are explicit lights to be sampled
@@ -431,14 +434,14 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
                 if (cosO > 0.0f && cosI > 0.0f)
                 {
-                    F32 SA = cosI * light.area * falloff;
-                    F32 lightPDF = 1.0f / SA;
-
                     if (!m_scene.intersectAny(sr))
                     {
+                        F32 SA = cosI * light.area * falloff;
+                        lightPDF = 1.0f / SA;
+
                         F32 invPdf = 1.0f / lightPDF;
                         Float3 Ld = light.material->emittance() * invPdf * brdf * cosO * static_cast<F32>(lightCount);
-                        energy += transmission * Ld;
+                        energy += transmission * Ld * MIS_PDF_WEIGHT(lightPDF, diffusePDF);
                     }
                 }
             }
@@ -450,8 +453,7 @@ RgbColor Renderer::trace(U32& seed, Ray& ray, U32 depth)
 
             F32 rrScale = 1.0f / p;
             F32 invPdf = 1.0f / diffusePDF;
-            lastSpecular = false;
-            transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale;
+            transmission *= cosTheta * invPdf * brdf * mediumScale * rrScale * MIS_PDF_WEIGHT(diffusePDF, lightPDF);
         }
 
         Float3 O = I + F32_EPSILON * R;
