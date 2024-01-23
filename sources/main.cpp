@@ -180,9 +180,6 @@ int main()
 	Material wallGreenMaterial = Material{};
 	wallGreenMaterial.albedo = RgbColor(0.0f, 1.0f, 0.0f);
 
-	Material wallBlueMaterial = Material{};
-	wallBlueMaterial.albedo = RgbColor(0.0f, 0.0f, 1.0f);
-
 	Material diffuseMaterial = Material{};
 	diffuseMaterial.albedo = RgbColor(1.0f, 0.0f, 0.0f);
 
@@ -198,11 +195,11 @@ int main()
 
 	Material softLightMaterial = Material{};
 	softLightMaterial.emissionColor = RgbColor(1.0f, 0.8f, 0.6f);
-	softLightMaterial.emissionStrength = 2.0f;
+	softLightMaterial.emissionStrength = 5.0f;
 
 	Material redLightMaterial = Material{};
 	redLightMaterial.emissionColor = RgbColor(1.0f, 0.5f, 0.2f);
-	redLightMaterial.emissionStrength = 3.0f;
+	redLightMaterial.emissionStrength = 5.0f;
 
 	Instance cubeL(
 		&cubeBVH,
@@ -313,7 +310,7 @@ int main()
 
 	Instance wallFront(
 		&planeBVH,
-		&wallBlueMaterial,
+		&floorMaterial,
 		glm::scale(
 			glm::rotate(
 				glm::translate(
@@ -329,7 +326,7 @@ int main()
 
 	Instance wallBack(
 		&planeBVH,
-		&wallBlueMaterial,
+		&floorMaterial,
 		glm::scale(
 			glm::rotate(
 				glm::translate(
