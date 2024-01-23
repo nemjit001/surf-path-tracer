@@ -67,6 +67,12 @@ add_executable(${TARGET_NAME}
 	${IMGUI_SOURCES}
 )
 
+if (MSVC)
+	set_target_properties(${TARGET_NAME} PROPERTIES
+		VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${PROJECT_NAME}>
+	)
+endif()
+
 target_include_directories(${TARGET_NAME} PUBLIC
 	"headers/"
 	${Vulkan_INCLUDE_DIRS}
@@ -106,6 +112,6 @@ foreach(SHADER IN LISTS PROJECT_SHADERS)
 	add_custom_target(${SHADER_FILENAME} ALL
 		glslc ${SHADER} -o $<TARGET_FILE_DIR:${TARGET_NAME}>/shaders/${SHADER_FILENAME}.spv
 		COMMENT "Compiling shader ${SHADER_FILENAME}"
-		DEPENDS ${SHADER} ${PROJECT_SHADERS}
+		DEPENDS ${SHADER} ${PROJECT_SHADERS} create-shader-dir
 	)
 endforeach()
